@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "runDate": "2026-01-02",
+  "measured": true,
+  "note": "Test fixture. The numbers are made up for the tests and are never shown to anyone.",
+  "default": { "nouls": {}, "inputTokens": 100, "latencyMs": 40, "estimatedCostUsd": 0.0000042 },
+  "responses": [
+    {
+      "match": "In short",
+      "nouls": { "restating_closer": 0.93 },
+      "inputTokens": 200,
+      "latencyMs": 412,
+      "estimatedCostUsd": 0.0000084
+    },
+    {
+      "match": "In short, maybe",
+      "nouls": { "restating_closer": 0.74 },
+      "inputTokens": 210,
+      "latencyMs": 390,
+      "estimatedCostUsd": 0.0000088
+    }
+  ]
+}
