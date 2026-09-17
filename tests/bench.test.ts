@@ -1153,6 +1153,13 @@ describe("snifftest bench", () => {
     };
   }
 
+  /** A fetch that fails the test rather than answering it. */
+  function forbiddenFetch(): (url: string, init?: RequestInit) => Promise<Response> {
+    return async (url: string): Promise<Response> => {
+      throw new Error(`the network was used before it was allowed: ${url}`);
+    };
+  }
+
   function panelIn(dir: string): string {
     const panel = join(dir, "bench", "panel.yaml");
     mkdirSync(dirname(panel), { recursive: true });
@@ -1185,6 +1192,46 @@ describe("snifftest bench", () => {
     expect(printed).toContain("anthropic/claude-sonnet-5");
     // Opus is absent from the recorded list, so it is reported, never substituted.
     expect(printed).toContain("not available");
+  });
+
+  test("--dry-run reads no model list, so a key is offered to nobody", async () => {
+    // The model lists are an authenticated request to each provider, with the
+    // user's key, which discloses the run to both before the tool has asked
+    // anything. `--dry-run` says nothing leaves the machine, and it has to be
+    // true for every command that takes it.
+    const dir = sandbox();
+    panelIn(dir);
+
+    const { out, deps: cli } = deps(
+      ["bench", "--dry-run", "--panel", "bench/panel.yaml"],
+      dir,
+      forbiddenFetch(),
+    );
+    const code = await runCli({
+      ...cli,
+      env: { OPENROUTER_API_KEY: "test-key-not-a-real-credential", ANTHROPIC_API_KEY: "also-not-real" },
+    });
+
+    expect(code).toBe(EXIT.ok);
+    const printed = out.join("\n");
+    expect(printed).toContain("no model list was read");
+    expect(printed).toContain("no model was called");
+  });
+
+  test("asks before reading a model list, because that is a request with your key in it", async () => {
+    const dir = sandbox();
+    panelIn(dir);
+    writeFileSync(join(dir, "corpus.md"), "A paragraph of ordinary prose that seeds well enough.\n");
+
+    const { deps: cli } = deps(["bench", "--panel", "bench/panel.yaml", "corpus.md"], dir, forbiddenFetch());
+    const code = await runCli({
+      ...cli,
+      env: { OPENROUTER_API_KEY: "test-key-not-a-real-credential", ANTHROPIC_API_KEY: "also-not-real" },
+    });
+
+    // No terminal to ask in, so the answer is no, and nothing was asked of
+    // anybody's server on the way to finding that out.
+    expect(code).toBe(EXIT.consent);
   });
 
   test("reuses an eval run's own corpus, joins its arms, and writes raw per model per repeat", async () => {

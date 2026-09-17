@@ -516,11 +516,30 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
         : createAnthropicAdapter(adapterOptions);
   }
 
-  // The catalogues. A recorded payload means a dry run touches no network at
-  // all; otherwise each provider's own list is read, which is a catalogue read
-  // and not a model call.
+  /** The panel against whatever catalogues are known by the time it is called. */
+  const resolvedPanel = (): ResolvedModel[] =>
+    resolvePanel(panel, catalogs, (model) => ({
+      runDate,
+      catalogPriceSource: model.provider === "openrouter" ? OPENROUTER_PRICE_SOURCE : undefined,
+      priceLookup: (served: string) => {
+        const table = priceTables.get(model.provider);
+        return table === undefined ? undefined : priceFor(table, served);
+      },
+    }));
+
+  // The catalogues.
+  //
+  // Reading a provider's model list is an ordinary authenticated request: it
+  // carries the key, it tells that company a run is happening, and it is not
+  // a model call, which is the only part of it the old ordering noticed. So it
+  // sits behind the same two gates everything else does. A dry run does not
+  // make it at all, and a real run asks first.
+  //
+  // A recorded payload is read from disk either way, which is how a dry run
+  // still resolves the panel with no network in it.
   const catalogs: Partial<Record<Provider, readonly CatalogEntry[]>> = {};
   const catalogNotes: string[] = [];
+  const recorded = options.modelsPath !== undefined;
 
   if (options.modelsPath !== undefined) {
     const file = at(options.modelsPath, deps.cwd);
@@ -531,53 +550,44 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
       catalogs.anthropic = readAnthropicCatalog(payload["anthropic"]);
     }
     catalogNotes.push(`model lists read from ${display(file, deps.cwd)}, not from the providers`);
-  } else {
-    for (const provider of wanted) {
-      const adapter = adapters[provider];
-      if (adapter === undefined) {
-        catalogNotes.push(`${DESTINATIONS[provider].keyEnv} is not set, so ${provider} rows cannot run`);
-        continue;
-      }
-      try {
-        catalogs[provider] = await adapter.listModels();
-      } catch (error) {
-        catalogNotes.push(`the ${provider} model list could not be read: ${messageOf(error)}`);
-      }
-    }
   }
 
-  const resolved = resolvePanel(panel, catalogs, (model) => ({
-    runDate,
-    catalogPriceSource: model.provider === "openrouter" ? OPENROUTER_PRICE_SOURCE : undefined,
-    priceLookup: (served: string) => {
-      const table = priceTables.get(model.provider);
-      return table === undefined ? undefined : priceFor(table, served);
-    },
-  }));
-
-  for (const line of panelLines(resolved, catalogNotes)) deps.write(line);
-
   if (options.dryRun) {
+    if (!recorded) {
+      catalogNotes.push(
+        "--dry-run makes no request of any kind, so no model list was read and no row was checked " +
+          "against a provider. Record one with --models <file> to resolve the panel offline.",
+      );
+    }
+    for (const line of panelLines(resolvedPanel(), catalogNotes)) deps.write(line);
     deps.write("");
-    deps.write("--dry-run: the panel above is resolved and no model was called.");
+    deps.write("--dry-run: the panel above is as far as this goes and no model was called.");
     return EXIT.ok;
   }
 
   // --- the corpus, which must be the eval's own
+  //
+  // Before the question rather than after it: a run that cannot work should not
+  // talk anyone into agreeing to requests it was never going to make.
   const corpus = benchCorpus(deps, options, ruleset);
   if (corpus.documents.length === 0) {
     throw new UsageError("that corpus holds no paragraphs to judge.");
   }
 
-  const runnable = resolved.filter((model) => model.available);
-  if (runnable.length === 0) {
+  const reachable = [...wanted].filter((provider) => adapters[provider] !== undefined);
+  for (const provider of wanted) {
+    if (adapters[provider] === undefined) {
+      catalogNotes.push(`${DESTINATIONS[provider].keyEnv} is not set, so ${provider} rows cannot run`);
+    }
+  }
+  if (!recorded && reachable.length === 0) {
     deps.writeError("no model in the panel could be run, so nothing was sent.");
     return EXIT.failure;
   }
 
-  const destinations = [...new Set(runnable.map((model) => model.entry.provider))].map(
-    (provider) => DESTINATIONS[provider],
-  );
+  // Every provider the panel names and a key exists for, because every one of
+  // them is about to be sent a request, starting with the model list.
+  const destinations = reachable.map((provider) => DESTINATIONS[provider]);
   const consent = await requestConsent({
     env: deps.env,
     homedir: deps.homedir,
@@ -590,6 +600,27 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
     ...(deps.prompt === undefined ? {} : { prompt: deps.prompt }),
   });
   if (!consent.granted) return EXIT.consent;
+
+  if (!recorded) {
+    for (const provider of reachable) {
+      // SAFETY: `reachable` is exactly the providers an adapter was built for.
+      const adapter = adapters[provider] as ModelAdapter;
+      try {
+        catalogs[provider] = await adapter.listModels();
+      } catch (error) {
+        catalogNotes.push(`the ${provider} model list could not be read: ${messageOf(error)}`);
+      }
+    }
+  }
+
+  const resolved = resolvedPanel();
+  for (const line of panelLines(resolved, catalogNotes)) deps.write(line);
+
+  const runnable = resolved.filter((model) => model.available);
+  if (runnable.length === 0) {
+    deps.writeError("no model in the panel could be run, so nothing was sent.");
+    return EXIT.failure;
+  }
 
   const outcome = await runBench({
     ruleset,
@@ -1178,7 +1209,8 @@ function helpLines(): string[] {
     "                      relative paths and the ruleset are found there, not here",
     "  --threshold <0-1>   the probability at or above which a judgment counts as a flag",
     "  --format text|json  how to print the flags (default text)",
-    "  --dry-run           run the countable rules only; nothing leaves the machine",
+    "  --dry-run           make no network request of any kind, whatever the command;",
+    "                      for check that means the countable rules and nothing else",
     "  --yes, -y           answer the send question for this run and remember the answer",
     "  --help, --version",
     "",
@@ -1192,7 +1224,8 @@ function helpLines(): string[] {
     "  --eval <dir>        an eval results directory: its corpus is reused and its arms joined",
     `  --repeats <n>       how many times each document is asked of each model (default ${DEFAULT_REPEATS})`,
     "  --models <file>     a recorded models-endpoint payload, so a dry run needs no network",
-    "  --dry-run           resolve and print the panel and its prices; call no model",
+    "  --dry-run           print the panel and go no further. With --models it resolves",
+    "                      offline; without one, no model list is read either",
     "",
     "Environment",
     `  ${KEY_ENV}    the key the judgment rules are sent with`,
