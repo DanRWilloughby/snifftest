@@ -566,8 +566,8 @@ const DEEP: ResolvedModel = {
   prices: null,
 };
 
-const GHOST: ResolvedModel = {
-  entry: entry({ id: "ghost", label: "Ghost", tier: "deep" }),
+const UNLISTED: ResolvedModel = {
+  entry: entry({ id: "unlisted", label: "Unlisted", tier: "deep" }),
   available: false,
   slug: null,
   candidates: [],
@@ -684,7 +684,7 @@ describe("arm D over the panel", () => {
       ruleset: RULES,
       classes: CLASSES,
       documents: DOCUMENTS,
-      resolved: [GHOST],
+      resolved: [UNLISTED],
       adapters: { openrouter: adapter },
       repeats: 2,
       threshold: 0.7,
@@ -708,7 +708,7 @@ describe("the comparison tables", () => {
       ruleset: RULES,
       classes: CLASSES,
       documents: DOCUMENTS,
-      resolved: [...RESOLVED_TWO, GHOST],
+      resolved: [...RESOLVED_TWO, UNLISTED],
       adapters: { openrouter: adapter },
       repeats: 1,
       threshold: 0.7,
@@ -977,7 +977,7 @@ describe("the headline table names the model each row was served by", () => {
       ruleset: RULES,
       classes: CLASSES,
       documents: DOCUMENTS,
-      resolved: [...RESOLVED_TWO, GHOST],
+      resolved: [...RESOLVED_TWO, UNLISTED],
       adapters: { openrouter: adapter },
       repeats: 1,
       threshold: 0.7,

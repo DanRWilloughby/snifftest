@@ -53,7 +53,7 @@ function escapeForRegex(term: string): string {
  * Parse a newline-separated denylist.
  *
  * Matching is case-insensitive and stops at a word boundary on either side, so
- * `lore` does not fire on "explore" or "folklore". The boundary is spelled as a
+ * `art` does not fire on "start" or "cartoon". The boundary is spelled as a
  * pair of lookarounds rather than `\b`, because a term is allowed to begin or
  * end with punctuation — a hostname, a hyphenated name — and `\b` is defined
  * against word characters, so it would put the boundary in the wrong place.
