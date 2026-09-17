@@ -8,9 +8,12 @@ import {
   JevRequestError,
   JevStateRefusedError,
   MODEL,
+  NO_JUDGMENT_HIGH,
+  NO_JUDGMENT_LOW,
   STATE_GUARD_CHARS,
   createJevClient,
   estimatedCostUsd,
+  isNoJudgment,
   questionsFromRules,
 } from "../src/jev.ts";
 import { HIDDEN } from "../src/scrub.ts";
@@ -173,6 +176,25 @@ describe("createJevClient response parsing", () => {
 
     const result = await client.ask({ state: "A paragraph.", questions });
     expect(result.nouls).toEqual({ a: 0 });
+  });
+
+  test("a noul outside 0 to 1 is no answer at all", async () => {
+    const stub = stubFetch([
+      () =>
+        ok({
+          model: "jev-1.13.0",
+          answers: {
+            a: { type: "noul", noul: 7 },
+            b: { type: "noul", noul: -0.2 },
+            c: { type: "noul", noul: 1 },
+          },
+          usage: { input_tokens: 10, output_tokens: 0 },
+        }),
+    ]);
+    const client = createJevClient({ apiKey: fakeKey, fetch: stub.doFetch });
+
+    const result = await client.ask({ state: "A paragraph.", questions });
+    expect(result.nouls).toEqual({ c: 1 });
   });
 
   test("a response with no answers object is a torn response, not a silent empty result", async () => {
@@ -402,6 +424,18 @@ describe("the state guard is local and never asks the service", () => {
       questions,
     });
     expect(stub.calls).toHaveLength(1);
+  });
+});
+
+describe("the no-judgment band", () => {
+  test("the middle of the range is no judgment and the ends of it are", () => {
+    expect(isNoJudgment(0.5)).toBe(true);
+    expect(isNoJudgment(NO_JUDGMENT_LOW)).toBe(true);
+    expect(isNoJudgment(NO_JUDGMENT_HIGH)).toBe(true);
+    expect(isNoJudgment(0.39)).toBe(false);
+    expect(isNoJudgment(0.61)).toBe(false);
+    expect(isNoJudgment(0)).toBe(false);
+    expect(isNoJudgment(1)).toBe(false);
   });
 });
 

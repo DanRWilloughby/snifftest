@@ -146,6 +146,7 @@ describe("runJudgmentArm", () => {
         rule: "restating_closer",
         probability: 0.11,
         message: "A closer that only restates. Cut it.",
+        noJudgment: false,
       },
     ]);
     expect(flagsFrom(result.readings, 0.7)).toEqual([]);
@@ -166,8 +167,8 @@ describe("runJudgmentArm", () => {
 
   test("flagsFrom keeps a reading at the threshold and drops the one below it", () => {
     const readings = [
-      { file: "d.md", line: 1, rule: "a", probability: 0.7, message: "m" },
-      { file: "d.md", line: 2, rule: "b", probability: 0.69, message: "m" },
+      { file: "d.md", line: 1, rule: "a", probability: 0.7, message: "m", noJudgment: false },
+      { file: "d.md", line: 2, rule: "b", probability: 0.69, message: "m", noJudgment: false },
     ];
 
     expect(flagsFrom(readings, 0.7)).toEqual([
