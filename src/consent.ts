@@ -37,9 +37,36 @@ export interface ConsentOutcome {
   readonly stored: boolean;
 }
 
+/** Somewhere text goes. Named in the disclosure, one line each. */
+export interface Destination {
+  readonly name: string;
+  readonly endpoint: string;
+  readonly keyEnv: string;
+}
+
+/** The judgment rules' own destination, and the only one `check` ever uses. */
+export const TYPESAFE_DESTINATION: Destination = {
+  name: "TypeSafe",
+  endpoint: ENDPOINT,
+  keyEnv: KEY_ENV,
+};
+
 export interface DisclosureFacts {
   readonly ruleIds: readonly string[];
   readonly fileCount: number;
+  /**
+   * Where the text goes. Absent means TypeSafe alone.
+   *
+   * The bench sends the same paragraphs to other companies' models, and a yes
+   * given to one destination is not a yes to another: a stored answer only
+   * covers the destinations it was given for, and a new one asks again.
+   */
+  readonly destinations?: readonly Destination[];
+}
+
+function destinationsOf(facts: DisclosureFacts): readonly Destination[] {
+  const given = facts.destinations ?? [];
+  return given.length > 0 ? given : [TYPESAFE_DESTINATION];
 }
 
 export interface ConsentRequest extends DisclosureFacts {
@@ -69,7 +96,9 @@ export function disclosure(facts: DisclosureFacts): string[] {
     "",
     `  What leaves this machine: one paragraph of your text at a time, from ${drafts},`,
     `    together with the wording of these rules: ${rules}.`,
-    `  Where it goes: ${ENDPOINT} (TypeSafe), over HTTPS, with your ${KEY_ENV}.`,
+    ...destinationsOf(facts).map(
+      (where) => `  Where it goes: ${where.endpoint} (${where.name}), over HTTPS, with your ${where.keyEnv}.`,
+    ),
     "  What comes back: one probability per rule per paragraph.",
     "  What is never sent: file names, file paths, anything outside the text you pointed at.",
     "  There is no telemetry, no analytics, and nothing is stored by this tool.",
@@ -84,11 +113,12 @@ export async function requestConsent(request: ConsentRequest): Promise<ConsentOu
   }
 
   const path = consentPath(request.env, request.homedir);
+  const names = destinationsOf(request).map((where) => where.name);
 
   if (request.assumeYes) {
-    return { granted: true, asked: false, stored: remember(path) };
+    return { granted: true, asked: false, stored: remember(path, names) };
   }
-  if (alreadyGranted(path)) {
+  if (alreadyGranted(path, names)) {
     return { granted: true, asked: false, stored: false };
   }
 
@@ -102,33 +132,55 @@ export async function requestConsent(request: ConsentRequest): Promise<ConsentOu
     return { granted: false, asked: true, stored: false };
   }
 
-  const answer = (await request.prompt("Send paragraphs to TypeSafe? [y/N] ")).trim().toLowerCase();
+  const answer = (await request.prompt(`Send paragraphs to ${names.join(", ")}? [y/N] `))
+    .trim()
+    .toLowerCase();
   if (answer !== "y" && answer !== "yes") {
     request.say("Nothing was sent.");
     return { granted: false, asked: true, stored: false };
   }
 
-  return { granted: true, asked: true, stored: remember(path) };
+  return { granted: true, asked: true, stored: remember(path, names) };
 }
 
-function alreadyGranted(path: string): boolean {
-  if (!existsSync(path)) return false;
+/** A stored yes covers the destinations it was given for, and no others. */
+function alreadyGranted(path: string, names: readonly string[]): boolean {
+  const stored = storedAnswer(path);
+  if (stored === null) return false;
+  return names.every((name) => stored.includes(name));
+}
+
+function storedAnswer(path: string): readonly string[] | null {
+  if (!existsSync(path)) return null;
   try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as { granted?: unknown };
-    return parsed.granted === true;
+    const parsed = JSON.parse(readFileSync(path, "utf8")) as {
+      granted?: unknown;
+      destinations?: unknown;
+    };
+    if (parsed.granted !== true) return null;
+    // A file written before destinations were recorded answered for TypeSafe,
+    // which was the only place anything went.
+    if (!Array.isArray(parsed.destinations)) return [TYPESAFE_DESTINATION.name];
+    return parsed.destinations.filter((name): name is string => typeof name === "string");
   } catch {
     // An unreadable answer is not an answer. Asking again is the safe failure.
-    return false;
+    return null;
   }
 }
 
 /** Best effort: a home directory we cannot write to is not a reason to fail a run. */
-function remember(path: string): boolean {
+function remember(path: string, names: readonly string[]): boolean {
   try {
+    const known = storedAnswer(path) ?? [];
+    const destinations = [...new Set([...known, ...names])].sort();
     mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
     writeFileSync(
       path,
-      `${JSON.stringify({ version: CONSENT_VERSION, granted: true, at: new Date().toISOString() }, null, 2)}\n`,
+      `${JSON.stringify(
+        { version: CONSENT_VERSION, granted: true, destinations, at: new Date().toISOString() },
+        null,
+        2,
+      )}\n`,
       { encoding: "utf8", mode: 0o600 },
     );
     return true;

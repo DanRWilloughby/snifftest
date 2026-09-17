@@ -1,0 +1,167 @@
+name: CI
+
+# Only the two events that run in the pull request's own context. An event whose
+# name ends in _target runs in the base repository's context, with its secret
+# store and a writable token, against a branch the author of the pull request
+# controls. This repository never uses one, and a test asserts it.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Nothing in this workflow reads a secret and nothing it runs sends a byte to
+# anyone: the checker runs with --dry-run, which is the countable rules only.
+# Default to no permissions at all and let each job ask for what it needs.
+permissions: {}
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Typecheck, tests, build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.3.6"
+
+      - name: Install, exactly as the lockfile says
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Tests
+        run: bun test
+
+      - name: Build the published bin
+        run: bun run build
+
+      - name: Nothing runtime is installed
+        # The promise on the first screen of the README. `bun pm ls` prints the
+        # installed tree; if a runtime dependency ever appears in package.json,
+        # this is where it gets caught rather than in somebody's node_modules.
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const pkg = JSON.parse(readFileSync("package.json", "utf8"));
+            const runtime = Object.keys(pkg.dependencies ?? {});
+            if (runtime.length > 0) {
+              console.error("Runtime dependencies are not allowed: " + runtime.join(", "));
+              process.exit(1);
+            }
+            console.log("No runtime dependencies.");
+          '
+          bun pm ls
+
+      - name: The package carries only what the allowlist names
+        run: |
+          set -euo pipefail
+          npm pack --dry-run --json > pack.json
+          node --input-type=module -e '
+            import { readFileSync } from "node:fs";
+            const [report] = JSON.parse(readFileSync("pack.json", "utf8"));
+            const files = report.files.map((f) => f.path).sort();
+            console.log(files.join("\n"));
+            const strays = files.filter((p) =>
+              p.startsWith("bench/") ||
+              p.startsWith("examples/") ||
+              p.startsWith("tests/") ||
+              p.startsWith("src/") ||
+              p.startsWith(".github/")
+            );
+            if (strays.length > 0) {
+              console.error("These have no business in the tarball: " + strays.join(", "));
+              process.exit(1);
+            }
+          '
+          rm -f pack.json
+
+      - name: No tracked file is larger than the cap
+        # Raw bench output is meant to be committed beside the numbers it
+        # produced; a multi-megabyte dump of model responses is not. The cap
+        # catches the second without banning the first.
+        env:
+          MAX_TRACKED_BYTES: "1048576"
+        run: |
+          set -euo pipefail
+          oversized=0
+          while IFS= read -r -d '' file; do
+            size=$(wc -c < "$file")
+            if [ "$size" -gt "$MAX_TRACKED_BYTES" ]; then
+              echo "::error file=${file}::${size} bytes, over the ${MAX_TRACKED_BYTES} byte cap. Summarise it, or store it outside the repository."
+              oversized=1
+            fi
+          done < <(git ls-files -z)
+          [ "$oversized" = "0" ]
+
+      - name: Sniff Test reads its own prose
+        # Dry run: the countable rules only, no key, nothing sent.
+        #
+        # docs/ is not in this list yet. The checker counts colons inside fenced
+        # code blocks, so a YAML sample trips `colon_heavy` three times in
+        # docs/husky.md. That is a real finding against the engine, not against
+        # the prose; when the engine stops reading code as sentences, add `docs`
+        # back to the end of this line.
+        run: bun src/cli.ts check --dry-run README.md CONTRIBUTING.md CHANGELOG.md
+
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The history, not just the tip: a key removed in a later commit is
+          # still a published key.
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install gitleaks, pinned and checksummed
+        env:
+          GITLEAKS_VERSION: "8.30.1"
+          GITLEAKS_SHA256: "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb"
+        run: |
+          set -euo pipefail
+          archive="gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -fsSL --retry 3 -o "$archive" \
+            "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/${archive}"
+          echo "${GITLEAKS_SHA256}  ${archive}" | sha256sum --check --strict
+          tar -xzf "$archive" gitleaks
+          rm -f "$archive"
+          ./gitleaks version
+
+      - name: Scan the whole history
+        # --redact so a finding names the file and the rule without printing the
+        # value into a public log, which would publish the very thing it caught.
+        run: ./gitleaks git . --redact --no-banner --exit-code 1
+
+      - name: Scan the working tree
+        run: ./gitleaks dir . --redact --no-banner --exit-code 1
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          # A package with zero runtime dependencies can afford the strictest
+          # setting there is.
+          fail-on-severity: low

@@ -1,0 +1,99 @@
+name: Release
+
+# A tag is the only thing that publishes. Nothing about a branch, a merge or a
+# manual click puts a version on npm.
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+      - "v[0-9]+.[0-9]+.[0-9]+-*"
+
+permissions: {}
+
+jobs:
+  publish:
+    name: Publish to npm, then cut the release
+    runs-on: ubuntu-latest
+
+    # The gate. The npm token lives on this environment, not on the repository,
+    # so a workflow that is not this one cannot reach it, and a required
+    # reviewer on the environment means a tag alone never publishes unattended.
+    environment:
+      name: release
+      url: https://www.npmjs.com/package/snifftest
+
+    permissions:
+      # Creating the GitHub Release.
+      contents: write
+      # The OIDC token npm signs the provenance attestation with. This is what
+      # lets anyone check that this tarball was built by this workflow from this
+      # commit, rather than uploaded by whoever held a token.
+      id-token: write
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: "1.3.6"
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install, exactly as the lockfile says
+        run: bun install --frozen-lockfile
+
+      - name: Typecheck and tests
+        run: bun run check
+
+      - name: Build the published bin
+        run: bun run build
+
+      - name: The tag, package.json and the changelog agree
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          packaged="$(node -p 'require("./package.json").version')"
+          if [ "$version" != "$packaged" ]; then
+            echo "::error::Tag ${TAG} does not match package.json version ${packaged}."
+            exit 1
+          fi
+          # The release notes are a slice of CHANGELOG.md: the section whose
+          # heading names this version, up to the next version heading. A tag
+          # with no section fails here rather than shipping empty notes.
+          awk -v v="$version" '
+            $0 ~ "^## \\[" v "\\]" { collecting = 1; next }
+            collecting && /^## \[/  { exit }
+            collecting              { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::error::CHANGELOG.md has no section for ${version}."
+            exit 1
+          fi
+          cat release-notes.md
+
+      - name: Publish to npm with provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --provenance --access public
+
+      - name: Cut the GitHub Release
+        env:
+          # The job's own short-lived token, not a stored secret.
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          args=(release create "$TAG" --verify-tag --title "$TAG" --notes-file release-notes.md)
+          # The launch GIF rides along when there is one. Track C writes it;
+          # until then the release is notes only rather than a broken upload.
+          if [ -f assets/snifftest.gif ]; then
+            args+=(assets/snifftest.gif#"Sniff Test in motion")
+          fi
+          gh "${args[@]}"

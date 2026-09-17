@@ -1,0 +1,70 @@
+name: Rule proposal
+description: A house rule the shipped ruleset should catch.
+title: "rule: "
+labels: ["rule proposal"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The shipped ruleset stays generic. A rule that only makes sense inside
+        one company, product or house style belongs in that house's own
+        `.snifftest.yaml`. Everything below is public, so keep the examples made
+        up rather than lifted from something you have not published.
+
+  - type: input
+    id: name
+    attributes:
+      label: The rule, in one line
+      description: What it catches, in a writer's language.
+      placeholder: A cost stated with no price and no alternative beside it.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Can a computer decide it exactly?
+      description: >-
+        If a regular expression can decide it, it must: those rules are free and
+        never leave the machine. Reserve judgment rules for the ones that need
+        reading.
+      options:
+        - Yes, a regular expression decides it (kind regex)
+        - No, it needs reading (kind judgment)
+    validations:
+      required: true
+
+  - type: textarea
+    id: should-trip
+    attributes:
+      label: Two examples that should trip it
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: should-not
+    attributes:
+      label: Two examples that should not
+      description: Near misses are the valuable ones. The closer, the better.
+      render: text
+    validations:
+      required: true
+
+  - type: textarea
+    id: seed
+    attributes:
+      label: How to plant one, for a judgment rule
+      description: >-
+        The recipe `snifftest eval` follows to put one clean instance of this
+        fault into otherwise clean text, so the rule can be measured rather than
+        argued about. Leave blank for a regex rule.
+      render: text
+
+  - type: textarea
+    id: why
+    attributes:
+      label: Why this is worth a rule
+      description: What goes wrong when a draft ships with it.
+    validations:
+      required: true
