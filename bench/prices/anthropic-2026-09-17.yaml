@@ -26,8 +26,8 @@ models:
     input: 1
     output: 5
   - match: sonnet-5
-    input: 3
-    output: 15
+    input: 2
+    output: 10
   - match: opus-5
     input: 5
     output: 25

@@ -1,0 +1,88 @@
+# The direct panel: every row on its provider's own API.
+#
+# `bench/panel.yaml` routes most of its rows through OpenRouter, which buys one
+# key for the whole bench at the cost of a proxy hop in every latency number.
+# This file is the other trade. Each row here is called on the API of the
+# company that serves it, with that company's own key, so the latencies are the
+# providers' own rather than a proxy's, and a row's cost is the published price
+# of the model rather than a reseller's.
+#
+# What it costs to read this way: more keys, and rows that cannot be compared
+# with the ones in the routed panel on latency, because they did not make the
+# same journey. Rows within this file are comparable with each other.
+#
+# Everything else is the same contract. Nothing here claims a model exists: each
+# row carries a pattern and a preference, every row is matched against the
+# provider's own model list on the day of the run, and a model the provider does
+# not list becomes a row that says "not available on <date>" rather than being
+# swapped for a near neighbour.
+
+version: 1
+
+prices:
+  # Neither the Messages API nor the OpenAI models endpoint publishes a price,
+  # so both direct providers are priced from a dated file and every table that
+  # uses those numbers cites the file, its source and the date it was checked.
+  anthropic: prices/anthropic-2026-09-17.yaml
+  openai: prices/openai-2026-09-17.yaml
+  # No dated published price has been recorded for the judgment service, so no
+  # file is named here and its row prints its cost as unknown. A constant in
+  # this repo's source is not a source.
+
+models:
+  - id: haiku
+    label: Claude Haiku 4.5
+    tier: fast
+    provider: anthropic
+    match: "^claude-haiku-4-5"
+    prefer:
+      - claude-haiku-4-5-20251001
+
+  - id: sonnet
+    label: Claude Sonnet 5
+    tier: mid
+    provider: anthropic
+    match: "^claude-sonnet-5"
+    prefer:
+      - claude-sonnet-5
+
+  - id: opus
+    label: Claude Opus 5
+    tier: deep
+    provider: anthropic
+    match: "^claude-opus-5"
+    prefer:
+      - claude-opus-5
+
+  - id: sol
+    label: gpt-5.6-sol
+    tier: mid
+    provider: openai
+    match: "^gpt-5\\.6-sol$"
+    prefer:
+      - gpt-5.6-sol
+    # This row reasons, and on this API the reasoning tokens come out of the
+    # same completion budget as the answer. On the default budget it can spend
+    # the whole of it thinking and stop before it writes the JSON object, which
+    # lands in the table as a parse failure and reads as a verdict on the model
+    # rather than on the request. So the budget is raised and the effort is
+    # declared: low keeps the row affordable, and the footnote prints both, so
+    # nobody reads this row as the model's best.
+    max_tokens: 4000
+    reasoning:
+      effort: low
+
+  - id: jev
+    label: Jev, the judgment arm
+    tier: judgment
+    provider: jev
+    match: "^jev-"
+    prefer:
+      - jev-latest
+    note: >
+      Asked its own way, one request per paragraph carrying every rule as a
+      separate question, which is the shape the service documents and the shape
+      arm C uses. The request count matches the other rows; the request shape
+      does not. It returns a probability and no boolean, so its flag column is
+      that probability against the shipped threshold rather than a decision the
+      service made.

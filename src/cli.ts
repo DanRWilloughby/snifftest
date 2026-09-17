@@ -33,6 +33,12 @@ import {
 } from "./bench/anthropic.ts";
 import type { ModelAdapter } from "./bench/adapter.ts";
 import {
+  OPENAI_CHAT_ENDPOINT,
+  OPENAI_KEY_ENV,
+  createOpenAIAdapter,
+  readOpenAICatalog,
+} from "./bench/openai.ts";
+import {
   OPENROUTER_CHAT_ENDPOINT,
   OPENROUTER_KEY_ENV,
   OPENROUTER_PRICE_SOURCE,
@@ -835,6 +841,11 @@ const DESTINATIONS: Readonly<Record<Provider, Destination>> = {
     endpoint: ANTHROPIC_MESSAGES_ENDPOINT,
     keyEnv: ANTHROPIC_KEY_ENV,
   },
+  openai: {
+    name: "OpenAI",
+    endpoint: OPENAI_CHAT_ENDPOINT,
+    keyEnv: OPENAI_KEY_ENV,
+  },
   // The judgment arm's own service, in the panel rotation rather than joined in
   // from another run, so that one latency column is one measurement.
   jev: TYPESAFE_DESTINATION,
@@ -875,9 +886,12 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
   const keys: Record<Provider, string> = {
     openrouter: (deps.env[OPENROUTER_KEY_ENV] ?? "").trim(),
     anthropic: (deps.env[ANTHROPIC_KEY_ENV] ?? "").trim(),
+    openai: (deps.env[OPENAI_KEY_ENV] ?? "").trim(),
     jev: (deps.env[KEY_ENV] ?? "").trim(),
   };
-  const secrets = [keys.openrouter, keys.anthropic, (deps.env[KEY_ENV] ?? "").trim()].filter(
+  // Every key the run holds, so a service that echoes a request back cannot
+  // quote one of the others into an error message.
+  const secrets = [keys.openrouter, keys.anthropic, keys.openai, keys.jev].filter(
     (key) => key !== "",
   );
 
@@ -895,6 +909,8 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
         ? createOpenRouterAdapter(adapterOptions)
         : provider === "anthropic"
           ? createAnthropicAdapter(adapterOptions)
+          : provider === "openai"
+          ? createOpenAIAdapter(adapterOptions)
           : createJevAdapter({
               client: (deps.createClient ?? createJevClient)({
                 apiKey: keys.jev,
@@ -938,11 +954,23 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
     if (payload["anthropic"] !== undefined) {
       catalogs.anthropic = readAnthropicCatalog(payload["anthropic"]);
     }
+    if (payload["openai"] !== undefined) {
+      catalogs.openai = readOpenAICatalog(payload["openai"]);
+    }
     // The judgment service publishes no model list, so there is nothing to
     // record and nothing to read: its one model is a constant, and no network
     // call is made to learn it.
     if (adapters.jev !== undefined) catalogs.jev = jevCatalog();
     catalogNotes.push(`model lists read from ${display(file, deps.cwd)}, not from the providers`);
+  }
+
+  // Which rows have no key, said before the dry run stops rather than after it.
+  // A panel is read by someone deciding what a run would cost them, and "this
+  // row would not have run at all" is the first thing they need to know.
+  for (const provider of wanted) {
+    if (adapters[provider] === undefined) {
+      catalogNotes.push(`${DESTINATIONS[provider].keyEnv} is not set, so ${provider} rows cannot run`);
+    }
   }
 
   if (options.dryRun) {
@@ -968,11 +996,6 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
   }
 
   const reachable = [...wanted].filter((provider) => adapters[provider] !== undefined);
-  for (const provider of wanted) {
-    if (adapters[provider] === undefined) {
-      catalogNotes.push(`${DESTINATIONS[provider].keyEnv} is not set, so ${provider} rows cannot run`);
-    }
-  }
   if (!recorded && reachable.length === 0) {
     deps.writeError("no model in the panel could be run, so nothing was sent.");
     return EXIT.failure;
@@ -1775,6 +1798,7 @@ function helpLines(): string[] {
     `  ${KEY_ENV}    the key the judgment rules are sent with`,
     `  ${OPENROUTER_KEY_ENV}  the key the bench panel is routed with`,
     `  ${ANTHROPIC_KEY_ENV}   the key the bench's direct overhead control uses`,
+    `  ${OPENAI_KEY_ENV}     the key an openai row in the panel is called with`,
     `  ${CACHE_DIR_ENV}  where answers already paid for are kept, so a rerun after an`,
     "                      outage asks only about the paragraphs that went unanswered.",
     "                      A reply that answered nothing is never kept, so a rerun after",
