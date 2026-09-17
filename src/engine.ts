@@ -25,7 +25,7 @@
  * to sit at the same depth as the one that opened the block: a row of backticks
  * outside a quote does not close a block inside it.
  *
- * Indented code blocks — four spaces, no fence — are deliberately out of scope:
+ * Indented code blocks (four spaces, no fence) are deliberately out of scope:
  * in ordinary prose that indent is as often a quotation or a wrapped list item,
  * and dropping those would lose real sentences to catch snippets that a fence
  * already covers. Four spaces under a list marker are a different thing, and

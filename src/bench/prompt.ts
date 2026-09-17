@@ -6,9 +6,9 @@
  * every adapter, and the whole text is written into the run's raw output. A
  * reader who doubts the table can read exactly what each model was sent.
  *
- * The rule's own words go in verbatim — `what`, `not_for`, the examples, both
- * criteria — because that is what Jev is given, and a bench that paraphrases
- * the rules for the panel is measuring the paraphrase.
+ * The rule's own words go in verbatim (`what`, `not_for`, the examples, both
+ * criteria) because that is what Jev is given, and a bench that paraphrases the
+ * rules for the panel is measuring the paraphrase.
  *
  * ## Why the reply carries a probability as well as a yes or no
  *
@@ -22,7 +22,7 @@
  * Nothing here guesses. A reply that is not one JSON object is a failure for
  * that document, counted and listed; a rule answered out of contract (a
  * probability above one, a `flag` that is a word) is an unanswered cell. The
- * alternative — reading a refusal as "no defects" — would score a model that
+ * alternative, reading a refusal as "no defects", would score a model that
  * declined to answer as a model that answered perfectly on clean text.
  */
 

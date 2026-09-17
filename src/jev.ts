@@ -12,8 +12,8 @@
  *
  * ## The state guard is local, and it has to be
  *
- * Jev answers HTTP 200 to image state — base64, a data URI, an image block —
- * and returns probabilities near 0.5 for every question (measured 2026-09-16).
+ * Jev answers HTTP 200 to image state (base64, a data URI, an image block) and
+ * returns probabilities near 0.5 for every question (measured 2026-09-16).
  * That is the worst failure shape there is: a clean success carrying numbers
  * that mean nothing. Nothing downstream can tell those apart from real answers,
  * so anything that is not plain text is refused here, before the request is
@@ -24,7 +24,7 @@
  * A service that rejects a request often echoes what it was sent, which is how
  * a credential ends up in a log. Every error string this module throws is built
  * from a status and a capped body and then passed through `scrubSecrets` with
- * the key in hand, so a key that comes back — whole or cut in half — leaves as
+ * the key in hand, so a key that comes back, whole or cut in half, leaves as
  * `[key hidden]`.
  *
  * ## The retry ladder is the spike's

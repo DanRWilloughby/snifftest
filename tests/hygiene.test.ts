@@ -4,7 +4,7 @@
  * None of this can be unit tested by running it: a workflow only really runs on
  * GitHub, and by the time a release workflow is wrong it has already published
  * something. So the files are parsed and asserted instead, and the properties
- * asserted are the ones that would be expensive to discover afterwards — an
+ * asserted are the ones that would be expensive to discover afterwards: an
  * action pinned to a tag somebody can move, a job holding a token it does not
  * need, a secret reachable from a pull request, a tarball carrying the test
  * fixtures, or a publish with no provenance behind it.
@@ -106,8 +106,8 @@ describe("what the published tarball may contain", () => {
 
   test("a git revision builds its own bin rather than installing a dangling one", () => {
     // `dist/` is not in git. Without this, installing this package from a git
-    // revision — which is what the pre-commit framework does with
-    // `language: node` — leaves the `snifftest` bin pointing at nothing.
+    // revision, which is what the pre-commit framework does with
+    // `language: node`, leaves the `snifftest` bin pointing at nothing.
     expect(pkg.scripts.prepare).toBe("bun run build");
   });
 });
@@ -218,7 +218,7 @@ describe("every action is pinned to a commit", () => {
     test(`${file}:${line}`, () => {
       // A tag can be moved to point at anything. A commit cannot, so the pin is
       // the commit and the tag rides along as a comment for whoever reads it
-      // next — and for Dependabot, which rewrites both together.
+      // next, and for Dependabot, which rewrites both together.
       expect(text).toMatch(/^-?\s*uses:\s+\S+@[0-9a-f]{40}\s+#\s*v\d+\.\d+\.\d+$/);
     });
   }
@@ -370,5 +370,64 @@ describe("what git refuses to carry", () => {
   test("no env file is tracked", async () => {
     const tracked = (await Bun.$`git ls-files`.cwd(repoRoot).text()).split("\n");
     expect(tracked.filter((path) => /(^|\/)\.env($|\.)/.test(path))).toEqual([]);
+  });
+});
+
+/**
+ * The linter passes its own dash rule.
+ *
+ * A prose linter whose first countable rule is "no long dashes" cannot ship a
+ * source tree full of them. Running the tool on its own comments is the only
+ * check nobody has to remember to run.
+ *
+ * Where the character is the point, code writes it as an escape (\u2014 and
+ * \u2013), so the behaviour is unchanged and the file still holds neither
+ * character. What is left is the handful of fixture documents that exist to be
+ * flagged, and those are named below with a reason each. The `examples/`
+ * corpus needs no entry: it passes on its own today, and an example that has to
+ * carry a dash belongs in this list beside the others.
+ */
+describe("the tool passes the dash rule it enforces", () => {
+  // An en dash or an em dash, as escapes, so this file is not its own exception.
+  const LONG_DASH = /[\u2013\u2014]/;
+
+  const allowed: readonly { readonly file: string; readonly why: string }[] = [
+    {
+      file: "tests/fixtures/eval/corpus/already-flagged.md",
+      why: "A base paragraph that already trips a rule, so the seeder must refuse it.",
+    },
+    {
+      file: "tests/fixtures/texts/closer.md",
+      why: "A draft written to be flagged: a dash and a restating closer in one file.",
+    },
+    {
+      file: "tests/fixtures/texts/flagged.md",
+      why: "The smallest draft that trips the dash rule, used wherever a flag is expected.",
+    },
+  ];
+
+  test("the allowlist names only files that are still there", () => {
+    for (const { file } of allowed) {
+      expect(existsSync(join(repoRoot, file))).toBe(true);
+    }
+  });
+
+  test("no other tracked file carries one", async () => {
+    const exempt = new Set(allowed.map((entry) => entry.file));
+    const tracked = (await Bun.$`git ls-files`.cwd(repoRoot).text())
+      .split("\n")
+      .filter((path) => path !== "" && !exempt.has(path));
+
+    const offenders: string[] = [];
+    for (const path of tracked) {
+      const full = join(repoRoot, path);
+      if (!existsSync(full)) continue;
+      const text = readFileSync(full, "utf8");
+      if (!LONG_DASH.test(text)) continue;
+      const line = text.split("\n").findIndex((one) => LONG_DASH.test(one)) + 1;
+      offenders.push(`${path}:${line}`);
+    }
+
+    expect(offenders).toEqual([]);
   });
 });

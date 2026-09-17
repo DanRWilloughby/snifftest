@@ -3,9 +3,9 @@
  *
  * Most of the panel is priced by the provider itself: OpenRouter publishes a
  * per-token price beside every model and the run records it. One row cannot be
- * priced that way — the Anthropic direct control, because the Messages API does
- * not publish prices — so it is priced from a file that carries its source and
- * the date it was checked, and every table that uses it cites both.
+ * priced that way. That is the Anthropic direct control, because the Messages
+ * API does not publish prices, so it is priced from a file that carries its
+ * source and the date it was checked, and every table that uses it cites both.
  *
  * The file is dated rather than inline because a constant in a source file is a
  * number with no provenance and no expiry: it keeps printing dollars long after
@@ -13,7 +13,7 @@
  *
  * A model that matches no row has no price. Not zero. A zero in a cost column
  * is the claim "this was free", which is the one claim an unpriced model cannot
- * support — Houston's `estimateCostUsd` makes the same choice for the same
+ * support. Houston's `estimateCostUsd` makes the same choice for the same
  * reason (`src/producer/llm.ts`).
  */
 

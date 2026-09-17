@@ -394,7 +394,7 @@ describe("serve: the walls", () => {
     });
     running.push(handle);
 
-    const reply = await scorePost(handle.port, "A dash — here. In short, this is what we said.");
+    const reply = await scorePost(handle.port, "A dash \u2014 here. In short, this is what we said.");
     const result = JSON.parse(reply.body) as { flags: { rule: string }[]; problem: string };
     // The countable flag survives the failure, as it does in `check`.
     expect(reply.status).toBe(200);
@@ -474,7 +474,7 @@ describe("serve: replay mode", () => {
     }) as unknown as typeof fetch;
     try {
       const { port } = await replayServer();
-      const reply = await scorePost(port, "First — a dash. In short, we said it.");
+      const reply = await scorePost(port, "First \u2014 a dash. In short, we said it.");
       expect(reply.status).toBe(200);
       expect((JSON.parse(reply.body) as { flags: unknown[] }).flags.length).toBe(2);
       expect(calls).toBe(0);
@@ -566,7 +566,7 @@ describe("serve: live mode asks before anything leaves", () => {
       },
     });
 
-    const reply = await scorePost(run.handle.port, "First — a dash. In short, we said it.");
+    const reply = await scorePost(run.handle.port, "First \u2014 a dash. In short, we said it.");
     const result = JSON.parse(reply.body) as { judged: boolean; flags: { rule: string }[]; usd: number };
     expect(reply.status).toBe(200);
     expect(result.judged).toBe(false);
@@ -638,7 +638,7 @@ describe("serve: live mode asks before anything leaves", () => {
       env: { TYPESAFE_API_KEY: FAKE_KEY, SNIFFTEST_SEND: "1" },
       createClient: () => stubClient(() => ({ restating_closer: 0.9 }), []),
     });
-    for (const draft of ["One.", "One. Two — three.", "In short, we said it."]) {
+    for (const draft of ["One.", "One. Two \u2014 three.", "In short, we said it."]) {
       await scorePost(run.handle.port, draft);
     }
     run.stop();
@@ -662,28 +662,28 @@ describe("serve: live mode asks before anything leaves", () => {
 describe("serve: scoring a draft", () => {
   test("a countable flag points at the words, a paragraph rule at the paragraph", async () => {
     const scorer = createScorer({ ruleset: mixed(), threshold: 0.7 });
-    const draft = "A calm opener.\n\nOne: two: three: and a dash — here.";
+    const draft = "A calm opener.\n\nOne: two: three: and a dash \u2014 here.";
     const result = await scorer.score(draft);
 
     const dash = result.flags.find((flag) => flag.rule === "dash_present");
     const colons = result.flags.find((flag) => flag.rule === "colon_heavy");
     expect(dash?.scope).toBe("span");
-    expect(draft.slice(dash?.start, dash?.end)).toBe("dash — here");
+    expect(draft.slice(dash?.start, dash?.end)).toBe("dash \u2014 here");
     expect(dash?.line).toBe(3);
     expect(dash?.reaction).toBe("wrinkle");
 
     expect(colons?.scope).toBe("paragraph");
-    expect(draft.slice(colons?.start, colons?.end)).toBe("One: two: three: and a dash — here.");
+    expect(draft.slice(colons?.start, colons?.end)).toBe("One: two: three: and a dash \u2014 here.");
     expect(result.reaction).toBe("wrinkle");
     expect(result.judged).toBe(false);
   });
 
   test("offsets survive Windows line endings", async () => {
     const scorer = createScorer({ ruleset: mixed(), threshold: 0.7 });
-    const result = await scorer.score("Line one.\r\n\r\nA dash — there.");
-    const normalised = "Line one.\n\nA dash — there.";
+    const result = await scorer.score("Line one.\r\n\r\nA dash \u2014 there.");
+    const normalised = "Line one.\n\nA dash \u2014 there.";
     const flag = result.flags[0];
-    expect(normalised.slice(flag?.start, flag?.end)).toBe("dash — there");
+    expect(normalised.slice(flag?.start, flag?.end)).toBe("dash \u2014 there");
     expect(result.text).toBe(normalised);
   });
 
@@ -702,7 +702,7 @@ describe("serve: scoring a draft", () => {
       threshold: 0.7,
       client: stubClient(() => ({ restating_closer: 0.95 }), seen),
     });
-    expect((await scorer.score("A dash — and, in short, a restatement.")).reaction).toBe("recoil");
+    expect((await scorer.score("A dash \u2014 and, in short, a restatement.")).reaction).toBe("recoil");
   });
 
   test("a paragraph that did not change is not sent again, and the meter counts only what was sent", async () => {

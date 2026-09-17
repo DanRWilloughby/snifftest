@@ -10,7 +10,7 @@
  * Two runners are used. Some tests point `SNIFFTEST_BIN` at the package's own
  * CLI so the flag decisions are checked against the real exit codes. Others
  * point it at a recording script, which is the only way to assert what the hook
- * *asked for* — that a default run carries `--dry-run`, that nothing is run at
+ * *asked for*: that a default run carries `--dry-run`, that nothing is run at
  * all when no prose is staged, and that a missing key downgrades a send.
  */
 
@@ -33,7 +33,7 @@ rules:
 `;
 
 const CLEAN = "A short paragraph that trips nothing at all.\n";
-const TRIPS = "A short paragraph that goes wrong — right about here.\n";
+const TRIPS = "A short paragraph that goes wrong \u2014 right about here.\n";
 
 const temporary: string[] = [];
 
@@ -201,7 +201,7 @@ describe("the pre-commit hook, against the real checker", () => {
 
   test("ignores a file that is not prose", () => {
     const dir = scratchRepo();
-    writeFileSync(join(dir, "data.json"), `{"note": "an em dash — inside data"}\n`);
+    writeFileSync(join(dir, "data.json"), `{"note": "an em dash \u2014 inside data"}\n`);
     git(dir, ["add", "data.json"]);
 
     const commit = git(dir, ["commit", "-m", "data"], { SNIFFTEST_BIN: realRunner });

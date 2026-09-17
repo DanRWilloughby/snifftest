@@ -104,10 +104,10 @@ part, so a tween is a field-by-field lerp between two states; there is nothing t
 | Name | Reads as | What moves (concept A) |
 | --- | --- | --- |
 | `rest` | neutral | identity everywhere |
-| `sniff` | sniffing | nose rotate -5°, lift 1.5; nostrils scale 1.2–1.25; scent wisps on and drift 4 |
+| `sniff` | sniffing | nose rotate -5°, lift 1.5; nostrils scale 1.2 to 1.25; scent wisps on and drift 4 |
 | `approve` | approving | nose rotate -9°, lift 3; nostrils relax to 0.92; tick marks on |
 | `wrinkle` | suspicious | nose rotate 4°, drop 1; bridge compress 0.9; wrinkles on; nostrils pinch 0.85 and rotate 8°; stink half on |
-| `recoil` | recoiling | nose translate 9,-4, rotate 12°, scale 0.94; nostrils flare 1.25–1.3; wrinkles 0.7; stink on |
+| `recoil` | recoiling | nose translate 9,-4, rotate 12°, scale 0.94; nostrils flare 1.25 to 1.3; wrinkles 0.7; stink on |
 | `twitch` | a flick | nose rotate -4°; right nostril 1.18×1.1 rotate -6°; left nostril 0.9; flick marks on |
 
 Concept B overrides the head moves so the front-on face lifts and drops without rotating;

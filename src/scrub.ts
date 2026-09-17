@@ -5,7 +5,7 @@
  * Only one string in this tool is ever built out of something we did not write:
  * the failure body a provider sends back. That is exactly where a key can turn
  * up, because a service that rejects a request often quotes the request it
- * rejected. So the removal is exact rather than heuristic — we hold the value,
+ * rejected. So the removal is exact rather than heuristic: we hold the value,
  * and we take it out.
  *
  * Prefixes count, not just the whole value. The gateway quotes at most a couple
@@ -34,8 +34,8 @@ export function scrubSecrets(text: string, secrets: readonly string[]): string {
     // Longest match first, so a copy is replaced at its full surviving length
     // rather than leaving a tail behind. Every shorter length is then tried as
     // well, without stopping at the first one that matched: one failure body
-    // can quote the same key twice at two different truncations — once in full
-    // and once cut off by the service's own logging cap — and stopping early
+    // can quote the same key twice at two different truncations, once in full
+    // and once cut off by the service's own logging cap, and stopping early
     // replaced the long copy and left the short one in the message.
     const floor = Math.min(secret.length, MIN_SECRET_FRAGMENT);
     for (let end = secret.length; end >= floor; end--) {

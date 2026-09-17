@@ -2,7 +2,8 @@
  * The whole panel except the control, through one key and one latency path.
  *
  * Routing every model through OpenRouter is a deliberate trade. It costs a
- * little accuracy on absolute latency — there is a proxy hop in every number —
+ * little accuracy on absolute latency, since there is a proxy hop in every
+ * number,
  * and it buys the thing the comparison actually needs: one key to reproduce the
  * bench, and the same hop in every row, so the differences between rows are
  * differences between models. The Anthropic direct row exists to measure that

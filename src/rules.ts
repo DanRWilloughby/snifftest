@@ -282,7 +282,9 @@ export function checkRegexRule(rule: RegexRule, text: string): Match[] {
 }
 
 function dashPresent(text: string): Match[] {
-  return patternMatches(/[–—]/g, text);
+  // An en dash or an em dash, written as escapes so this file holds neither
+  // character literally and passes the rule it implements.
+  return patternMatches(/[\u2013\u2014]/g, text);
 }
 
 function colonCount(text: string, rule: BuiltinRule): Match[] {
@@ -357,8 +359,8 @@ function numberField(
  * `seed.position` on a splice seed.
  *
  * It is one optional field rather than three, because "where the sentence
- * lands" is one decision and the rules that care about it — an opener, a
- * closer — care about exactly one value of it.
+ * lands" is one decision, and the rules that care about it (an opener, a
+ * closer) care about exactly one value of it.
  */
 function positionField(
   value: YamlValue | undefined,

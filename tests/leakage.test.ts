@@ -18,7 +18,7 @@
  * same sentence and only one of them is worth trusting.
  *
  * A hit prints the file, the line, and the denylist entry's position in the
- * list — never the term and never the surrounding text. Naming the term in a
+ * list. It never prints the term and never the surrounding text. Naming it in a
  * test log would leak it into CI output, a terminal scrollback and whatever
  * reads them, and the person running the scan is holding the list anyway.
  */
@@ -55,7 +55,7 @@ function escapeForRegex(term: string): string {
  * Matching is case-insensitive and stops at a word boundary on either side, so
  * `art` does not fire on "start" or "cartoon". The boundary is spelled as a
  * pair of lookarounds rather than `\b`, because a term is allowed to begin or
- * end with punctuation — a hostname, a hyphenated name — and `\b` is defined
+ * end with punctuation (a hostname, a hyphenated name) and `\b` is defined
  * against word characters, so it would put the boundary in the wrong place.
  */
 export function parseDenylist(source: string): DenylistEntry[] {
@@ -179,7 +179,7 @@ describe("the scan itself", () => {
 
 if (denylistPath === undefined) {
   console.warn(
-    "\n  leakage: SKIPPED — no denylist.\n" +
+    "\n  leakage: SKIPPED, no denylist.\n" +
       "  Every tracked file was left unread. Set SNIFFTEST_LEAK_DENYLIST to a file\n" +
       "  of forbidden strings, one per line, and run this again before the repository\n" +
       "  goes public. A skip is not a pass.\n",

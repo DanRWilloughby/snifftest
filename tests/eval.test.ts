@@ -236,7 +236,7 @@ describe("seeding, one defect per rule", () => {
 
   test("a base that already trips a countable rule is dropped, with its reason", () => {
     const set = ruleset([DASH_RULE, judgmentRule("closer", "end")].join(""));
-    const dirty = base("C99", "Not clean at all — there is a dash right there in it.");
+    const dirty = base("C99", "Not clean at all \u2014 there is a dash right there in it.");
     const result = seedCorpus([...BASES, dirty], set, { perRule: 1 });
 
     expect(result.clean.map((doc) => doc.id)).toEqual(["C00", "C01"]);

@@ -129,8 +129,8 @@ cat "$err" >&2
 FLAG_LINE='^[^[:space:]]+:[0-9]+ [^[:space:]]+ [01]\.[0-9][0-9] '
 
 # The checker never got as far as an opinion about the prose. Anything that
-# fetches the package can fail this way — an unpublished or mistyped version, a
-# registry that is down, a proxy that says no — and every one of those exits 1,
+# fetches the package can fail this way: an unpublished or mistyped version, a
+# registry that is down, a proxy that says no. Every one of those exits 1,
 # which is also the code for "your draft trips a rule". Blaming the prose for a
 # 404 is the worst thing this hook could do, so the output decides, not the code.
 not_run() {

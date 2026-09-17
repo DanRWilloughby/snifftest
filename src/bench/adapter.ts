@@ -3,17 +3,17 @@
  * network manners live.
  *
  * Two adapters, one contract: list the models you have, and answer one
- * question about one paragraph. Everything else — the timeout, the retry
- * ladder, how a failure body is quoted, and the fact that no error string may
- * carry a key — is here, once, so a third adapter cannot be added with worse
- * manners than the first two.
+ * question about one paragraph. Everything else lives here, once, so a third
+ * adapter cannot be added with worse manners than the first two. That is the
+ * timeout, the retry ladder, how a failure body is quoted, and the fact that no
+ * error string may carry a key.
  *
  * The retry ladder is the gateway's (`src/jev.ts`), which is the T1 spike's:
  * four attempts, doubling backoff, on 429 and the 5xx family only. A 401 is not
  * retried, because a rejected key is rejected four times just as fast.
  *
  * Every error message is built from a status and a capped body and then passed
- * through `scrubSecrets` with every key the run holds — not only this adapter's
+ * through `scrubSecrets` with every key the run holds, not only this adapter's
  * own. A bench run has an OpenRouter key and an Anthropic key in the same
  * process, and a service that echoes a request back can echo either.
  */

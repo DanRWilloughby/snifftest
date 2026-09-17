@@ -2,10 +2,10 @@
  * The command people type.
  *
  * Everything the CLI needs from the outside world arrives as `CliDeps` and it
- * returns an exit code instead of calling `process.exit`, so the whole surface
- * — argument parsing, the consent gate, the order the two arms run in, every
- * exit code — is testable without a subprocess and without a network stub that
- * has to be trusted not to fire.
+ * returns an exit code instead of calling `process.exit`. So the whole surface
+ * is testable without a subprocess and without a network stub that has to be
+ * trusted not to fire: argument parsing, the consent gate, the order the two
+ * arms run in, every exit code.
  *
  * Two orderings here are load-bearing.
  *
@@ -192,8 +192,8 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
 
   const files = collectFiles(options.paths, deps.cwd);
   const chunks = readDrafts(deps, files).flatMap((draft) =>
-    // The cap is applied on every run, dry or not, so a chunk boundary — and so
-    // a reported line number — never depends on whether the network was used.
+    // The cap is applied on every run, dry or not, so a chunk boundary (and so
+    // a reported line number) never depends on whether the network was used.
     chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS }),
   );
 
@@ -1035,10 +1035,11 @@ interface Draft {
  * not prose at all.
  *
  * A directory of drafts collects a PDF or a screenshot sooner or later. Reading
- * one as UTF-8 does not fail — the invalid bytes become replacement characters —
- * so the tool used to check a paragraph of mojibake, find nothing, and exit 0
- * with no output, which reads exactly like a clean draft. Saying which file was
- * skipped is the difference between "nothing to flag" and "nothing was read".
+ * one as UTF-8 does not fail, because the invalid bytes become replacement
+ * characters, so the tool used to check a paragraph of mojibake, find nothing,
+ * and exit 0 with no output, which reads exactly like a clean draft. Saying
+ * which file was skipped is the difference between "nothing to flag" and
+ * "nothing was read".
  * The exit code is unchanged: a binary file is not a finding.
  */
 function readDrafts(deps: CliDeps, files: readonly string[]): Draft[] {
@@ -1119,7 +1120,7 @@ function version(): string {
 
 function helpLines(): string[] {
   return [
-    "snifftest — does the draft pass the sniff test?",
+    "snifftest: does the draft pass the sniff test?",
     "",
     "Usage",
     "  snifftest check <paths...>   check files or directories against the ruleset",
