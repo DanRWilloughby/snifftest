@@ -112,6 +112,25 @@ describe("what the published tarball may contain", () => {
   });
 });
 
+describe("the release notes keep the name-ownership step", () => {
+  // The one step in this repository that cannot be enforced by a test, because
+  // what it is about happens on somebody else's registry. It can at least be
+  // kept from being quietly edited out: the pins are public install
+  // instructions, and an unclaimed name means a stranger decides what they
+  // install.
+  const releasing = read("docs/releasing.md");
+
+  test("owning the name comes before the release checklist, with the reason", () => {
+    const ownership = releasing.indexOf("Own the name on npm first");
+    const checklist = releasing.indexOf("## The checklist");
+
+    expect(ownership).toBeGreaterThan(-1);
+    expect(ownership).toBeLessThan(checklist);
+    expect(releasing).toContain("npm view snifftest version");
+    expect(releasing.slice(ownership, checklist)).toContain("public");
+  });
+});
+
 describe("the version is pinned in one place at a time", () => {
   /**
    * Every file that names the version a stranger would fetch.
