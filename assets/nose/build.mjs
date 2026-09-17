@@ -121,8 +121,8 @@ const W = {
   thinTaper: [[0, 0.9], [0.5, 2.6], [1, 0.9]],
   wisp: [[0, 1], [0.5, 2.8], [1, 1]],
   shine: [[0, 0.5], [0.5, 1.3], [1, 0.5]],
-  // round 2, pencil: a graphite line is thin and its pressure varies; ghosts are the searching passes
-  ghost: [[0, 0.25], [0.5, 0.55], [1, 0.25]],
+  // round 2, pencil: a graphite line is thin and its pressure varies; underdrawn lines are the searching passes
+  underdraw: [[0, 0.25], [0.5, 0.55], [1, 0.25]],
   pencilThin: [[0, 0.3], [0.5, 0.85], [1, 0.3]],
 };
 const ACCENT = "var(--nose-accent, #e4572e)";
@@ -231,8 +231,8 @@ const SPEC = {
     ],
     bridge: [
       { line: "M59 15 C56.5 19 54.5 23 53.5 27 C51.5 35 46 44 39 52", w: [[0, 0.35], [0.25, 0.9], [0.55, 1.25], [0.85, 1], [1, 0.55]], seed: 101, samples: 24, opacity: 0.8, main: true },
-      { line: "M55 24 C52.5 32 47 42 41 50", w: W.ghost, seed: 102, opacity: 0.3, tremor: 0.6, shift: [0.9, -0.3] },
-      { line: "M59 15 C56.5 19 54.5 23 53.5 27 C51.5 35 46 44 39 52", w: W.ghost, seed: 103, opacity: 0.22, tremor: 0.7, shift: [-0.7, 0.6] },
+      { line: "M55 24 C52.5 32 47 42 41 50", w: W.underdraw, seed: 102, opacity: 0.3, tremor: 0.6, shift: [0.9, -0.3] },
+      { line: "M59 15 C56.5 19 54.5 23 53.5 27 C51.5 35 46 44 39 52", w: W.underdraw, seed: 103, opacity: 0.22, tremor: 0.7, shift: [-0.7, 0.6] },
     ],
     hatchBridge: { pts: [[54.8, 30], [52.4, 34], [50.1, 38], [47.8, 42]], len: 4, angle: 160, seed: 7 },
     wrinkle: [
@@ -242,8 +242,8 @@ const SPEC = {
     ],
     tip: [
       { line: "M39 52 C32 57 24 63 21.5 70 C19.5 76.5 24 82 31 82.5 C37 83 43 81 48 79", w: [[0, 0.5], [0.3, 1.05], [0.55, 1.3], [0.8, 1.15], [1, 0.5]], seed: 121, samples: 26, opacity: 0.8, main: true },
-      { line: "M38 53.5 C31 58.5 23.5 64.5 21.5 71", w: W.ghost, seed: 122, opacity: 0.28, tremor: 0.6, shift: [-0.8, 0.2] },
-      { line: "M25 80 C30 83.5 38 83 46 80.5", w: W.ghost, seed: 123, opacity: 0.3, tremor: 0.5, shift: [0.3, 1] },
+      { line: "M38 53.5 C31 58.5 23.5 64.5 21.5 71", w: W.underdraw, seed: 122, opacity: 0.28, tremor: 0.6, shift: [-0.8, 0.2] },
+      { line: "M25 80 C30 83.5 38 83 46 80.5", w: W.underdraw, seed: 123, opacity: 0.3, tremor: 0.5, shift: [0.3, 1] },
     ],
     hatchTip: { pts: [[26, 82], [29, 83.8], [32, 84.5], [35, 84.4], [38, 84], [41, 83.2], [44, 82.2]], len: 4.5, angle: 62, seed: 8 },
     nostrilR: [
@@ -274,8 +274,8 @@ const SPEC = {
     ],
     bridge: [
       { line: "M53 8 C51 18 48 32 44 46", w: [[0, 0.35], [0.3, 0.9], [0.6, 1.25], [1, 0.7]], seed: 201, samples: 22, opacity: 0.8 },
-      { line: "M61 14 C61 26 60 36 58 46", w: W.ghost, seed: 202, opacity: 0.2, tremor: 0.4 },
-      { line: "M53 8 C51 18 48 32 44 46", w: W.ghost, seed: 203, opacity: 0.22, tremor: 0.7, shift: [-0.8, 0.4] },
+      { line: "M61 14 C61 26 60 36 58 46", w: W.underdraw, seed: 202, opacity: 0.2, tremor: 0.4 },
+      { line: "M53 8 C51 18 48 32 44 46", w: W.underdraw, seed: 203, opacity: 0.22, tremor: 0.7, shift: [-0.8, 0.4] },
     ],
     hatchBridge: { pts: [[46, 24], [45.2, 29], [44.4, 34]], len: 3, angle: 20, seed: 17 },
     wrinkle: [
@@ -285,15 +285,15 @@ const SPEC = {
     ],
     tip: [
       { line: "M44 46 C36 51 31.5 59 33.5 68 C35.5 77 43 81.5 51 81.5 C57 81.5 61 78 62 73", w: [[0, 0.5], [0.3, 1.05], [0.55, 1.3], [0.8, 1.15], [1, 0.5]], seed: 221, samples: 28, opacity: 0.8 },
-      { line: "M43 47.5 C35.5 52.5 31.5 60 33 68", w: W.ghost, seed: 222, opacity: 0.28, tremor: 0.6, shift: [-0.7, 0.3] },
-      { line: "M37 79 C43 82.5 50 83.5 57 81.5", w: W.ghost, seed: 223, opacity: 0.3, tremor: 0.5, shift: [0, 1] },
+      { line: "M43 47.5 C35.5 52.5 31.5 60 33 68", w: W.underdraw, seed: 222, opacity: 0.28, tremor: 0.6, shift: [-0.7, 0.3] },
+      { line: "M37 79 C43 82.5 50 83.5 57 81.5", w: W.underdraw, seed: 223, opacity: 0.3, tremor: 0.5, shift: [0, 1] },
     ],
     hatchTip: { pts: [[37, 83.5], [40, 84.5], [43, 85], [46, 85.2], [49, 85], [52, 84.4], [55, 83.4]], len: 4, angle: 70, seed: 18 },
     nostrilL: [{ line: "M35 62 C29.5 64 27 70.5 30.5 76.5", w: [[0, 0.4], [0.5, 1.15], [1, 0.45]], seed: 231, opacity: 0.85 }],
     nostrilLShape: '<path opacity="0.42" d="M34.5 77.5c1.2-1.5 4-1.8 5.6-0.5 0.9 0.7 0.4 1.9-0.8 2.1-2 0.3-4.2 0-4.8-1.6z"/>',
     nostrilR: [
       { line: "M58.5 60 C66 59 71.5 65.5 70.5 72 C69.8 76.5 65 80 59.5 79.5", w: [[0, 0.4], [0.4, 1.2], [0.8, 1], [1, 0.4]], seed: 241, samples: 20, opacity: 0.85 },
-      { line: "M61.5 58 C67.5 55.5 73.5 59 75.5 65", w: W.ghost, seed: 242, opacity: 0.28, tremor: 0.3 },
+      { line: "M61.5 58 C67.5 55.5 73.5 59 75.5 65", w: W.underdraw, seed: 242, opacity: 0.28, tremor: 0.3 },
     ],
     nostrilRShape: '<path opacity="0.42" d="M51.5 78c2-2.1 6.8-2.5 9.5-0.5 1.3 1 0.5 2.6-1.4 2.8-3.3 0.4-7 0-8.1-2.3z"/>',
     hatchNostril: { pts: [[64, 71], [66, 74], [67, 77]], len: 3, angle: 125, seed: 19 },
@@ -318,14 +318,14 @@ const SPEC = {
 // SPEC.e above stays as drawn for round 2; the lock is a weight pass over the same centrelines, so
 // the before and after on the contact sheet differ in weight and nothing else. Main contours
 // (`main: true`) take `contour` and the higher opacity; thin strokes and hatching take `fine`; the
-// ghost passes and construction marks are left alone so the line still reads as graphite, not ink.
+// underdrawn passes and construction marks are left alone so the line still reads as graphite, not ink.
 // Settled by eye at 64 and 400 px on white and near-black: 1.35 did not register at 64 px, 1.85 read
 // as an inked outline on the wing. At 1.5 the heaviest point of the contour is 1.95 units against
 // concept A's 9.2.
 const E_LOCK = { contour: 1.5, fine: 1.25, contourOpacity: 0.9, nostrilFill: 0.46 };
 function lockWeight(spec, { contour, fine, contourOpacity, nostrilFill }) {
   const scale = (w, k) => w.map(([u, v]) => [u, Number((v * k).toFixed(3))]);
-  const stroke = (st) => (st.w === W.ghost ? st : st.main ? { ...st, w: scale(st.w, contour), opacity: contourOpacity } : { ...st, w: scale(st.w, fine) });
+  const stroke = (st) => (st.w === W.underdraw ? st : st.main ? { ...st, w: scale(st.w, contour), opacity: contourOpacity } : { ...st, w: scale(st.w, fine) });
   const out = { ...spec };
   for (const k of ["bridge", "wrinkle", "tip", "nostrilR", "nostrilL", "lip"]) out[k] = spec[k].map(stroke);
   for (const k of ["hatchBridge", "hatchTip", "hatchNostril"]) out[k] = { ...spec[k], w: Number(((spec[k].w ?? 0.5) * fine).toFixed(3)) };
@@ -550,7 +550,7 @@ for (const rc of FRAMED) {
   writeFileSync(join(ROOT, "favicon.svg"), fav);
 }
 // The pencil line is too thin to survive 16 px, so the favicon cut keeps only the main contours (no
-// ghosts, hatching or lip) and puts the weight up. Still the same centrelines. It reads its widths
+// underdrawn lines, hatching or lip) and puts the weight up. Still the same centrelines. It reads its widths
 // from the spec it is given, so the locked E carries its weight factor into the 16 px cut.
 function faviconSketchSvg(s) {
   const heavy = (list) => list.slice(0, 1).map((st) => ({ ...st, opacity: undefined, shift: undefined, tremor: 0.25, w: st.w.map(([u, w]) => [u, w * 5 + 1.8]) }));
