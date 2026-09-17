@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { chunkDocument, mergeFlags, runRegexArm } from "../src/engine.ts";
+import { chunkDocument, flagsFrom, mergeFlags, runJudgmentArm, runRegexArm } from "../src/engine.ts";
+import type { JevClient, JevRequest, JevResult } from "../src/jev.ts";
 import { parseRuleset } from "../src/rules.ts";
 import type { Flag } from "../src/types.ts";
 
@@ -88,6 +89,85 @@ describe("runRegexArm", () => {
     const flags = runRegexArm(chunks, pair);
     expect(flags).toHaveLength(1);
     expect(flags[0]?.line).toBe(1);
+  });
+});
+
+describe("runJudgmentArm", () => {
+  const mixed = parseRuleset(
+    readFileSync(join(here, "fixtures", "rules", "mixed.yaml"), "utf8"),
+    "rules/mixed.yaml",
+  );
+
+  function client(nouls: Readonly<Record<string, number>>, seen: JevRequest[]): JevClient {
+    return {
+      async ask(request: JevRequest): Promise<JevResult> {
+        seen.push(request);
+        return {
+          model: "jev-test",
+          nouls,
+          inputTokens: 50,
+          outputTokens: 0,
+          estimatedCostUsd: 50 * 0.042e-6,
+          latencyMs: 7,
+          attempts: 2,
+        };
+      },
+    };
+  }
+
+  test("asks once per chunk, carrying only the judgment rules", async () => {
+    const seen: JevRequest[] = [];
+    const chunks = chunkDocument(text("flagged.md"), "flagged.md");
+
+    const result = await runJudgmentArm(chunks, mixed, client({ restating_closer: 0.4 }, seen));
+
+    expect(seen).toHaveLength(chunks.length);
+    expect(Object.keys(seen[0]?.questions ?? {})).toEqual(["restating_closer"]);
+    expect(result.usage.requests).toBe(chunks.length);
+    expect(result.usage.inputTokens).toBe(50 * chunks.length);
+    expect(result.usage.retries).toBe(chunks.length);
+  });
+
+  test("returns every reading, so a caller can calibrate below the threshold", async () => {
+    const seen: JevRequest[] = [];
+    const chunks = chunkDocument("A paragraph that says a thing.\n", "d.md");
+
+    const result = await runJudgmentArm(chunks, mixed, client({ restating_closer: 0.11 }, seen));
+
+    expect(result.readings).toEqual([
+      {
+        file: "d.md",
+        line: 1,
+        rule: "restating_closer",
+        probability: 0.11,
+        message: "A closer that only restates. Cut it.",
+      },
+    ]);
+    expect(flagsFrom(result.readings, 0.7)).toEqual([]);
+  });
+
+  test("a ruleset with no judgment rules makes no request at all", async () => {
+    const seen: JevRequest[] = [];
+    const result = await runJudgmentArm(
+      chunkDocument(text("flagged.md"), "flagged.md"),
+      pair,
+      client({}, seen),
+    );
+
+    expect(seen).toEqual([]);
+    expect(result.readings).toEqual([]);
+    expect(result.usage.requests).toBe(0);
+  });
+
+  test("flagsFrom keeps a reading at the threshold and drops the one below it", () => {
+    const readings = [
+      { file: "d.md", line: 1, rule: "a", probability: 0.7, message: "m" },
+      { file: "d.md", line: 2, rule: "b", probability: 0.69, message: "m" },
+    ];
+
+    expect(flagsFrom(readings, 0.7)).toEqual([
+      { file: "d.md", line: 1, rule: "a", kind: "judgment", probability: 0.7, message: "m" },
+    ]);
   });
 });
 
