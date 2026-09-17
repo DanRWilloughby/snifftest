@@ -1,0 +1,104 @@
+{
+ "version": 1,
+ "runDate": "2026-09-17",
+ "measured": true,
+ "note": "Recorded by snifftest serve --record over examples/replays/drafts/clean.md, examples/replays/drafts/faulty.md.",
+ "default": {
+  "nouls": {},
+  "inputTokens": 0,
+  "latencyMs": 0,
+  "estimatedCostUsd": 0
+ },
+ "responses": [
+  {
+   "match": "We rebuilt the importer last week.",
+   "nouls": {
+    "not_x_but_y": 0.08,
+    "tricolon": 0.05,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.08,
+    "pullquote_fragment": 0.05
+   },
+   "inputTokens": 2879,
+   "latencyMs": 528,
+   "estimatedCostUsd": 0.000120918
+  },
+  {
+   "match": "We are the first tool that reads a draft the way an editor does.",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.08,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.09,
+    "self_undercutting": 0.12,
+    "first_x_that": 0.98,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.15,
+    "pullquote_fragment": 0.1
+   },
+   "inputTokens": 2887,
+   "latencyMs": 198,
+   "estimatedCostUsd": 0.000121254
+  },
+  {
+   "match": "We are the first tool that reads a draft the way an editor does. It cost us $1.30 in API calls to produce this report.",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.08,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.98,
+    "naked_cost_figure": 0.97,
+    "jobs_claim": 0.12,
+    "pullquote_fragment": 0.07
+   },
+   "inputTokens": 2903,
+   "latencyMs": 198,
+   "estimatedCostUsd": 0.000121926
+  },
+  {
+   "match": "We rebuilt the importer last week. It finishes a 50,000-row file in under a minute, and the rows it cannot fix are listed by number.",
+   "nouls": {
+    "not_x_but_y": 0.09,
+    "tricolon": 0.07,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.07,
+    "pullquote_fragment": 0.04
+   },
+   "inputTokens": 2907,
+   "latencyMs": 185,
+   "estimatedCostUsd": 0.000122094
+  },
+  {
+   "match": "We are the first tool that reads a draft the way an editor does. It cost us $1.30 in API calls to produce this report. In short, everything above is what we just said.",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.11,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.95,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.98,
+    "naked_cost_figure": 0.97,
+    "jobs_claim": 0.11,
+    "pullquote_fragment": 0.07
+   },
+   "inputTokens": 2914,
+   "latencyMs": 199,
+   "estimatedCostUsd": 0.000122388
+  }
+ ]
+}
