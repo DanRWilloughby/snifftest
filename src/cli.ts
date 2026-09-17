@@ -22,12 +22,37 @@
 
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
-import { extname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
 
+import {
+  ANTHROPIC_KEY_ENV,
+  ANTHROPIC_MESSAGES_ENDPOINT,
+  createAnthropicAdapter,
+} from "./bench/anthropic.ts";
+import type { ModelAdapter } from "./bench/adapter.ts";
+import {
+  OPENROUTER_CHAT_ENDPOINT,
+  OPENROUTER_KEY_ENV,
+  OPENROUTER_PRICE_SOURCE,
+  createOpenRouterAdapter,
+  readOpenRouterCatalog,
+} from "./bench/openrouter.ts";
+import {
+  type CatalogEntry,
+  PanelError,
+  type Provider,
+  type ResolvedModel,
+  parsePanel,
+  resolvePanel,
+} from "./bench/panel.ts";
+import { PriceError, type PriceTable, parsePriceTable, priceCitation, priceFor } from "./bench/prices.ts";
+import { readAnthropicCatalog } from "./bench/anthropic.ts";
+import { type BenchDocument, runBench } from "./bench/run.ts";
+import { type JoinedArm, buildBenchReport, writeBenchReport } from "./bench/tables.ts";
 import { ConfigError, resolveRuleset } from "./config.ts";
-import { type Env, requestConsent } from "./consent.ts";
+import { type Destination, type Env, requestConsent } from "./consent.ts";
 import {
   type JudgmentUsage,
   chunkDocument,
@@ -38,8 +63,9 @@ import {
 } from "./engine.ts";
 import { buildReport, writeReport } from "./eval/report.ts";
 import { type RunEvalOptions, runEval } from "./eval/run.ts";
-import { DEFAULT_PER_RULE, DEFAULT_SEED, SeedError, type BaseDocument } from "./eval/seed.ts";
+import { DEFAULT_PER_RULE, DEFAULT_SEED, SeedError, type BaseDocument, seedCorpus } from "./eval/seed.ts";
 import {
+  type FetchLike,
   type JevClient,
   type JevClientOptions,
   KEY_ENV,
@@ -47,7 +73,7 @@ import {
   createJevClient,
 } from "./jev.ts";
 import { RulesetError } from "./rules.ts";
-import { type Flag, isJudgmentRule } from "./types.ts";
+import { type Flag, type Ruleset, isJudgmentRule } from "./types.ts";
 import { YamlError } from "./yaml.ts";
 
 /** What each exit code means. Documented in `--help` and tested one by one. */
@@ -87,6 +113,8 @@ export interface CliDeps {
   readonly prompt?: (question: string) => Promise<string>;
   /** Injected in tests so no test can reach the network by accident. */
   readonly createClient?: (options: JevClientOptions) => JevClient;
+  /** The same, for the bench adapters, which do not go through the gateway. */
+  readonly fetchLike?: FetchLike;
   readonly defaultRulesPath?: string;
 }
 
@@ -104,6 +132,13 @@ interface Options {
   readonly seed?: number;
   readonly perRule?: number;
   readonly outDir?: string;
+  /** `bench` only. */
+  readonly panelPath?: string;
+  readonly repeats?: number;
+  /** A recorded models-endpoint payload, so a dry run needs no network at all. */
+  readonly modelsPath?: string;
+  /** An `eval` results directory: its corpus is reused and its arms are joined. */
+  readonly evalDir?: string;
 }
 
 // --- the entry point ------------------------------------------------------
@@ -131,8 +166,9 @@ export async function runCli(deps: CliDeps): Promise<number> {
     if (options.command === "check") return await check(deps, options);
     if (options.command === "rules") return rules(deps, options);
     if (options.command === "eval") return await evaluate(deps, options);
+    if (options.command === "bench") return await bench(deps, options);
     throw new UsageError(
-      `"snifftest ${options.command}" is planned but not built yet. Today there is check, rules and eval.`,
+      `"snifftest ${options.command}" is planned but not built yet. Today there is check, rules, eval and bench.`,
     );
   } catch (error) {
     return fail(deps, error);
@@ -367,6 +403,400 @@ function fixed(value: number | null | undefined): string {
   return value === null || value === undefined ? "  n/a" : value.toFixed(3);
 }
 
+// --- bench ----------------------------------------------------------------
+
+/** How many times each document is asked of each model, for the latency spread. */
+export const DEFAULT_REPEATS = 3;
+
+const DESTINATIONS: Readonly<Record<Provider, Destination>> = {
+  openrouter: {
+    name: "OpenRouter",
+    endpoint: OPENROUTER_CHAT_ENDPOINT,
+    keyEnv: OPENROUTER_KEY_ENV,
+  },
+  anthropic: {
+    name: "Anthropic",
+    endpoint: ANTHROPIC_MESSAGES_ENDPOINT,
+    keyEnv: ANTHROPIC_KEY_ENV,
+  },
+};
+
+/**
+ * Ask the panel the same questions the judgment rules ask.
+ *
+ * The order is the same promise the rest of the tool makes: the panel is
+ * resolved and printed before anything is sent, and `--dry-run` stops there.
+ * Nothing is substituted for a model the provider does not list, and no row is
+ * dropped in silence: a provider with no key in the environment becomes a row
+ * that says so.
+ */
+async function bench(deps: CliDeps, options: Options): Promise<number> {
+  const resolvedRules = resolveRuleset({
+    cwd: deps.cwd,
+    ...(options.rulesPath === undefined ? {} : { rulesPath: options.rulesPath }),
+    ...(deps.defaultRulesPath === undefined ? {} : { defaultRulesPath: deps.defaultRulesPath }),
+  });
+  const ruleset = resolvedRules.ruleset;
+  const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
+  const runDate = today();
+
+  const panelFile = at(options.panelPath ?? join("bench", "panel.yaml"), deps.cwd);
+  const panel = parsePanel(readDraft(panelFile), display(panelFile, deps.cwd));
+
+  const priceTables = new Map<Provider, PriceTable>();
+  for (const [provider, relative] of Object.entries(panel.prices)) {
+    const file = at(relative, dirname(panelFile));
+    priceTables.set(provider as Provider, parsePriceTable(readDraft(file), display(file, deps.cwd)));
+  }
+
+  const keys: Record<Provider, string> = {
+    openrouter: (deps.env[OPENROUTER_KEY_ENV] ?? "").trim(),
+    anthropic: (deps.env[ANTHROPIC_KEY_ENV] ?? "").trim(),
+  };
+  const secrets = [keys.openrouter, keys.anthropic, (deps.env[KEY_ENV] ?? "").trim()].filter(
+    (key) => key !== "",
+  );
+
+  const wanted = new Set(panel.models.map((model) => model.provider));
+  const adapters: Partial<Record<Provider, ModelAdapter>> = {};
+  for (const provider of wanted) {
+    if (keys[provider] === "") continue;
+    const adapterOptions = {
+      apiKey: keys[provider],
+      secrets,
+      ...(deps.fetchLike === undefined ? {} : { fetch: deps.fetchLike }),
+    };
+    adapters[provider] =
+      provider === "openrouter"
+        ? createOpenRouterAdapter(adapterOptions)
+        : createAnthropicAdapter(adapterOptions);
+  }
+
+  // The catalogues. A recorded payload means a dry run touches no network at
+  // all; otherwise each provider's own list is read, which is a catalogue read
+  // and not a model call.
+  const catalogs: Partial<Record<Provider, readonly CatalogEntry[]>> = {};
+  const catalogNotes: string[] = [];
+
+  if (options.modelsPath !== undefined) {
+    const file = at(options.modelsPath, deps.cwd);
+    const payload = JSON.parse(readDraft(file)) as Record<string, unknown>;
+    const openrouter = payload["data"] !== undefined ? payload : payload["openrouter"];
+    if (openrouter !== undefined) catalogs.openrouter = readOpenRouterCatalog(openrouter);
+    if (payload["anthropic"] !== undefined) {
+      catalogs.anthropic = readAnthropicCatalog(payload["anthropic"]);
+    }
+    catalogNotes.push(`model lists read from ${display(file, deps.cwd)}, not from the providers`);
+  } else {
+    for (const provider of wanted) {
+      const adapter = adapters[provider];
+      if (adapter === undefined) {
+        catalogNotes.push(`${DESTINATIONS[provider].keyEnv} is not set, so ${provider} rows cannot run`);
+        continue;
+      }
+      try {
+        catalogs[provider] = await adapter.listModels();
+      } catch (error) {
+        catalogNotes.push(`the ${provider} model list could not be read: ${messageOf(error)}`);
+      }
+    }
+  }
+
+  const resolved = resolvePanel(panel, catalogs, (model) => ({
+    runDate,
+    catalogPriceSource: model.provider === "openrouter" ? OPENROUTER_PRICE_SOURCE : undefined,
+    priceLookup: (served: string) => {
+      const table = priceTables.get(model.provider);
+      return table === undefined ? undefined : priceFor(table, served);
+    },
+  }));
+
+  for (const line of panelLines(resolved, catalogNotes)) deps.write(line);
+
+  if (options.dryRun) {
+    deps.write("");
+    deps.write("--dry-run: the panel above is resolved and no model was called.");
+    return EXIT.ok;
+  }
+
+  // --- the corpus, which must be the eval's own
+  const corpus = benchCorpus(deps, options, ruleset);
+  if (corpus.documents.length === 0) {
+    throw new UsageError("that corpus holds no paragraphs to judge.");
+  }
+
+  const runnable = resolved.filter((model) => model.available);
+  if (runnable.length === 0) {
+    deps.writeError("no model in the panel could be run, so nothing was sent.");
+    return EXIT.failure;
+  }
+
+  const destinations = [...new Set(runnable.map((model) => model.entry.provider))].map(
+    (provider) => DESTINATIONS[provider],
+  );
+  const consent = await requestConsent({
+    env: deps.env,
+    homedir: deps.homedir,
+    assumeYes: options.assumeYes,
+    isTty: deps.isTty,
+    ruleIds: ruleset.rules.filter(isJudgmentRule).map((rule) => rule.id),
+    fileCount: corpus.documents.length,
+    destinations,
+    say: deps.writeError,
+    ...(deps.prompt === undefined ? {} : { prompt: deps.prompt }),
+  });
+  if (!consent.granted) return EXIT.consent;
+
+  const outcome = await runBench({
+    ruleset,
+    documents: corpus.documents,
+    resolved,
+    adapters,
+    repeats: options.repeats ?? DEFAULT_REPEATS,
+    threshold,
+    runDate,
+    onProgress: (note) => deps.writeError(note),
+  });
+
+  const priceSources = [
+    ...(catalogs.openrouter === undefined ? [] : [OPENROUTER_PRICE_SOURCE]),
+    ...[...priceTables.values()].map((table) => priceCitation(table)),
+  ];
+
+  const report = buildBenchReport(outcome, {
+    runDate,
+    threshold,
+    repeats: options.repeats ?? DEFAULT_REPEATS,
+    panelFile: display(panelFile, deps.cwd),
+    priceSources,
+    corpus: corpus.counts,
+    ...(corpus.joined === undefined ? {} : { joined: corpus.joined }),
+    ...(corpus.evalSource === undefined ? {} : { evalSource: corpus.evalSource }),
+  });
+
+  const outDir = at(options.outDir ?? corpus.defaultOutDir ?? join("bench", "results", runDate), deps.cwd);
+  const written = writeBenchReport(report, outcome, outDir);
+
+  if (options.format === "json") {
+    deps.write(JSON.stringify(report, null, 2));
+  } else {
+    deps.write("");
+    for (const model of report.models) {
+      deps.write(
+        `${model.id.padEnd(16)} ${
+          model.available
+            ? `${(model.served_model ?? model.slug ?? "").padEnd(34)} ` +
+              `recall ${fixed(model.accuracy?.overall[String(threshold)]?.recall)}  ` +
+              `median ${Math.round(model.latency.median_ms)} ms  ` +
+              `${model.cost.usd_per_100_documents === null ? "cost unknown" : `$${model.cost.usd_per_100_documents.toFixed(4)} per 100 documents`}`
+            : (model.note ?? "not available")
+        }`,
+      );
+    }
+    deps.write("");
+    deps.write(`wrote ${display(written.markdown, deps.cwd)}`);
+  }
+
+  return EXIT.ok;
+}
+
+interface BenchCorpus {
+  readonly documents: readonly BenchDocument[];
+  readonly counts: { clean: number; seeded: number; seed: number; perRule: number };
+  readonly joined?: readonly JoinedArm[];
+  readonly evalSource?: string;
+  readonly defaultOutDir?: string;
+}
+
+/**
+ * The corpus arm D judges.
+ *
+ * Reusing the eval's own written corpus is the point: the headline table joins
+ * arm C's numbers to arm D's, and two runs over two corpora would produce a
+ * table whose rows cannot be compared. Seeding from paths is the standalone
+ * form, for someone benching their own rules on their own writing.
+ */
+function benchCorpus(deps: CliDeps, options: Options, ruleset: Ruleset): BenchCorpus {
+  if (options.evalDir !== undefined) {
+    if (options.paths.length > 0) {
+      throw new UsageError("give bench either --eval <dir> or some paths, not both.");
+    }
+    return fromEvalDirectory(deps, options, ruleset);
+  }
+
+  if (options.paths.length === 0) {
+    throw new UsageError(
+      "snifftest bench needs a corpus: either --eval <dir> (an eval results directory, whose " +
+        "arms are joined into the table) or one or more files to seed.",
+    );
+  }
+
+  const files = collectFiles(options.paths, deps.cwd);
+  const candidates: BaseDocument[] = [];
+  for (const file of files) {
+    const shown = display(file, deps.cwd);
+    for (const chunk of chunkDocument(readDraft(file), shown, { maxChars: STATE_GUARD_CHARS })) {
+      candidates.push({
+        id: `C${String(candidates.length).padStart(2, "0")}`,
+        file: chunk.file,
+        line: chunk.line,
+        text: chunk.text,
+      });
+    }
+  }
+
+  const seeded = seedCorpus(candidates, ruleset, {
+    ...(options.seed === undefined ? {} : { seed: options.seed }),
+    ...(options.perRule === undefined ? {} : { perRule: options.perRule }),
+  });
+
+  return {
+    documents: [
+      ...seeded.clean.map((doc) => ({ id: doc.id, kind: "clean" as const, text: doc.text })),
+      ...seeded.seeded.map((doc) => ({
+        id: doc.id,
+        kind: "seeded" as const,
+        truth: doc.rule,
+        text: doc.text,
+      })),
+    ],
+    counts: {
+      clean: seeded.clean.length,
+      seeded: seeded.seeded.length,
+      seed: seeded.seedValue,
+      perRule: seeded.perRule,
+    },
+  };
+}
+
+function fromEvalDirectory(deps: CliDeps, options: Options, ruleset: Ruleset): BenchCorpus {
+  const dir = at(options.evalDir ?? "", deps.cwd);
+  const clean = readJson(join(dir, "inputs", "clean.json"));
+  const seeded = readJson(join(dir, "inputs", "seeded.json"));
+  const scores = readJson(join(dir, "scores.json"));
+
+  const classes = scores["classes"];
+  const ours = ruleset.rules.map((rule) => rule.id);
+  if (!Array.isArray(classes) || classes.join("|") !== ours.join("|")) {
+    throw new UsageError(
+      `${display(dir, deps.cwd)} was run against a different ruleset, so its arms cannot be joined ` +
+        "to this one. Re-run eval with the same rules, or drop --eval.",
+    );
+  }
+
+  const documents: BenchDocument[] = [
+    ...paragraphsOf(clean).map((doc) => ({ id: doc.id, kind: "clean" as const, text: doc.text })),
+    ...paragraphsOf(seeded).map((doc) => ({
+      id: doc.id,
+      kind: "seeded" as const,
+      ...(doc.rule === undefined ? {} : { truth: doc.rule }),
+      text: doc.text,
+    })),
+  ];
+
+  return {
+    documents,
+    counts: {
+      clean: documents.filter((doc) => doc.kind === "clean").length,
+      seeded: documents.filter((doc) => doc.kind === "seeded").length,
+      seed: numberOf(scores["seed"]),
+      perRule: numberOf(scores["per_rule"]),
+    },
+    joined: joinedArms(scores),
+    evalSource: display(join(dir, "scores.json"), deps.cwd),
+    defaultOutDir: dir,
+  };
+}
+
+function joinedArms(scores: Record<string, unknown>): JoinedArm[] {
+  const arms = scores["arms"];
+  if (typeof arms !== "object" || arms === null) return [];
+  const at = String(numberOf(scores["threshold"]));
+
+  const out: JoinedArm[] = [];
+  for (const [id, value] of Object.entries(arms as Record<string, unknown>)) {
+    const arm = value as Record<string, unknown>;
+    const overall = (arm["overall"] as Record<string, Record<string, unknown>> | undefined)?.[at];
+    const summary = arm["summary"] as Record<string, unknown> | undefined;
+    out.push({
+      arm: id,
+      label: typeof arm["label"] === "string" ? arm["label"] : id,
+      recall: ratioOf(overall?.["recall"]),
+      fpPerCleanCell: ratioOf(overall?.["fp_rate_per_clean_cell"]),
+      medianMs: numberOf(summary?.["median_latency_ms"]),
+      usdPer100Documents: ratioOf(summary?.["usd_per_100_documents"]),
+    });
+  }
+  return out;
+}
+
+function panelLines(resolved: readonly ResolvedModel[], notes: readonly string[]): string[] {
+  const lines = ["panel", ""];
+
+  for (const model of resolved) {
+    const price =
+      model.prices === null
+        ? "price unknown"
+        : `$${(model.prices.inputUsdPerToken * 1e6).toFixed(2)} in / $${(
+            model.prices.outputUsdPerToken * 1e6
+          ).toFixed(2)} out per million tokens`;
+    lines.push(
+      `  ${model.entry.id.padEnd(16)} ${model.entry.tier.padEnd(8)} ` +
+        (model.available ? `${(model.slug ?? "").padEnd(34)} ${price}` : (model.note ?? "not available")),
+    );
+    if (model.candidates.length > 1) {
+      lines.push(`  ${"".padEnd(16)} also matched: ${model.candidates.filter((id) => id !== model.slug).join(", ")}`);
+    }
+  }
+
+  if (notes.length > 0) {
+    lines.push("");
+    for (const note of notes) lines.push(`  note: ${note}`);
+  }
+  return lines;
+}
+
+function paragraphsOf(doc: Record<string, unknown>): { id: string; text: string; rule?: string }[] {
+  const paragraphs = doc["paragraphs"];
+  if (!Array.isArray(paragraphs)) return [];
+
+  const out: { id: string; text: string; rule?: string }[] = [];
+  for (const value of paragraphs) {
+    if (typeof value !== "object" || value === null) continue;
+    const record = value as Record<string, unknown>;
+    const id = record["id"];
+    const text = record["text"];
+    if (typeof id !== "string" || typeof text !== "string") continue;
+    out.push({ id, text, ...(typeof record["rule"] === "string" ? { rule: record["rule"] } : {}) });
+  }
+  return out;
+}
+
+function readJson(file: string): Record<string, unknown> {
+  try {
+    const parsed = JSON.parse(readFileSync(file, "utf8")) as unknown;
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new Error("it is not a JSON object");
+    }
+    return parsed as Record<string, unknown>;
+  } catch (error) {
+    throw new UsageError(`${file} could not be read (${messageOf(error)})`);
+  }
+}
+
+function numberOf(value: unknown): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function ratioOf(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** An absolute path, from something a person typed. */
+function at(path: string, from: string): string {
+  return isAbsolute(path) ? path : resolve(from, path);
+}
+
 /** The run date, in the one format the results directory is named with. */
 function today(): string {
   return new Date().toISOString().slice(0, 10);
@@ -419,6 +849,10 @@ function parseArgs(argv: readonly string[]): Options {
   let seed: number | undefined;
   let perRule: number | undefined;
   let outDir: string | undefined;
+  let panelPath: string | undefined;
+  let modelsPath: string | undefined;
+  let evalDir: string | undefined;
+  let repeats: number | undefined;
 
   for (let i = 1; i < argv.length; i++) {
     const argument = argv[i] ?? "";
@@ -457,6 +891,18 @@ function parseArgs(argv: readonly string[]): Options {
       case "--out":
         outDir = valueFor(argv, ++i, "--out");
         break;
+      case "--panel":
+        panelPath = valueFor(argv, ++i, "--panel");
+        break;
+      case "--models":
+        modelsPath = valueFor(argv, ++i, "--models");
+        break;
+      case "--eval":
+        evalDir = valueFor(argv, ++i, "--eval");
+        break;
+      case "--repeats":
+        repeats = wholeNumber(valueFor(argv, ++i, "--repeats"), "--repeats", 1);
+        break;
       default:
         throw new UsageError(`unknown option "${argument}". Try snifftest --help.`);
     }
@@ -477,6 +923,10 @@ function parseArgs(argv: readonly string[]): Options {
     ...(seed === undefined ? {} : { seed }),
     ...(perRule === undefined ? {} : { perRule }),
     ...(outDir === undefined ? {} : { outDir }),
+    ...(panelPath === undefined ? {} : { panelPath }),
+    ...(modelsPath === undefined ? {} : { modelsPath }),
+    ...(evalDir === undefined ? {} : { evalDir }),
+    ...(repeats === undefined ? {} : { repeats }),
   };
 }
 
@@ -573,6 +1023,8 @@ function fail(deps: CliDeps, error: unknown): number {
     error instanceof UsageError ||
     error instanceof ConfigError ||
     error instanceof RulesetError ||
+    error instanceof PanelError ||
+    error instanceof PriceError ||
     error instanceof YamlError;
 
   deps.writeError(known ? messageOf(error) : `snifftest could not finish: ${messageOf(error)}`);
@@ -603,6 +1055,8 @@ function helpLines(): string[] {
     "  snifftest rules              print the ruleset that would be used, and where it came from",
     "  snifftest eval <paths...>    plant one known fault per rule in your own clean text,",
     "                               run it three ways, and report what each way caught",
+    "  snifftest bench              ask a panel of ordinary models the same questions, over the",
+    "                               same corpus, and put cost, speed and accuracy side by side",
     "",
     "Options",
     "  --rules <path>      use this ruleset instead of .snifftest.yaml or the built-in one",
@@ -617,8 +1071,17 @@ function helpLines(): string[] {
     `  --per-rule <n>      seeded paragraphs per rule (default ${DEFAULT_PER_RULE})`,
     "  --out <dir>         where the report is written (default bench/results/<today>)",
     "",
+    "Options for bench",
+    "  --panel <file>      the panel file (default bench/panel.yaml)",
+    "  --eval <dir>        an eval results directory: its corpus is reused and its arms joined",
+    `  --repeats <n>       how many times each document is asked of each model (default ${DEFAULT_REPEATS})`,
+    "  --models <file>     a recorded models-endpoint payload, so a dry run needs no network",
+    "  --dry-run           resolve and print the panel and its prices; call no model",
+    "",
     "Environment",
     `  ${KEY_ENV}    the key the judgment rules are sent with`,
+    `  ${OPENROUTER_KEY_ENV}  the key the bench panel is routed with`,
+    `  ${ANTHROPIC_KEY_ENV}   the key the bench's direct overhead control uses`,
     "  SNIFFTEST_SEND=1    answer the send question in CI, without remembering it",
     "",
     "Exit codes",

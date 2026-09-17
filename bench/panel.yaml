@@ -1,0 +1,93 @@
+# The panel `snifftest bench` asks the same questions as the judgment rules.
+#
+# Nothing here is a claim that a model exists. Each entry carries a pattern and
+# a preference; on the day of the run every entry is matched against the
+# provider's own model list and the exact slug, its published prices and
+# whether it takes a JSON mode are written into the raw output. A model the
+# provider does not list becomes a row that says "not available on <date>" and
+# is never swapped for a near neighbour.
+#
+# Most of the panel is routed through OpenRouter so that one key reproduces the
+# whole bench and every row carries the same proxy hop. The last entry calls one
+# of those models directly, which is what makes that hop measurable rather than
+# an asterisk.
+#
+# Jev is not in this file. Arm C is run by `snifftest eval`, over the same
+# seeded corpus, and joined into the headline table with `--eval`.
+
+version: 1
+
+prices:
+  # OpenRouter publishes a price per model, so only the direct row needs a file.
+  anthropic: prices/anthropic-2026-09-17.yaml
+
+models:
+  - id: haiku
+    label: Claude Haiku 4.5
+    tier: fast
+    provider: openrouter
+    match: "^anthropic/claude-haiku-4"
+    prefer:
+      - anthropic/claude-haiku-4.5
+
+  - id: sonnet
+    label: Claude Sonnet 5
+    tier: mid
+    provider: openrouter
+    match: "^anthropic/claude-sonnet-5"
+    prefer:
+      - anthropic/claude-sonnet-5
+
+  - id: opus
+    label: Claude Opus 5
+    tier: deep
+    provider: openrouter
+    match: "^anthropic/claude-opus-5"
+    prefer:
+      - anthropic/claude-opus-5
+
+  - id: openai-fast
+    label: OpenAI, fast tier
+    tier: fast
+    provider: openrouter
+    match: "^openai/gpt-5[^/]*mini$"
+    prefer:
+      - openai/gpt-5-mini
+
+  - id: gemini-flash
+    label: Gemini Flash
+    tier: fast
+    provider: openrouter
+    match: "^google/gemini-[0-9.]+-flash$"
+    prefer:
+      - google/gemini-2.5-flash
+
+  - id: deepseek
+    label: DeepSeek, chat tier
+    tier: fast
+    provider: openrouter
+    match: "^deepseek/deepseek-chat"
+    prefer:
+      - deepseek/deepseek-chat-v3
+    note: >
+      DeepSeek publishes no model called Flash; this is its chat tier, which is
+      the cheap-and-quick row the panel wanted.
+
+  - id: openai-deep
+    label: OpenAI, deep tier
+    tier: deep
+    provider: openrouter
+    match: "^openai/gpt-5(\\.[0-9]+)?$"
+    prefer:
+      - openai/gpt-5
+
+  - id: sonnet-direct
+    label: Claude Sonnet 5, direct
+    tier: control
+    provider: anthropic
+    match: "^claude-sonnet-5"
+    prefer:
+      - claude-sonnet-5
+    note: >
+      The overhead control. Same model as the sonnet row, called without the
+      OpenRouter hop, so the pair measures the hop.
