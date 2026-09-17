@@ -1,0 +1,7 @@
+# Dev dependencies are pinned to exact versions: the package ships with zero
+# runtime dependencies and the dev toolchain must not drift under a fresh install.
+[install]
+exact = true
+
+[test]
+root = "./tests"
