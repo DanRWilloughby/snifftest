@@ -5,9 +5,9 @@
  * quietly stop meaning what they say the day a provider renames a slug or
  * retires one. So the panel file carries a pattern and a tier, never a promise
  * about what exists, and every entry is matched against the provider's own
- * model list on the day of the run. What that match found — the exact slug, the
- * prices the provider published for it, whether it takes a JSON mode — is
- * written into the raw output beside the answers.
+ * model list on the day of the run. What that match found is written into the
+ * raw output beside the answers: the exact slug, the prices the provider
+ * published for it, and whether it takes a JSON mode.
  *
  * A model the provider does not list is not substituted with a near neighbour.
  * It becomes a row that says "not available on <date>", which is a true thing

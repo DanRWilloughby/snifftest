@@ -6,10 +6,10 @@
  * parses cannot drift apart.
  *
  * Two rules hold everywhere in here. A number that was not measured is printed
- * as `n/a`, never as zero, because a zero is a claim. And the run's own
- * awkward parts — rules that could not be seeded, paragraphs that were dropped,
- * requests that failed — are printed in the same document as the headline
- * table rather than in a footnote nobody regenerates.
+ * as `n/a`, never as zero, because a zero is a claim. And the run's own awkward
+ * parts are printed in the same document as the headline table rather than in a
+ * footnote nobody regenerates: rules that could not be seeded, paragraphs that
+ * were dropped, requests that failed.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -46,8 +46,9 @@ export interface EvalReport {
   };
   /**
    * The model string the service actually served, as it came back on the
-   * answers — not the one that was asked for. A table of numbers whose model is
-   * only in a raw file beside it is a table nobody can date to a model.
+   * answers, which is not always the one that was asked for. A table of numbers
+   * whose model is only in a raw file beside it is a table nobody can date to a
+   * model.
    */
   readonly served_model: string | null;
   readonly classes: readonly string[];

@@ -4,7 +4,7 @@
  * An Action cannot be unit tested by running it, so the test treats `action.yml`
  * as the contract it is: a parsed document whose inputs, defaults and guard
  * expressions are asserted one by one. The properties checked here are the ones
- * that would be expensive to discover in production — a draft posted into a
+ * that would be expensive to discover in production: a draft posted into a
  * public pull request, a fork's pull request reaching an API, a floating
  * version, or the Action helping itself to a secret it was never given.
  *

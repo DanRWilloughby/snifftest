@@ -26,8 +26,8 @@ rules:
 
   - id: dash_present
     kind: regex
-    # The built-in matches the pattern [–—], that is an en dash – or
-    # an em dash —. A plain hyphen in a compound word does not count.
+    # The built-in matches two characters: an en dash (U+2013) and an em dash
+    # (U+2014). A plain hyphen in a compound word does not count.
     builtin: dash_present
     message: "A long dash. Give the sentence a full stop instead."
     seed: { transform: insert_em_dash, count: 1 }

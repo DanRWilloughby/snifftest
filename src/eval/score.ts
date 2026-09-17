@@ -108,7 +108,7 @@ export interface OverallAtThreshold {
  *
  * A cell the arm gave no opinion on has no probability to bucket, and defaulting
  * it to zero put it in `0.0-0.1` beside the readings where a model actually said
- * "no" — which made a bucket the arm never spoke into look well calibrated. The
+ * "no". That made a bucket the arm never spoke into look well calibrated. The
  * unanswered cells are counted instead, in `calibration_unanswered`, and they
  * are still misses everywhere recall is computed.
  */

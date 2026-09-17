@@ -8,8 +8,8 @@
 #
 # `match` is a substring of the served model id, so a dated id such as
 # `claude-sonnet-5-20260101` lands on its family. A served model that matches no
-# row here has no cost at all in the report — not a zero, which would read as
-# "this call was free".
+# row here has no cost at all in the report. It is never a zero, which would
+# read as "this call was free".
 #
 # Re-verify on the run date and write a new dated file rather than editing this
 # one; the run that used the old numbers should keep pointing at them.

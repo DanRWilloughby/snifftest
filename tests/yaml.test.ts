@@ -24,7 +24,7 @@ function expectYamlError(fn: () => unknown): YamlError {
   throw new Error("expected a YamlError, but parsing succeeded");
 }
 
-describe("parseYaml — the supported subset", () => {
+describe("parseYaml: the supported subset", () => {
   test("reads maps, lists, scalars, block scalars and one-line flow", () => {
     const doc = parseFixture("subset.yaml") as Record<string, unknown>;
 
@@ -101,7 +101,7 @@ describe("parseYaml — the supported subset", () => {
   });
 });
 
-describe("parseYaml — out of subset, loudly and with a line number", () => {
+describe("parseYaml: out of subset, loudly and with a line number", () => {
   test("rejects an anchor and names the line", () => {
     const error = expectYamlError(() => parseFixture("anchor.yaml"));
     expect(error.line).toBe(2);

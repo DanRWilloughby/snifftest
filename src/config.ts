@@ -3,7 +3,7 @@
  *
  * Three places a ruleset can come from, in order: the one named on the command
  * line, a `.snifftest.yaml` in the working directory, and the one that ships
- * inside the package. The order is the whole feature — a team keeps its house
+ * inside the package. The order is the whole feature. A team keeps its house
  * rules in the repo, a person overrides them for one run, and someone who has
  * never seen the tool gets something useful on the first command.
  *
@@ -55,7 +55,7 @@ export interface ResolvedRuleset {
   /**
    * Things the file said that this tool does not read. A mistyped key is
    * indistinguishable from a key we ignore on purpose, so it is named rather
-   * than dropped — but it is a warning, because a strict refusal would break
+   * than dropped. It is only a warning, because a strict refusal would break
    * every ruleset written against a later version of the tool.
    */
   readonly warnings: readonly string[];

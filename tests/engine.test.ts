@@ -90,7 +90,7 @@ describe("runRegexArm", () => {
   });
 
   test("reports one flag per occurrence but never two on the same line for one rule", () => {
-    const chunks = chunkDocument("A — dash and another — dash on one line.\n", "d.md");
+    const chunks = chunkDocument("A \u2014 dash and another \u2014 dash on one line.\n", "d.md");
     const flags = runRegexArm(chunks, pair);
     expect(flags).toHaveLength(1);
     expect(flags[0]?.line).toBe(1);
@@ -566,12 +566,12 @@ describe("inline code spans", () => {
   });
 
   test("an em dash inside a span is code, not prose", () => {
-    expect(runRegexArm(chunkDocument("Run `printf a — b` and stop.\n", "d.md"), pair)).toEqual([]);
-    expect(runRegexArm(chunkDocument("Run printf a — b and stop.\n", "d.md"), pair)).toHaveLength(1);
+    expect(runRegexArm(chunkDocument("Run `printf a \u2014 b` and stop.\n", "d.md"), pair)).toEqual([]);
+    expect(runRegexArm(chunkDocument("Run printf a \u2014 b and stop.\n", "d.md"), pair)).toHaveLength(1);
   });
 
   test("a span does not shift the line a later flag is reported on", () => {
-    const document = "Prose with `a: b:` in it.\nA second line — with a dash.\n";
+    const document = "Prose with `a: b:` in it.\nA second line \u2014 with a dash.\n";
     const flags = runRegexArm(chunkDocument(document, "d.md"), pair);
 
     expect(flags).toHaveLength(1);

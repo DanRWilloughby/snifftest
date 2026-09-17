@@ -127,8 +127,8 @@ describe("regex checks", () => {
 
   test("dash_present catches em and en dashes but not a hyphen", () => {
     const rule = builtinRule("dash_present");
-    expect(checkRegexRule(rule, "the window July 21–25")).toHaveLength(1);
-    expect(checkRegexRule(rule, "the refusal — and I did not plan for it")).toHaveLength(1);
+    expect(checkRegexRule(rule, "the window July 21\u201325")).toHaveLength(1);
+    expect(checkRegexRule(rule, "the refusal \u2014 and I did not plan for it")).toHaveLength(1);
     expect(checkRegexRule(rule, "a prompt-to-app tool, twenty-four hours")).toHaveLength(0);
   });
 

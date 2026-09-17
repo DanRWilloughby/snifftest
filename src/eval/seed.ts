@@ -291,7 +291,9 @@ function plant(rule: Rule, text: string, random: Random): Planted {
 
   switch (seed.transform) {
     case "insert_em_dash":
-      return commaTransform(text, count, where, " — ");
+      // Written as an escape so this source file holds no literal em dash of
+      // its own; the seeded paragraph gets the real character.
+      return commaTransform(text, count, where, " \u2014 ");
     case "add_colons":
       return commaTransform(text, colonsNeeded(rule, text, count), where, ": ");
     case "equalize_sentences":
