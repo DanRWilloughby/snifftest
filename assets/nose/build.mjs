@@ -99,15 +99,35 @@ function expand({ line, w, seed = 1, samples = 16, tremor = 0.3 }) {
   const startCap = cap(r0, l0, pStart, -pStart.ny, pStart.nx, Math.max(0.2, widthAt(w, 0) / 2));
   return `M${f2(l0[0])} ${f2(l0[1])}${catmull(left)}${endCap}${catmull(rightBack)}${startCap}Z`;
 }
-const strokes = (list, extra = "") => list.map((s) => `<path${extra}${s.opacity ? ` opacity="${s.opacity}"` : ""} d="${expand(s)}"/>`).join("\n        ");
+const strokes = (list, extra = "") => list.map((s) => `<path${extra}${s.opacity ? ` opacity="${s.opacity}"` : ""}${s.shift ? ` transform="translate(${s.shift[0]} ${s.shift[1]})"` : ""} d="${expand(s)}"/>`).join("\n        ");
+
+// Pencil hatching: short, slightly bowed parallel strokes with per-stroke jitter, as stroke paths.
+function hatchSet({ pts, len, angle, seed, w = 0.5, o = 0.42 }) {
+  const a = (angle * Math.PI) / 180;
+  const d = pts.map(([x, y], i) => {
+    const L = len * (1 + jitter(seed, i, 1) * 0.25);
+    const x0 = x + jitter(seed, i, 2) * 0.4, y0 = y + jitter(seed, i, 3) * 0.4;
+    const ex = Math.cos(a) * L, ey = Math.sin(a) * L;
+    const bow = jitter(seed, i, 4) * 0.5;
+    const cx = ex / 2 - Math.sin(a) * bow, cy = ey / 2 + Math.cos(a) * bow;
+    return `M${f2(x0)} ${f2(y0)}q${f2(cx)} ${f2(cy)} ${f2(ex)} ${f2(ey)}`;
+  });
+  return `<g fill="none" stroke="currentColor" stroke-width="${w}" stroke-linecap="round" opacity="${o}">${d.map((p) => `<path d="${p}"/>`).join("")}</g>`;
+}
 
 // ---- the drawings ------------------------------------------------------------------------------
 const W = {
   thinTaper: [[0, 0.9], [0.5, 2.6], [1, 0.9]],
   wisp: [[0, 1], [0.5, 2.8], [1, 1]],
   shine: [[0, 0.5], [0.5, 1.3], [1, 0.5]],
+  // round 2, pencil: a graphite line is thin and its pressure varies; ghosts are the searching passes
+  ghost: [[0, 0.25], [0.5, 0.55], [1, 0.25]],
+  pencilThin: [[0, 0.3], [0.5, 0.85], [1, 0.3]],
 };
 const ACCENT = "var(--nose-accent, #e4572e)";
+// Construction lines sit at 0.16 on the ink concepts and a little stronger on the pencil ones,
+// where the overlapping construction strokes are part of the look.
+const CONSTRUCTION_REST = { e: 0.16, f: 0.16 };
 
 const SPEC = {
   a: {
@@ -197,6 +217,99 @@ const SPEC = {
     ok: ['<path d="M16 34v12"/><path d="M10 40h12"/>', '<path d="M28 27v8"/><path d="M24 31h8"/>'],
     flick: ['<path d="M76 14l7-3"/><path d="M78 22l8-1"/>'],
   },
+  // ---- round 2: pencil sketch, unmistakably a nose ----
+  e: {
+    name: "Sketch",
+    title: "Sniff Test nose, concept E: Sketch, profile",
+    blurb: "Round 2. Pencil profile: brow into bridge, round tip, wing, nostril and a hint of the lip below. A quick sketchbook line, graphite not ink; the searching passes and the hatching are part of it.",
+    round: 2,
+    pencil: true,
+    construction: [
+      '<path d="M30 57c7.2 0 13 5.8 13 13s-5.8 13-13 13-13-5.8-13-13 5.6-13 12.6-13"/>',
+      '<path d="M59 15 37 55"/>',
+    ],
+    bridge: [
+      { line: "M59 15 C56.5 19 54.5 23 53.5 27 C51.5 35 46 44 39 52", w: [[0, 0.35], [0.25, 0.9], [0.55, 1.25], [0.85, 1], [1, 0.55]], seed: 101, samples: 24, opacity: 0.8 },
+      { line: "M55 24 C52.5 32 47 42 41 50", w: W.ghost, seed: 102, opacity: 0.3, tremor: 0.6, shift: [0.9, -0.3] },
+      { line: "M59 15 C56.5 19 54.5 23 53.5 27 C51.5 35 46 44 39 52", w: W.ghost, seed: 103, opacity: 0.22, tremor: 0.7, shift: [-0.7, 0.6] },
+    ],
+    hatchBridge: { pts: [[54.8, 30], [52.4, 34], [50.1, 38], [47.8, 42]], len: 4, angle: 160, seed: 7 },
+    wrinkle: [
+      { line: "M49.5 28 C52 26.6 54.5 25.2 57 24", w: W.pencilThin, seed: 111, opacity: 0.8 },
+      { line: "M47 35 C49.5 33.8 52 32.6 54.5 31.5", w: W.pencilThin, seed: 112, opacity: 0.8 },
+      { line: "M44.5 42 C47 41 49.5 40 52 39", w: W.pencilThin, seed: 113, opacity: 0.8 },
+    ],
+    tip: [
+      { line: "M39 52 C32 57 24 63 21.5 70 C19.5 76.5 24 82 31 82.5 C37 83 43 81 48 79", w: [[0, 0.5], [0.3, 1.05], [0.55, 1.3], [0.8, 1.15], [1, 0.5]], seed: 121, samples: 26, opacity: 0.8 },
+      { line: "M38 53.5 C31 58.5 23.5 64.5 21.5 71", w: W.ghost, seed: 122, opacity: 0.28, tremor: 0.6, shift: [-0.8, 0.2] },
+      { line: "M25 80 C30 83.5 38 83 46 80.5", w: W.ghost, seed: 123, opacity: 0.3, tremor: 0.5, shift: [0.3, 1] },
+    ],
+    hatchTip: { pts: [[26, 82], [29, 83.8], [32, 84.5], [35, 84.4], [38, 84], [41, 83.2], [44, 82.2]], len: 4.5, angle: 62, seed: 8 },
+    nostrilR: [
+      { line: "M46 60 C54 59 60.5 65 60 71.5 C59.5 75.5 55.5 79 50 79", w: [[0, 0.4], [0.4, 1.1], [0.8, 0.95], [1, 0.4]], seed: 131, samples: 20, opacity: 0.8 },
+    ],
+    nostrilRShape: '<path opacity="0.42" d="M39.5 77.2c2-1.7 5.6-2 8-0.5 1.3 0.8 0.6 2.1-0.9 2.3-2.5 0.3-5.7 0-7.1-1.8z"/>',
+    hatchNostril: { pts: [[41, 76.5], [43.5, 76.2], [46, 76.4]], len: 2.2, angle: 70, seed: 9, w: 0.45, o: 0.5 },
+    nostrilL: [{ line: "M27 74 C25.5 76 25.5 78.5 27 80.5", w: W.pencilThin, seed: 141, opacity: 0.4 }],
+    lip: [{ line: "M48 79.5 C49 83 49.5 87 48 91 C47 93.5 45 95 42.5 96.5", w: [[0, 0.35], [0.4, 0.8], [1, 0.4]], seed: 151, opacity: 0.55 }],
+    scent: [
+      { line: "M4 96 C8 90 0 84 5 78 C9 72 2 66 7 60", w: W.wisp, seed: 31 },
+      { line: "M11 100 C15 94 7 88 12 82 C16 76 9 70 14 64", w: W.wisp, seed: 32 },
+      { line: "M18 100 C22 95 15 91 19 86", w: W.wisp, seed: 33 },
+    ],
+    stink: ['<path d="M4 96l4-7-4-7 4-7-4-7 4-7"/>', '<path d="M12 100l4-7-4-7 4-7-4-7 4-7"/>', '<path d="M20 98l3-6-3-6 3-6"/>'],
+    ok: ['<path d="M14 30v11"/><path d="M8.5 35.5h11"/>', '<path d="M25 20v6"/><path d="M22 23h6"/>'],
+    flick: ['<path d="M68 12l7-3"/><path d="M70 20l8-1"/>'],
+  },
+  f: {
+    name: "Sketch ¾",
+    title: "Sniff Test nose, concept F: Sketch, three-quarter",
+    blurb: "Round 2 wildcard. Pencil three-quarter view: one bridge line, round tip, both wings and nostrils, philtrum and lip line below. Reads front-on at small sizes.",
+    round: 2,
+    pencil: true,
+    construction: [
+      '<path d="M47 50c7.7 0 14 6.3 14 14s-6.3 14-14 14-14-6.3-14-14 6-14 13.4-14"/>',
+      '<path d="M53 8 44 46"/>',
+    ],
+    bridge: [
+      { line: "M53 8 C51 18 48 32 44 46", w: [[0, 0.35], [0.3, 0.9], [0.6, 1.25], [1, 0.7]], seed: 201, samples: 22, opacity: 0.8 },
+      { line: "M61 14 C61 26 60 36 58 46", w: W.ghost, seed: 202, opacity: 0.2, tremor: 0.4 },
+      { line: "M53 8 C51 18 48 32 44 46", w: W.ghost, seed: 203, opacity: 0.22, tremor: 0.7, shift: [-0.8, 0.4] },
+    ],
+    hatchBridge: { pts: [[46, 24], [45.2, 29], [44.4, 34]], len: 3, angle: 20, seed: 17 },
+    wrinkle: [
+      { line: "M43 24 C46 23 49 22.5 52 22.5", w: W.pencilThin, seed: 211, opacity: 0.8 },
+      { line: "M42 31 C45 30 48 29.5 51 29.5", w: W.pencilThin, seed: 212, opacity: 0.8 },
+      { line: "M41 38 C44 37 47 36.5 50 36.5", w: W.pencilThin, seed: 213, opacity: 0.8 },
+    ],
+    tip: [
+      { line: "M44 46 C36 51 31.5 59 33.5 68 C35.5 77 43 81.5 51 81.5 C57 81.5 61 78 62 73", w: [[0, 0.5], [0.3, 1.05], [0.55, 1.3], [0.8, 1.15], [1, 0.5]], seed: 221, samples: 28, opacity: 0.8 },
+      { line: "M43 47.5 C35.5 52.5 31.5 60 33 68", w: W.ghost, seed: 222, opacity: 0.28, tremor: 0.6, shift: [-0.7, 0.3] },
+      { line: "M37 79 C43 82.5 50 83.5 57 81.5", w: W.ghost, seed: 223, opacity: 0.3, tremor: 0.5, shift: [0, 1] },
+    ],
+    hatchTip: { pts: [[37, 83.5], [40, 84.5], [43, 85], [46, 85.2], [49, 85], [52, 84.4], [55, 83.4]], len: 4, angle: 70, seed: 18 },
+    nostrilL: [{ line: "M35 62 C29.5 64 27 70.5 30.5 76.5", w: [[0, 0.4], [0.5, 1.15], [1, 0.45]], seed: 231, opacity: 0.85 }],
+    nostrilLShape: '<path opacity="0.42" d="M34.5 77.5c1.2-1.5 4-1.8 5.6-0.5 0.9 0.7 0.4 1.9-0.8 2.1-2 0.3-4.2 0-4.8-1.6z"/>',
+    nostrilR: [
+      { line: "M58.5 60 C66 59 71.5 65.5 70.5 72 C69.8 76.5 65 80 59.5 79.5", w: [[0, 0.4], [0.4, 1.2], [0.8, 1], [1, 0.4]], seed: 241, samples: 20, opacity: 0.85 },
+      { line: "M61.5 58 C67.5 55.5 73.5 59 75.5 65", w: W.ghost, seed: 242, opacity: 0.28, tremor: 0.3 },
+    ],
+    nostrilRShape: '<path opacity="0.42" d="M51.5 78c2-2.1 6.8-2.5 9.5-0.5 1.3 1 0.5 2.6-1.4 2.8-3.3 0.4-7 0-8.1-2.3z"/>',
+    hatchNostril: { pts: [[64, 71], [66, 74], [67, 77]], len: 3, angle: 125, seed: 19 },
+    lip: [
+      { line: "M46.5 83 C46 86.5 46 89.5 46.5 92.5", w: [[0, 0.3], [0.5, 0.7], [1, 0.35]], seed: 251, opacity: 0.45 },
+      { line: "M53.5 83 C54 86.5 54 89.5 53.5 92.5", w: [[0, 0.3], [0.5, 0.7], [1, 0.35]], seed: 252, opacity: 0.45 },
+      { line: "M38 95.5 C44 93.5 51 93.5 60 95.5", w: [[0, 0.3], [0.5, 0.8], [1, 0.35]], seed: 253, opacity: 0.5 },
+    ],
+    scent: [
+      { line: "M8 96 C12 90 4 84 9 78 C13 72 6 66 11 60", w: W.wisp, seed: 34 },
+      { line: "M15 100 C19 94 11 88 16 82 C20 76 13 70 18 64", w: W.wisp, seed: 35 },
+      { line: "M22 100 C26 95 19 91 23 86", w: W.wisp, seed: 36 },
+    ],
+    stink: ['<path d="M8 96l4-7-4-7 4-7-4-7 4-7"/>', '<path d="M16 100l4-7-4-7 4-7-4-7 4-7"/>', '<path d="M24 98l3-6-3-6 3-6"/>'],
+    ok: ['<path d="M14 30v11"/><path d="M8.5 35.5h11"/>', '<path d="M25 20v6"/><path d="M22 23h6"/>'],
+    flick: ['<path d="M74 12l7-3"/><path d="M76 20l8-1"/>'],
+  },
 };
 
 function conceptSvg(key) {
@@ -208,30 +321,39 @@ function conceptSvg(key) {
     tapered outline with a little tremor (assets/nose/build.mjs holds the drawing). No raster, no
     image generation. Ink is currentColor so the mark sits on any ground; the one accent is the CSS
     variable nose-accent. Every rig part carries id + data-part (use data-part when several copies
-    share a page). Transforms are applied by consumers per assets/nose/expressions.json.
+    share a page). Transforms are applied by consumers per assets/nose/expressions.json.${s.pencil ? `
+    Round 2, pencil: thin main contour at partial opacity, two fainter searching passes, hatching
+    for the shadow under the tip and beside the bridge, and a lip hint (group "lip", static, inside
+    "nose") so the silhouette reads as a nose on a face.` : ""}
   -->
   <g id="stage" data-part="stage" stroke-linecap="round" stroke-linejoin="round">
     <g id="nose" data-part="nose" fill="currentColor" stroke="none">
-      <g id="construction" data-part="construction" opacity="0.16" fill="none" stroke="currentColor" stroke-width="1.4">
+      <g id="construction" data-part="construction" opacity="${CONSTRUCTION_REST[key] ?? 0.16}" fill="none" stroke="currentColor" stroke-width="${s.pencil ? 0.7 : 1.4}">
         ${s.construction.join("\n        ")}
       </g>
       <g id="bridge" data-part="bridge">
         ${strokes(s.bridge)}
+        ${s.hatchBridge ? hatchSet(s.hatchBridge) : ""}
         <g id="wrinkle" data-part="wrinkle" opacity="0">
           ${strokes(s.wrinkle)}
         </g>
       </g>
       <g id="tip" data-part="tip">
         ${strokes(s.tip)}
+        ${s.hatchTip ? hatchSet(s.hatchTip) : ""}
       </g>
       <g id="nostril-r" data-part="nostril-r">
         ${strokes(s.nostrilR)}
         ${s.nostrilRShape ?? ""}
+        ${s.hatchNostril ? hatchSet(s.hatchNostril) : ""}
       </g>
       <g id="nostril-l" data-part="nostril-l">
         ${strokes(s.nostrilL)}
         ${s.nostrilLShape ?? ""}
-      </g>
+      </g>${s.lip ? `
+      <g id="lip" data-part="lip">
+        ${strokes(s.lip)}
+      </g>` : ""}
     </g>
     <g id="scent" data-part="scent" fill="${ACCENT}" stroke="none" opacity="0">
       ${strokes(s.scent)}
@@ -254,13 +376,16 @@ function conceptSvg(key) {
 
 mkdirSync(join(ROOT, "concepts"), { recursive: true });
 const CONCEPTS = {
-  a: { name: "Snoot", file: "concepts/a-snoot.svg", blurb: SPEC.a.blurb },
-  b: { name: "Bulb", file: "concepts/b-bulb.svg", blurb: SPEC.b.blurb },
-  c: { name: "Beak", file: "concepts/c-beak.svg", blurb: SPEC.c.blurb },
-  d: { name: "Blot", file: "concepts/d-blot.svg", blurb: "Solid ink silhouette, knock-out nostril. Woodcut weight; wins at 16 px, loses the pen line." },
+  a: { name: "Snoot", file: "concepts/a-snoot.svg", blurb: SPEC.a.blurb, round: 1 },
+  b: { name: "Bulb", file: "concepts/b-bulb.svg", blurb: SPEC.b.blurb, round: 1 },
+  c: { name: "Beak", file: "concepts/c-beak.svg", blurb: SPEC.c.blurb, round: 1 },
+  d: { name: "Blot", file: "concepts/d-blot.svg", blurb: "Solid ink silhouette, knock-out nostril. Woodcut weight; wins at 16 px, loses the pen line.", round: 1 },
+  e: { name: "Sketch", file: "concepts/e-sketch.svg", blurb: SPEC.e.blurb, round: 2 },
+  f: { name: "Sketch ¾", file: "concepts/f-sketch-3q.svg", blurb: SPEC.f.blurb, round: 2 },
 };
-for (const k of ["a", "b", "c"]) writeFileSync(join(ROOT, CONCEPTS[k].file), conceptSvg(k));
-const RECOMMENDED = "a";
+for (const k of ["a", "b", "c", "e", "f"]) writeFileSync(join(ROOT, CONCEPTS[k].file), conceptSvg(k));
+const RECOMMENDED = "e"; // round 2 recommendation; A stays the round 1 recommendation until Dan picks
+const FRAMED = ["a", "e"]; // concepts that get a baked frame set
 
 // ---- expression manifest --------------------------------------------------------------------------
 const PARTS = ["nose", "bridge", "tip", "nostril-l", "nostril-r", "wrinkle", "construction", "scent", "stink", "mark-ok", "mark-flick"];
@@ -270,6 +395,8 @@ const PIVOTS = {
   b: { nose: [50, 28], bridge: [50, 48], tip: [50, 66], "nostril-l": [34, 71], "nostril-r": [66, 71], wrinkle: [50, 37], construction: [50, 50], scent: [50, 85], stink: [50, 85], "mark-ok": [50, 25], "mark-flick": [82, 16] },
   c: { nose: [66, 8], bridge: [25, 51], tip: [18, 64], "nostril-r": [50, 62], "nostril-l": [7, 65], wrinkle: [49, 28], construction: [30, 40], scent: [14, 86], stink: [14, 86], "mark-ok": [20, 36], "mark-flick": [80, 18] },
   d: { nose: [58, 8], bridge: [46, 42], tip: [34, 66], "nostril-r": [54, 76], "nostril-l": [16, 76], wrinkle: [50, 28], construction: [33, 60], scent: [10, 80], stink: [10, 80], "mark-ok": [18, 30], "mark-flick": [72, 18] },
+  e: { nose: [59, 15], bridge: [39, 52], tip: [30, 70], "nostril-r": [53, 70], "nostril-l": [26, 77], wrinkle: [50, 35], construction: [35, 55], scent: [10, 80], stink: [10, 80], "mark-ok": [18, 30], "mark-flick": [72, 18] },
+  f: { nose: [52, 8], bridge: [44, 46], tip: [47, 64], "nostril-l": [32, 71], "nostril-r": [64, 70], wrinkle: [47, 30], construction: [48, 60], scent: [14, 80], stink: [14, 80], "mark-ok": [18, 30], "mark-flick": [78, 16] },
 };
 const BASE = {
   rest: {},
@@ -286,6 +413,12 @@ const OVERRIDES = {
     wrinkle: { nose: { r: 0, ty: 1 }, "nostril-r": { sx: 0.85, sy: 0.8, r: -8 }, "nostril-l": { sx: 0.85, sy: 0.8, r: 8 } },
     recoil: { nose: { tx: 0, ty: -7, r: 0, sx: 0.88, sy: 0.88 } },
   },
+  f: {
+    sniff: { nose: { r: -2, ty: -2, sy: 1.03 } },
+    approve: { nose: { r: -4, ty: -3 } },
+    wrinkle: { nose: { r: 2, ty: 1 }, "nostril-l": { sx: 0.85, sy: 0.8, r: 8 }, "nostril-r": { sx: 0.85, sy: 0.8, r: -8 } },
+    recoil: { nose: { tx: 5, ty: -6, r: 6, sx: 0.9, sy: 0.9 } },
+  },
 };
 const REST_OPACITY = { wrinkle: 0, scent: 0, stink: 0, "mark-ok": 0, "mark-flick": 0, construction: 0.16 };
 const EXPRESSIONS = Object.keys(BASE);
@@ -299,7 +432,10 @@ const TIMING = {
 };
 function fullState(concept, expr) {
   const out = {};
-  for (const p of PARTS) out[p] = { ...ID, o: REST_OPACITY[p] ?? 1, ...(BASE[expr][p] ?? {}), ...(OVERRIDES[concept]?.[expr]?.[p] ?? {}) };
+  for (const p of PARTS) {
+    const rest = p === "construction" ? (CONSTRUCTION_REST[concept] ?? REST_OPACITY.construction) : (REST_OPACITY[p] ?? 1);
+    out[p] = { ...ID, o: rest, ...(BASE[expr][p] ?? {}), ...(OVERRIDES[concept]?.[expr]?.[p] ?? {}) };
+  }
   return out;
 }
 const manifest = {
@@ -313,7 +449,7 @@ const manifest = {
   concepts: {},
 };
 for (const [key, c] of Object.entries(CONCEPTS)) {
-  manifest.concepts[key] = { name: c.name, file: c.file, pivots: PIVOTS[key], expressions: {} };
+  manifest.concepts[key] = { name: c.name, file: c.file, round: c.round, frames: FRAMED.includes(key), pivots: PIVOTS[key], expressions: {} };
   for (const e of EXPRESSIONS) manifest.concepts[key].expressions[e] = fullState(key, e);
 }
 writeFileSync(join(ROOT, "expressions.json"), JSON.stringify(manifest, null, 2) + "\n");
@@ -359,23 +495,25 @@ function boil(svg, frameSeed, amplitude = 0.4) {
 const src = {};
 for (const [k, c] of Object.entries(CONCEPTS)) src[k] = readFileSync(join(ROOT, c.file), "utf8");
 
-// ---- frames of the recommended concept --------------------------------------------------------------
+// ---- frames of the recommended concepts (round 1 A, round 2 E) ---------------------------------------
 mkdirSync(join(ROOT, "frames"), { recursive: true });
-EXPRESSIONS.forEach((e, i) => {
-  let frame = bake(src[RECOMMENDED], RECOMMENDED, e);
-  frame = boil(frame, 17 + i * 31);
-  frame = frame.replace(/<title>[^<]*<\/title>/, `<title>Sniff Test nose, frame: ${e}</title>`);
-  frame = frame.replace(/<!--[\s\S]*?-->\n?/, `<!-- Baked frame "${e}" of concept ${RECOMMENDED.toUpperCase()}: manifest transforms applied, outlines re-wobbled for line boil. -->\n`);
-  writeFileSync(join(ROOT, "frames", `${RECOMMENDED}-${String(i + 1).padStart(2, "0")}-${e}.svg`), frame);
-});
+for (const rc of FRAMED) {
+  EXPRESSIONS.forEach((e, i) => {
+    let frame = bake(src[rc], rc, e);
+    frame = boil(frame, 17 + i * 31, SPEC[rc].pencil ? 0.3 : 0.4);
+    frame = frame.replace(/<title>[^<]*<\/title>/, `<title>Sniff Test nose, frame: ${e}</title>`);
+    frame = frame.replace(/<!--[\s\S]*?-->\n?/, `<!-- Baked frame "${e}" of concept ${rc.toUpperCase()}: manifest transforms applied, outlines re-wobbled for line boil. -->\n`);
+    writeFileSync(join(ROOT, "frames", `${rc}-${String(i + 1).padStart(2, "0")}-${e}.svg`), frame);
+  });
+}
 
-// ---- favicon cut: construction marks dropped, weight up, filled to the box -------------------------
+// ---- favicon cuts: construction marks dropped, weight up, filled to the box -------------------------
 {
-  const s = SPEC[RECOMMENDED];
+  const s = SPEC.a;
   const heavier = (list, k) => list.map((st) => ({ ...st, w: st.w.map(([u, w]) => [u, w * k + 0.6]) }));
   const fav = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Sniff Test">
   <title>Sniff Test favicon</title>
-  <!-- Favicon cut of the recommended concept: the same strokes, heavier, no construction marks, filled to the box. -->
+  <!-- Favicon cut of concept A (round 1): the same strokes, heavier, no construction marks, filled to the box. -->
   <g transform="translate(50 50) scale(1.24) translate(-40 -47)" fill="currentColor">
     ${strokes(heavier(s.bridge, 1.3))}
     ${strokes(heavier(s.tip, 1.25))}
@@ -387,11 +525,31 @@ EXPRESSIONS.forEach((e, i) => {
 `;
   writeFileSync(join(ROOT, "favicon.svg"), fav);
 }
+{
+  // Round 2: the pencil line is too thin to survive 16 px, so the favicon cut keeps only the main
+  // contours (no ghosts, hatching or lip) and puts the weight up. Still the same centrelines.
+  const s = SPEC.e;
+  const heavy = (list) => list.slice(0, 1).map((st) => ({ ...st, opacity: undefined, shift: undefined, tremor: 0.25, w: st.w.map(([u, w]) => [u, w * 5 + 1.8]) }));
+  const fav = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Sniff Test">
+  <title>Sniff Test favicon, sketch cut</title>
+  <!-- Favicon cut of concept E (round 2): main contours only, weight up so the pencil line survives 16 px, filled to the box. -->
+  <g transform="translate(50 50) scale(1.22) translate(-41 -48)" fill="currentColor">
+    ${strokes(heavy(s.bridge))}
+    ${strokes(heavy(s.tip))}
+    ${strokes(heavy(s.nostrilR))}
+    ${s.nostrilRShape.replace(/opacity="[^"]*"/, 'opacity="1"')}
+  </g>
+</svg>
+`;
+  writeFileSync(join(ROOT, "favicon-sketch.svg"), fav);
+}
 
 // ---- the contact sheet ------------------------------------------------------------------------------
-const frames = EXPRESSIONS.map((e, i) => readFileSync(join(ROOT, "frames", `${RECOMMENDED}-${String(i + 1).padStart(2, "0")}-${e}.svg`), "utf8"));
-const favicon = readFileSync(join(ROOT, "favicon.svg"), "utf8");
 const stripXml = (s) => s.replace(/^\s*<\?xml[^>]*>\s*/, "").replace(/<!--[\s\S]*?-->\n?/g, "");
+const frameSets = {};
+for (const rc of FRAMED) frameSets[rc] = EXPRESSIONS.map((e, i) => stripXml(readFileSync(join(ROOT, "frames", `${rc}-${String(i + 1).padStart(2, "0")}-${e}.svg`), "utf8")));
+const favicon = readFileSync(join(ROOT, "favicon.svg"), "utf8");
+const faviconSketch = readFileSync(join(ROOT, "favicon-sketch.svg"), "utf8");
 
 const html = `<!doctype html>
 <html lang="en">
@@ -399,7 +557,7 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sniff Test nose, contact sheet</title>
-<meta name="description" content="Four hand-drawn nose concepts, six expressions, three sizes, two grounds. Pick a letter.">
+<meta name="description" content="Two rounds of hand-drawn nose concepts, six expressions, three sizes, two grounds. Pick a letter.">
 <style>
   :root { --ink:#141414; --ground:#ffffff; --ground-2:#f2f3f5; --line:#d9dbe0; --muted:#6b6f78; --nose-accent:#e4572e; --dark-ground:#141414; --dark-ink:#f2f2f2; --dark-line:#2e3036; }
   * { box-sizing:border-box; }
@@ -457,28 +615,32 @@ const html = `<!doctype html>
 <body>
 <main>
   <h1>Sniff Test nose, contact sheet</h1>
-  <p>Four hand-drawn concepts, then the recommended one in every expression at 16, 64 and 400 px on light and dark, then rig versus frames in motion. <b>Pick a concept with a letter (A, B, C, D) and a motion style with a letter (R rig, F frames).</b> Ink is the current text colour; the only accent is one warm red on the scent and stink lines.</p>
+  <p>Two rounds. Round 1 (A to D) is the inked cartoon. Round 2 (E, F) is the pencil sketch after the note that the edges were too bold and the shape not clearly enough a nose. Same rig, same six expressions, same transform hooks on both. <b>Pick a concept with a letter (A to F) and a motion style with a letter (R rig, F frames).</b> Ink is the current text colour; the only accent is one warm red on the scent and stink lines.</p>
 
-  <h2>1. Concepts</h2>
-  <p>Each at rest and in recoil, light and dark, with the 16, 32 and 64 px reads underneath. Recommended: <b>A, Snoot</b>. Wildcard: <b>D, Blot</b> for the strongest favicon.</p>
+  <h2>1. Round 1 versus round 2</h2>
+  <p>The round 1 recommendation (A) above the two round 2 drawings (E profile, F three-quarter), in three states, light and dark, at 16, 64 and 400 px. Round 2 recommendation: <b>E, Sketch</b>. Wildcard: <b>F, Sketch three-quarter</b>.</p>
+  <div class="grid" id="compare"></div>
+
+  <h2>2. Concepts</h2>
+  <p>Each at rest and in recoil, light and dark, with the 16, 32 and 64 px reads underneath. Round 2 first, then round 1 as shipped.</p>
   <div class="concepts" id="concepts"></div>
 
-  <h2>2. Expressions at 16, 64 and 400 px</h2>
+  <h2>3. Expressions at 16, 64 and 400 px</h2>
   <p>Six named states, each a set of per-part transforms in the expressions manifest: rest, sniff, approve, wrinkle, recoil, twitch. Switch the concept to see the same rig on another drawing.</p>
   <div class="toolbar" id="conceptSwitch"></div>
   <div class="grid" id="grid"></div>
 
-  <h2>3. Motion: rig versus frames</h2>
-  <p><b>R</b> tweens the one rigged SVG between states (what the serve page and the reel would do). <b>F</b> jump-cuts through six baked frames whose lines were redrawn with a little boil, the way a hand-drawn cycle looks. Same beat schedule on both.</p>
+  <h2>4. Motion: rig versus frames</h2>
+  <p><b>R</b> tweens the one rigged SVG between states (what the serve page and the reel would do). <b>F</b> jump-cuts through six baked frames whose lines were redrawn with a little boil, the way a hand-drawn cycle looks. Same beat schedule on both. Frames are baked for A and E.</p>
   <div class="motion">
     <div class="card"><header><span class="letter">R</span><span class="name">Rig, tweened</span><span class="tag" id="rigCap"></span></header>
       <div class="pair"><div class="ground light"><div class="stage" id="rigLight"></div><div class="cap" data-cap></div></div><div class="ground dark"><div class="stage" id="rigDark"></div><div class="cap" data-cap></div></div></div></div>
-    <div class="card"><header><span class="letter">F</span><span class="name">Frames, jump-cut with boil</span><span class="tag">concept A only</span></header>
+    <div class="card"><header><span class="letter">F</span><span class="name">Frames, jump-cut with boil</span><span class="tag" id="frCap"></span></header>
       <div class="pair"><div class="ground light"><div class="stage" id="frLight"></div><div class="cap" data-cap></div></div><div class="ground dark"><div class="stage" id="frDark"></div><div class="cap" data-cap></div></div></div></div>
   </div>
 
-  <h2>4. In a browser tab</h2>
-  <p>The rig itself at 16 px beside a favicon cut of the same strokes (construction marks dropped, weight up, filled to the box).</p>
+  <h2>5. In a browser tab</h2>
+  <p>The round 2 rig itself at 16 px beside its favicon cut (main contours only, weight up, filled to the box) and the round 1 cut for comparison. A pencil line does not survive 16 px on its own, so the favicon is allowed to be heavier than the 400 px art.</p>
   <div class="favs" id="favs"></div>
   <div class="note">Self-contained file: every SVG is inline, nothing loads from the network.</div>
 </main>
@@ -486,8 +648,11 @@ const html = `<!doctype html>
 const MANIFEST = ${JSON.stringify(manifest)};
 const SRC = ${JSON.stringify(Object.fromEntries(Object.entries(src).map(([k, v]) => [k, stripXml(v)])))};
 const BLURB = ${JSON.stringify(Object.fromEntries(Object.entries(CONCEPTS).map(([k, c]) => [k, c.blurb])))};
-const FRAMES = ${JSON.stringify(frames.map(stripXml))};
+const FRAMES = ${JSON.stringify(frameSets)};
 const FAVICON = ${JSON.stringify(stripXml(favicon))};
+const FAVICON_SKETCH = ${JSON.stringify(stripXml(faviconSketch))};
+const COMPARE = ["a", "e", "f"];
+const ORDER = ["e", "f", "a", "b", "c", "d"];
 const EXPR = MANIFEST.expressions;
 const PARTS = MANIFEST.parts;
 let uid = 0;
@@ -528,12 +693,35 @@ function cell(svg, label) {
   return c;
 }
 
-// 1. concepts
+// 1. round 1 versus round 2
+{
+  const grid = document.getElementById("compare");
+  grid.innerHTML = '<div class="hdr">state, concept</div><div class="hdr">light, 16 / 64 / 400</div><div class="hdr dark">dark, 16 / 64 / 400</div>';
+  for (const e of ["rest", "sniff", "recoil"]) {
+    for (const k of COMPARE) {
+      const c = MANIFEST.concepts[k];
+      const lbl = document.createElement("div"); lbl.className = "lbl";
+      lbl.innerHTML = e + '<small>' + k.toUpperCase() + ' ' + c.name + ', round ' + c.round + '</small>';
+      grid.appendChild(lbl);
+      for (const g of ["light", "dark"]) {
+        const gr = document.createElement("div"); gr.className = "ground " + g;
+        gr.appendChild(cell(posed(k, e, 16), "16"));
+        gr.appendChild(cell(posed(k, e, 64), "64"));
+        gr.appendChild(cell(posed(k, e, 400), "400"));
+        grid.appendChild(gr);
+      }
+    }
+  }
+}
+
+// 2. concepts
 {
   const host = document.getElementById("concepts");
-  for (const [k, c] of Object.entries(MANIFEST.concepts)) {
+  for (const k of ORDER) {
+    const c = MANIFEST.concepts[k];
+    const tag = "round " + c.round + (k === MANIFEST.recommended ? ", recommended" : (k === "a" ? ", round 1 pick" : ""));
     const card = document.createElement("div"); card.className = "card";
-    card.innerHTML = '<header><span class="letter">' + k.toUpperCase() + '</span><span class="name">' + c.name + '</span><span class="tag">' + (k === MANIFEST.recommended ? "recommended" : "") + '</span></header><p>' + BLURB[k] + '</p>';
+    card.innerHTML = '<header><span class="letter">' + k.toUpperCase() + '</span><span class="name">' + c.name + '</span><span class="tag">' + tag + '</span></header><p>' + BLURB[k] + '</p>';
     const pair = document.createElement("div"); pair.className = "pair";
     for (const g of ["light", "dark"]) {
       const gr = document.createElement("div"); gr.className = "ground " + g;
@@ -554,7 +742,7 @@ function cell(svg, label) {
   }
 }
 
-// 2. expression grid, switchable concept
+// 3. expression grid, switchable concept
 let current = MANIFEST.recommended;
 function renderGrid() {
   const grid = document.getElementById("grid");
@@ -576,7 +764,7 @@ function renderGrid() {
 }
 {
   const bar = document.getElementById("conceptSwitch");
-  for (const k of Object.keys(MANIFEST.concepts)) {
+  for (const k of ORDER) {
     const b = document.createElement("button");
     b.textContent = k.toUpperCase() + " " + MANIFEST.concepts[k].name;
     b.setAttribute("aria-pressed", String(k === current));
@@ -594,10 +782,12 @@ function resetMotion() {
     const host = document.getElementById(id); host.innerHTML = "";
     rigs[id] = instance(SRC[current], 240); host.appendChild(rigs[id]);
   }
+  const fr = FRAMES[current];
   for (const id of ["frLight", "frDark"]) {
     const host = document.getElementById(id); host.innerHTML = "";
-    frameEls[id] = FRAMES.map((f) => { const s = instance(f, 240); host.appendChild(s); return s; });
+    frameEls[id] = fr ? fr.map((f) => { const s = instance(f, 240); host.appendChild(s); return s; }) : [];
   }
+  document.getElementById("frCap").textContent = fr ? "concept " + current.toUpperCase() : "no frames baked for " + current.toUpperCase();
 }
 resetMotion();
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -624,23 +814,25 @@ function tick(now) {
 }
 requestAnimationFrame(tick);
 
-// 4. favicon strips
+// 5. favicon strips
 {
   const host = document.getElementById("favs");
   for (const g of ["light", "dark"]) {
     const card = document.createElement("div"); card.className = "card";
     const tabs = document.createElement("div"); tabs.className = "tabs " + g;
     const mk = (svg, text, inactive) => { const t = document.createElement("div"); t.className = "tab" + (inactive ? " inactive" : ""); t.appendChild(svg); const s = document.createElement("span"); s.textContent = text; t.appendChild(s); return t; };
-    tabs.appendChild(mk(posed(MANIFEST.recommended, "rest", 16), "Sniff Test, rig at 16"));
-    tabs.appendChild(mk(instance(FAVICON, 16), "Sniff Test, favicon cut", true));
-    tabs.appendChild(mk(posed(MANIFEST.recommended, "recoil", 16), "recoil at 16", true));
+    tabs.appendChild(mk(instance(FAVICON_SKETCH, 16), "Sniff Test, round 2 cut"));
+    tabs.appendChild(mk(posed(MANIFEST.recommended, "rest", 16), "rig E at 16", true));
+    tabs.appendChild(mk(instance(FAVICON, 16), "round 1 cut", true));
     card.appendChild(tabs);
     const gr = document.createElement("div"); gr.className = "ground " + g;
     const row = document.createElement("div"); row.className = "row";
-    row.appendChild(cell(posed(MANIFEST.recommended, "rest", 32), "rig 32"));
-    row.appendChild(cell(instance(FAVICON, 32), "favicon 32"));
-    row.appendChild(cell(instance(FAVICON, 64), "favicon 64"));
-    row.appendChild(cell(instance(FAVICON, 128), "favicon 128"));
+    row.appendChild(cell(posed(MANIFEST.recommended, "rest", 32), "rig E 32"));
+    row.appendChild(cell(instance(FAVICON_SKETCH, 32), "round 2 cut 32"));
+    row.appendChild(cell(instance(FAVICON_SKETCH, 64), "round 2 cut 64"));
+    row.appendChild(cell(instance(FAVICON_SKETCH, 128), "round 2 cut 128"));
+    row.appendChild(cell(instance(FAVICON, 32), "round 1 cut 32"));
+    row.appendChild(cell(instance(FAVICON, 64), "round 1 cut 64"));
     gr.appendChild(row);
     card.appendChild(gr);
     host.appendChild(card);
@@ -651,4 +843,4 @@ requestAnimationFrame(tick);
 </html>
 `;
 writeFileSync(join(ROOT, "contact-sheet.html"), html);
-console.log("wrote concepts a/b/c, expressions.json, frames/, favicon.svg, contact-sheet.html");
+console.log("wrote concepts a/b/c/e/f, expressions.json, frames/ (a, e), favicon.svg, favicon-sketch.svg, contact-sheet.html");
