@@ -158,6 +158,9 @@ async function handle(req: IncomingMessage, res: ServerResponse, options: ServeO
   }
 
   if (path === "/") {
+    // A page load is a fresh start: the new page has sent nothing yet, so nothing
+    // is remembered on its behalf. It also makes every capture of the page the same.
+    if (req.method === "GET") options.scorer.forget();
     const nonce = randomBytes(18).toString("base64");
     respond(res, 200, "text/html; charset=utf-8", renderPage(options.page, nonce), {
       "content-security-policy": pagePolicy(nonce),

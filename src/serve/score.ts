@@ -79,6 +79,11 @@ export interface ScoreResult {
 
 export interface Scorer {
   score(draft: string): Promise<ScoreResult>;
+  /**
+   * Forget every remembered paragraph. The server calls this each time the page
+   * is loaded, so what a page says it sent is about that page and nothing before it.
+   */
+  forget(): void;
 }
 
 export interface ScorerOptions {
@@ -108,6 +113,10 @@ export function createScorer(options: ScorerOptions): Scorer {
   const remembered = new Map<string, Readonly<Record<string, number>>>();
 
   return {
+    forget(): void {
+      remembered.clear();
+    },
+
     async score(draft: string): Promise<ScoreResult> {
       const text = draft.replace(/\r\n?/g, "\n");
       const placed = place(chunkDocument(text, "draft", { maxChars: STATE_GUARD_CHARS }), text);

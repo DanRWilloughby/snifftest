@@ -450,6 +450,21 @@ describe("serve: replay mode", () => {
     expect(borderline.reaction).toBe("twitch");
   });
 
+  test("a page load is a fresh start: the same paragraph is answered in full again, so a capture repeats", async () => {
+    const { port } = await replayServer();
+    const draft = "We said a thing. In short, we said it.";
+
+    expect(JSON.parse((await scorePost(port, draft)).body)).toMatchObject({ asked: 1, ms: 412 });
+    expect(JSON.parse((await scorePost(port, draft)).body)).toMatchObject({ asked: 0, skipped: 1, ms: 0 });
+
+    // HEAD is a probe, not a page in front of anyone.
+    await send(port, { method: "HEAD" });
+    expect(JSON.parse((await scorePost(port, draft)).body)).toMatchObject({ asked: 0, ms: 0 });
+
+    await send(port, {});
+    expect(JSON.parse((await scorePost(port, draft)).body)).toMatchObject({ asked: 1, skipped: 0, ms: 412 });
+  });
+
   test("never calls out: a fetch that throws is never reached", async () => {
     const original = globalThis.fetch;
     let calls = 0;
