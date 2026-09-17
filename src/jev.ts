@@ -294,6 +294,8 @@ async function post(
       );
     }
 
+    // SAFETY: `json()` is typed `any`; widening it to `unknown` is what forces
+    // `readAnswer` to check every field instead of trusting the wire.
     return (await response.json()) as unknown;
   } catch (error) {
     if (error instanceof JevError) throw error;
@@ -328,6 +330,8 @@ function readAnswer(parsed: unknown): Answer {
   const inputTokens = countOf(usage?.["input_tokens"]);
 
   return {
+    // SAFETY: the `typeof` check on the same line proves the field is a string;
+    // the index signature returns `unknown` and does not carry that across.
     model: typeof root?.["model"] === "string" ? (root["model"] as string) : MODEL,
     nouls,
     inputTokens,
