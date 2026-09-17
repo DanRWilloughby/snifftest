@@ -5,7 +5,7 @@
  * validated here and answered elsewhere; nothing in this file calls out.
  */
 
-import type { Match, RegexRule, Rule, Ruleset, Seed } from "./types.ts";
+import type { BuiltinRule, Match, RegexRule, Rule, Ruleset, Seed } from "./types.ts";
 import { type YamlValue, parseYaml } from "./yaml.ts";
 
 export class RulesetError extends Error {
@@ -35,7 +35,7 @@ const DEFAULT_COLON_MIN = 3;
 const DEFAULT_RHYTHM_FLOOR = 0.25;
 const DEFAULT_MIN_SENTENCES = 4;
 
-type BuiltinCheck = (text: string, rule: RegexRule) => Match[];
+type BuiltinCheck = (text: string, rule: BuiltinRule) => Match[];
 
 const BUILTINS: Readonly<Record<string, BuiltinCheck>> = {
   dash_present: dashPresent,
@@ -111,24 +111,19 @@ function validateRule(entry: YamlValue, file: string): Rule {
   }
 
   const seed = validateSeed(entry.seed, where);
+  const common = {
+    id,
+    message,
+    ...(seed === undefined ? {} : { seed }),
+  };
   const kind = entry.kind;
 
-  if (kind === "regex") {
-    return {
-      id,
-      kind: "regex",
-      message,
-      ...(seed === undefined ? {} : { seed }),
-      ...validateRegexBody(entry, where),
-    };
-  }
+  if (kind === "regex") return validateRegexRule(entry, where, common);
 
   if (kind === "judgment") {
     return {
-      id,
+      ...common,
       kind: "judgment",
-      message,
-      ...(seed === undefined ? {} : { seed }),
       ...validateJudgmentBody(entry, where),
     };
   }
@@ -136,10 +131,17 @@ function validateRule(entry: YamlValue, file: string): Rule {
   throw new RulesetError(`${where}: kind must be "regex" or "judgment"`);
 }
 
-function validateRegexBody(
+interface CommonFields {
+  readonly id: string;
+  readonly message: string;
+  readonly seed?: Seed;
+}
+
+function validateRegexRule(
   entry: Readonly<Record<string, YamlValue>>,
   where: string,
-): Omit<RegexRule, "id" | "kind" | "message" | "seed"> {
+  common: CommonFields,
+): RegexRule {
   const builtin = entry.builtin;
   const pattern = entry.pattern;
   const hasBuiltin = builtin !== undefined && builtin !== null;
@@ -154,6 +156,15 @@ function validateRegexBody(
     throw new RulesetError(`${where}: flags must be a string`);
   }
 
+  const tuning = {
+    ...numberField(entry.min, "min", where),
+    ...numberField(entry.floor, "floor", where),
+    ...numberField(entry.min_sentences, "min_sentences", where),
+    ...(entry.words === undefined || entry.words === null
+      ? {}
+      : { words: stringList(entry.words, "words", where) }),
+  };
+
   if (hasPattern) {
     if (typeof pattern !== "string") {
       throw new RulesetError(`${where}: pattern must be a string`);
@@ -163,21 +174,24 @@ function validateRegexBody(
     } catch (error) {
       throw new RulesetError(`${where}: pattern is not a valid regular expression (${reason(error)})`);
     }
-  } else if (typeof builtin !== "string" || !Object.hasOwn(BUILTINS, builtin)) {
-    throw new RulesetError(`${where}: unknown built-in "${String(builtin)}"`);
+    return {
+      ...common,
+      kind: "regex",
+      source: "pattern",
+      pattern,
+      ...(typeof flags === "string" ? { flags } : {}),
+      ...tuning,
+    };
   }
 
-  return {
-    ...(hasBuiltin ? { builtin: builtin as string } : {}),
-    ...(hasPattern ? { pattern: pattern as string } : {}),
-    ...(typeof flags === "string" ? { flags } : {}),
-    ...numberField(entry.min, "min", where),
-    ...numberField(entry.floor, "floor", where),
-    ...numberField(entry.min_sentences, "min_sentences", where),
-    ...(entry.words === undefined || entry.words === null
-      ? {}
-      : { words: stringList(entry.words, "words", where) }),
-  };
+  if (typeof builtin !== "string" || !Object.hasOwn(BUILTINS, builtin)) {
+    throw new RulesetError(`${where}: unknown built-in "${String(builtin)}"`);
+  }
+  if (typeof flags === "string") {
+    throw new RulesetError(`${where}: flags belong to a pattern, not to the built-in "${builtin}"`);
+  }
+
+  return { ...common, kind: "regex", source: "builtin", builtin, ...tuning };
 }
 
 function validateJudgmentBody(
@@ -244,12 +258,12 @@ function validateSeed(value: YamlValue | undefined, where: string): Seed | undef
 
 /** Run one countable rule over one chunk of text. Never touches the network. */
 export function checkRegexRule(rule: RegexRule, text: string): Match[] {
-  if (rule.pattern !== undefined) {
+  if (rule.source === "pattern") {
     return patternMatches(new RegExp(rule.pattern, withGlobal(rule.flags ?? "")), text);
   }
-  const check = rule.builtin === undefined ? undefined : BUILTINS[rule.builtin];
+  const check = BUILTINS[rule.builtin];
   if (check === undefined) {
-    throw new RulesetError(`rule "${rule.id}": unknown built-in "${String(rule.builtin)}"`);
+    throw new RulesetError(`rule "${rule.id}": unknown built-in "${rule.builtin}"`);
   }
   return check(text, rule);
 }
@@ -258,7 +272,7 @@ function dashPresent(text: string): Match[] {
   return patternMatches(/[–—]/g, text);
 }
 
-function colonCount(text: string, rule: RegexRule): Match[] {
+function colonCount(text: string, rule: BuiltinRule): Match[] {
   const min = rule.min ?? DEFAULT_COLON_MIN;
   const first = text.indexOf(":");
   let count = 0;
@@ -266,7 +280,7 @@ function colonCount(text: string, rule: RegexRule): Match[] {
   return count >= min && first !== -1 ? [{ index: first }] : [];
 }
 
-function sentenceRhythm(text: string, rule: RegexRule): Match[] {
+function sentenceRhythm(text: string, rule: BuiltinRule): Match[] {
   const floor = rule.floor ?? DEFAULT_RHYTHM_FLOOR;
   const minSentences = rule.min_sentences ?? DEFAULT_MIN_SENTENCES;
 
@@ -330,6 +344,8 @@ function stringList(value: YamlValue | undefined, name: string, where: string): 
   if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
     throw new RulesetError(`${where}: ${name} must be a list of strings`);
   }
+  // SAFETY: the guard above proves every element is a string; `some` narrows the
+  // elements for a human but not for the type checker.
   return value as string[];
 }
 

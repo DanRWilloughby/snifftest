@@ -28,13 +28,8 @@ interface RuleCommon {
   readonly seed?: Seed;
 }
 
-/** A countable rule. It runs locally and never touches the network. */
-export interface RegexRule extends RuleCommon {
-  readonly kind: "regex";
-  /** A named built-in check, or a `pattern`, but never both. */
-  readonly builtin?: string;
-  readonly pattern?: string;
-  readonly flags?: string;
+/** Knobs a countable rule may carry. Which ones apply depends on the check. */
+interface RegexTuning {
   /** `colon_count`: the number of colons that trips the rule. */
   readonly min?: number;
   /** `sentence_rhythm`: the coefficient of variation below which lengths are too uniform. */
@@ -44,6 +39,31 @@ export interface RegexRule extends RuleCommon {
   /** `banned_words` and `slop_vocab`: the word list to match. */
   readonly words?: readonly string[];
 }
+
+/**
+ * A countable rule written against a named built-in check.
+ *
+ * `source` exists so the two shapes are a discriminated union rather than two
+ * optional fields: "exactly one of builtin or pattern" is a validation rule the
+ * reader has to remember, and a type that cannot express the other three
+ * combinations is one the type checker remembers instead.
+ */
+export interface BuiltinRule extends RuleCommon, RegexTuning {
+  readonly kind: "regex";
+  readonly source: "builtin";
+  readonly builtin: string;
+}
+
+/** A countable rule written as a regular expression of the ruleset author's own. */
+export interface PatternRule extends RuleCommon, RegexTuning {
+  readonly kind: "regex";
+  readonly source: "pattern";
+  readonly pattern: string;
+  readonly flags?: string;
+}
+
+/** A countable rule. It runs locally and never touches the network. */
+export type RegexRule = BuiltinRule | PatternRule;
 
 /** A rule that needs reading. It is answered by a model, never by a regex. */
 export interface JudgmentRule extends RuleCommon {
