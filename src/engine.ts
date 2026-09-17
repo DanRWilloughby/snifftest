@@ -5,6 +5,22 @@
  * question is asked about and the unit a flag is reported against. The regex
  * arm runs first and runs locally, so `--dry-run` is a strict subset of a full
  * run and a network failure can never lose a countable flag.
+ *
+ * ## Code is not prose
+ *
+ * A fenced code block is dropped at the chunking step, so it reaches neither
+ * arm: the countable rules never see it and it is never sent anywhere. A YAML
+ * snippet in a README has colons the way a sentence has commas, and linting it
+ * as prose was enough on its own to make a docs directory unusable.
+ *
+ * An inline span is different. `--dry-run` inside a sentence is part of that
+ * sentence, and a judgment question about the sentence needs it, so the span
+ * stays in the chunk and only the countable rules blank it out.
+ *
+ * Indented code blocks — four spaces, no fence — are deliberately out of scope:
+ * in ordinary prose that indent is as often a quotation or a wrapped list item,
+ * and dropping those would lose real sentences to catch snippets that a fence
+ * already covers.
  */
 
 import { type JevClient, questionsFromRules } from "./jev.ts";
@@ -23,6 +39,7 @@ export function chunkDocument(text: string, file: string, options: ChunkOptions 
 
   let buffer: string[] = [];
   let startLine = 1;
+  let fence: Fence | null = null;
 
   const flush = (): void => {
     if (buffer.length === 0) return;
@@ -32,6 +49,21 @@ export function chunkDocument(text: string, file: string, options: ChunkOptions 
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i] ?? "";
+
+    // Every line of a fenced block is skipped rather than blanked, and the line
+    // a paragraph starts on comes from the index either way, so prose after a
+    // snippet is still reported on the line it is written on.
+    if (fence !== null) {
+      if (closesFence(line, fence)) fence = null;
+      continue;
+    }
+    const opened = opensFence(line);
+    if (opened !== null) {
+      flush();
+      fence = opened;
+      continue;
+    }
+
     if (line.trim() === "") {
       flush();
       continue;
@@ -39,6 +71,8 @@ export function chunkDocument(text: string, file: string, options: ChunkOptions 
     if (buffer.length === 0) startLine = i + 1;
     buffer.push(line);
   }
+  // An unclosed fence runs to the end of the file, which is what a reader sees
+  // too: everything after it is rendered as code.
   flush();
 
   const maxChars = options.maxChars;
@@ -51,12 +85,16 @@ export function runRegexArm(chunks: readonly Chunk[], ruleset: Ruleset): Flag[] 
   const flags: Flag[] = [];
 
   for (const chunk of chunks) {
+    // Spans are blanked character for character, newlines included, so every
+    // offset a rule reports still points at the line it came from.
+    const prose = maskInlineCode(chunk.text);
+
     for (const rule of ruleset.rules) {
       if (!isRegexRule(rule)) continue;
-      for (const match of checkRegexRule(rule, chunk.text)) {
+      for (const match of checkRegexRule(rule, prose)) {
         flags.push({
           file: chunk.file,
-          line: chunk.line + countNewlines(chunk.text.slice(0, match.index)),
+          line: chunk.line + countNewlines(prose.slice(0, match.index)),
           rule: rule.id,
           kind: "regex",
           probability: 1,
@@ -206,6 +244,92 @@ export function mergeFlags(...groups: readonly (readonly Flag[])[]): Flag[] {
     (a, b) =>
       a.file.localeCompare(b.file) || a.line - b.line || a.rule.localeCompare(b.rule),
   );
+}
+
+// --- code, which is not prose ---------------------------------------------
+
+/** An open fence: which character drew it, and how long it was. */
+interface Fence {
+  readonly char: string;
+  readonly length: number;
+}
+
+/** Three or more backticks or tildes, indented no more than three spaces. */
+const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
+
+function opensFence(line: string): Fence | null {
+  const match = FENCE_LINE.exec(line);
+  if (match === null) return null;
+
+  const marker = match[1] ?? "";
+  const info = match[2] ?? "";
+  // CommonMark's rule, and a useful one here: a backtick fence's info string
+  // cannot itself hold a backtick, so a line of prose that happens to carry
+  // three backticks and a closing one is a span, not the start of a block.
+  if (marker.startsWith("`") && info.includes("`")) return null;
+
+  return { char: marker[0] ?? "`", length: marker.length };
+}
+
+/** A closing fence: the same character, at least as long, and nothing after it. */
+function closesFence(line: string, fence: Fence): boolean {
+  const match = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+  if (match === null) return false;
+
+  const marker = match[1] ?? "";
+  return marker.startsWith(fence.char) && marker.length >= fence.length;
+}
+
+/**
+ * Inline code spans blanked to spaces, the same length as what they replace.
+ *
+ * Length is the whole point: the countable rules read this string, and a flag's
+ * line comes from the offset the match was found at, so a mask that changed any
+ * offset would move a flag onto the wrong line. Newlines survive for the same
+ * reason. A run of backticks with no partner is ordinary punctuation and is
+ * left alone.
+ */
+function maskInlineCode(text: string): string {
+  let out = "";
+  let i = 0;
+
+  while (i < text.length) {
+    if (text[i] !== "`") {
+      out += text[i];
+      i += 1;
+      continue;
+    }
+
+    let run = 0;
+    while (text[i + run] === "`") run += 1;
+    const close = closingRun(text, i + run, run);
+    if (close === -1) {
+      out += text.slice(i, i + run);
+      i += run;
+      continue;
+    }
+
+    out += blank(text.slice(i, close + run));
+    i = close + run;
+  }
+
+  return out;
+}
+
+/** Where a run of exactly `length` backticks starts, at or after `from`. */
+function closingRun(text: string, from: number, length: number): number {
+  for (let i = from; i < text.length; i++) {
+    if (text[i] !== "`") continue;
+    let run = 0;
+    while (text[i + run] === "`") run += 1;
+    if (run === length) return i;
+    i += run - 1;
+  }
+  return -1;
+}
+
+function blank(text: string): string {
+  return text.replace(/[^\n]/g, " ");
 }
 
 // --- helpers --------------------------------------------------------------
