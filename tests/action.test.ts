@@ -91,10 +91,50 @@ describe("action.yml, as a document", () => {
     // A composite action has no `secrets` context. Any mention of one would be
     // either a mistake or an instruction to the caller in the wrong file.
     expect(actionSource).not.toContain("secrets.");
-    const keyStep = stepById("run");
-    expect(keyStep.env?.TYPESAFE_API_KEY).toBe("${{ inputs.api-key }}");
     const keyEnvNames = [...actionSource.matchAll(/^\s{8}([A-Z_]+):/gm)].map((m) => m[1] as string);
     expect(keyEnvNames.filter((name) => name.endsWith("_API_KEY"))).toEqual(["TYPESAFE_API_KEY"]);
+  });
+
+  test("the key is in no step's environment when the guard turned sending off", () => {
+    // A key present while nothing may be sent is a key with nothing to do and
+    // somewhere to leak from, and the step it sat in is the one that runs the
+    // checker over a fork's own files.
+    const placement = stepById("run").env?.TYPESAFE_API_KEY ?? "";
+    expect(placement).toContain("steps.guard.outputs.send == 'true'");
+    expect(placement).toContain("inputs.api-key");
+    expect(placement).toContain("|| ''");
+
+    // The same expression, evaluated the way GitHub evaluates it.
+    const rendered = (send: string): string => {
+      const match = /^\$\{\{\s*steps\.guard\.outputs\.send == '(\w+)' && inputs\.api-key \|\| '' \}\}$/.exec(
+        placement,
+      );
+      expect(match).not.toBeNull();
+      return send === (match?.[1] as string) ? "the-key" : "";
+    };
+    expect(rendered("true")).toBe("the-key");
+    expect(rendered("false")).toBe("");
+  });
+
+  test("never fetches the checker while standing in the checkout", () => {
+    // `npx snifftest@<version>` run inside a repository runs that repository's
+    // own node_modules/snifftest and never reaches a registry. On a fork's pull
+    // request that is the fork's code, on this runner, with this environment.
+    const run = stepById("run").run ?? "";
+    // The command itself, not the comment above it that names what it avoids.
+    const fetch = /^[ \t]*npx --yes/m.exec(run);
+    expect(fetch).not.toBeNull();
+    const fetchAt = fetch?.index ?? -1;
+
+    const before = run.slice(0, fetchAt);
+    expect(before).toContain('cd "$fetch"');
+    expect(before).toContain('fetch="${RUNNER_TEMP:-/tmp}/snifftest-fetch"');
+    // Whatever else the step does, it never walks back into the workspace.
+    expect(run).not.toMatch(/cd\s+"?\$GITHUB_WORKSPACE/);
+  });
+
+  test("names the workspace as the tree being checked, rather than standing in it", () => {
+    expect(stepById("run").run).toContain('args+=(--root "$GITHUB_WORKSPACE")');
   });
 
   test("never names the event that would run it with the base repository's secrets", () => {

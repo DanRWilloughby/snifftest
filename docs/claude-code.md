@@ -67,3 +67,9 @@ not an error to work around. It is the question, asked.
 The bundled script pins the version of the checker it fetches, currently
 `0.1.0`, rather than taking whatever is newest. Set `SNIFFTEST_VERSION` to move
 it, or `SNIFFTEST_BIN` to point at a build of your own.
+
+It also refuses to run a `snifftest` that lives inside the repository being
+checked, and makes the fetch from a scratch directory rather than from that
+repository. An agent is often pointed at code somebody else wrote, and both of
+the ordinary ways to find a program would let that code supply one. The tree
+being checked is named with `--root` instead of stood in.

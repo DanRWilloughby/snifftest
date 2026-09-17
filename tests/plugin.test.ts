@@ -13,7 +13,15 @@
  */
 
 import { afterEach, describe, expect, test } from "bun:test";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -191,6 +199,20 @@ function recorder(): { bin: string; args: () => string[] } {
   };
 }
 
+/**
+ * The arguments with the `--root <dir>` pair taken out.
+ *
+ * The script runs the checker from a scratch directory, because a package
+ * manager asked for the tool while standing in the tree being checked runs that
+ * tree's own copy. `--root` is how the tree is named instead of stood in; it is
+ * asserted on its own below, and every other assertion here is about the shape
+ * of the path list, which it would otherwise clutter.
+ */
+function handed(args: readonly string[]): string[] {
+  const at = args.indexOf("--root");
+  return at === -1 ? [...args] : [...args.slice(0, at), ...args.slice(at + 2)];
+}
+
 function runTheScript(argv: readonly string[], bin: string): { code: number; stderr: string } {
   const result = Bun.spawnSync({
     cmd: ["sh", join(repoRoot, "skills/snifftest/scripts/run.sh"), ...argv],
@@ -209,7 +231,7 @@ describe("what the script hands the checker", () => {
     const run = runTheScript(["-notes.md"], log.bin);
 
     expect(run.code).toBe(0);
-    const args = log.args();
+    const args = handed(log.args());
     expect(args).toEqual(["check", "--dry-run", "--", "-notes.md"]);
     expect(args.indexOf("--")).toBeLessThan(args.indexOf("-notes.md"));
   });
@@ -217,13 +239,13 @@ describe("what the script hands the checker", () => {
   test("a path with spaces in it arrives as one argument", () => {
     const log = recorder();
     expect(runTheScript(["drafts/first draft.md"], log.bin).code).toBe(0);
-    expect(log.args()).toEqual(["check", "--dry-run", "--", "drafts/first draft.md"]);
+    expect(handed(log.args())).toEqual(["check", "--dry-run", "--", "drafts/first draft.md"]);
   });
 
   test("several paths survive, dashes and spaces together", () => {
     const log = recorder();
     runTheScript(["-notes.md", "a folder/second draft.md"], log.bin);
-    expect(log.args()).toEqual([
+    expect(handed(log.args())).toEqual([
       "check",
       "--dry-run",
       "--",
@@ -236,13 +258,23 @@ describe("what the script hands the checker", () => {
     const log = recorder();
     // The caller wrote `--` themselves; the script still places exactly one.
     runTheScript(["--judge", "--", "-notes.md"], log.bin);
-    const args = log.args();
+    const args = handed(log.args());
 
     expect(args).toEqual(["check", "--", "-notes.md"]);
     expect(args.filter((argument) => argument === "--")).toHaveLength(1);
     expect(args).not.toContain("--judge");
     // --judge asked for the judgment pass, so the free-rules flag is gone.
     expect(args).not.toContain("--dry-run");
+  });
+
+  test("names the tree it is checking, so the run can happen outside it", () => {
+    const log = recorder();
+    runTheScript(["notes.md"], log.bin);
+    const args = log.args();
+    const at = args.indexOf("--root");
+
+    expect(at).toBeGreaterThan(-1);
+    expect(args[at + 1]).toBe(realpathSync(process.cwd()));
   });
 });
 
