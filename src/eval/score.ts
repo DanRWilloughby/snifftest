@@ -31,7 +31,12 @@
  * quietly scored as a zero the model did not give.
  */
 
-export type ArmId = "A" | "B" | "C";
+/**
+ * `D` is the panel bench (`src/bench/run.ts`): one arm id per panel model would
+ * make the type say something it cannot check, and the model is named by the
+ * observation's label instead.
+ */
+export type ArmId = "A" | "B" | "C" | "D";
 
 /** The spike's sweep. A ruleset's own threshold is added to it when it differs. */
 export const THRESHOLDS: readonly number[] = [0.5, 0.7, 0.9];

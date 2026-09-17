@@ -1,0 +1,46 @@
+{
+  "data": [
+    {
+      "id": "anthropic/claude-haiku-4.5",
+      "name": "Anthropic: Claude Haiku 4.5",
+      "pricing": { "prompt": "0.000001", "completion": "0.000005" },
+      "supported_parameters": ["temperature", "response_format", "max_tokens"]
+    },
+    {
+      "id": "anthropic/claude-sonnet-5",
+      "name": "Anthropic: Claude Sonnet 5",
+      "pricing": { "prompt": "0.000003", "completion": "0.000015" },
+      "supported_parameters": ["temperature", "response_format", "max_tokens"]
+    },
+    {
+      "id": "anthropic/claude-sonnet-5:thinking",
+      "name": "Anthropic: Claude Sonnet 5 (thinking)",
+      "pricing": { "prompt": "0.000003", "completion": "0.000015" },
+      "supported_parameters": ["temperature", "max_tokens"]
+    },
+    {
+      "id": "google/gemini-2.5-flash",
+      "name": "Google: Gemini 2.5 Flash",
+      "pricing": { "prompt": "0.0000003", "completion": "0.0000025" },
+      "supported_parameters": ["temperature", "response_format"]
+    },
+    {
+      "id": "deepseek/deepseek-chat-v3",
+      "name": "DeepSeek: Chat v3",
+      "pricing": { "prompt": "0.00000027", "completion": "0.0000011" },
+      "supported_parameters": ["temperature"]
+    },
+    {
+      "id": "openai/gpt-5-mini",
+      "name": "OpenAI: GPT-5 mini",
+      "pricing": { "prompt": "0.00000025", "completion": "0.000002" },
+      "supported_parameters": ["temperature", "response_format"]
+    },
+    {
+      "id": "mystery/unpriced-model",
+      "name": "Mystery: unpriced",
+      "pricing": { "prompt": "-1", "completion": "-1" },
+      "supported_parameters": ["temperature"]
+    }
+  ]
+}
