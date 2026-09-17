@@ -96,15 +96,32 @@ function scratchRepo(): string {
 /** The package's own CLI, wrapped so the hook can call it as one executable. */
 let realRunner = "";
 
+interface RunnerOptions {
+  /** The exit code to return. */
+  readonly code?: number;
+  /** Lines to print on stdout, standing in for the checker's report. */
+  readonly stdout?: string;
+  /** Lines to print on stderr, standing in for whatever went wrong. */
+  readonly stderr?: string;
+}
+
 /** Writes its arguments and its working directory to a file, then exits `code`. */
-function recordingRunner(code = 0): { bin: string; log: string; args: () => string[]; cwd: () => string } {
+function recordingRunner(
+  options: RunnerOptions = {},
+): { bin: string; log: string; args: () => string[]; cwd: () => string } {
+  const { code = 0, stdout = "", stderr = "" } = options;
   const dir = mkdtempSync(join(tmpdir(), "snifftest-runner-"));
   temporary.push(dir);
   const log = join(dir, "log.txt");
   const bin = join(dir, "recorder");
+  const say = (text: string, stream: string): string =>
+    text === "" ? "" : `printf '%s\\n' ${JSON.stringify(text)}${stream}\n`;
   writeFileSync(
     bin,
-    `#!/bin/sh\npwd > ${JSON.stringify(log)}\nfor a in "$@"; do echo "$a" >> ${JSON.stringify(log)}; done\nexit ${code}\n`,
+    `#!/bin/sh\npwd > ${JSON.stringify(log)}\nfor a in "$@"; do echo "$a" >> ${JSON.stringify(log)}; done\n` +
+      say(stdout, "") +
+      say(stderr, " >&2") +
+      `exit ${code}\n`,
   );
   chmodSync(bin, 0o755);
 
@@ -279,6 +296,18 @@ describe("what the hook asks the checker to do", () => {
     expect(runner.args()[0]).toBe("check");
   });
 
+  test("passes a filename that starts with a dash as a path, not an option", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner();
+    writeFileSync(join(dir, "-dashfile.md"), CLEAN);
+    git(dir, ["add", "--", "-dashfile.md"]);
+
+    const commit = git(dir, ["commit", "-m", "dashed"], { SNIFFTEST_BIN: runner.bin });
+
+    expect(runner.args()).toEqual(["check", "--dry-run", "--", "-dashfile.md"]);
+    expect(commit.code).toBe(0);
+  });
+
   test("passes a threshold through when one is set", () => {
     const dir = scratchRepo();
     const runner = recordingRunner();
@@ -294,10 +323,78 @@ describe("what the hook asks the checker to do", () => {
   });
 });
 
+describe("when the checker never got as far as an opinion", () => {
+  // Exit 1 is both "your draft trips a rule" and what npx, bunx and npm return
+  // when they cannot resolve a package. The hook has to tell them apart from
+  // the output, or a registry 404 blames the writer for a network problem.
+  const FETCH_FAILED = "npm error 404 Not Found - GET https://registry.npmjs.org/snifftest";
+
+  test("exit 1 with no flags is a failed fetch, not a bad draft", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner({ code: 1, stderr: FETCH_FAILED });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "fetch failed"], { SNIFFTEST_BIN: runner.bin });
+
+    expect(commit.code).toBe(0);
+    expect(commit.stderr).toContain("did not run");
+    expect(commit.stderr).not.toContain("trips the rules");
+    // Whatever the runner said is passed through, so the cause is visible.
+    expect(commit.stderr).toContain("404 Not Found");
+    expect(git(dir, ["log", "--oneline"]).stdout).toContain("fetch failed");
+  });
+
+  test("SNIFFTEST_STRICT=1 blocks on a failed fetch too", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner({ code: 1, stderr: FETCH_FAILED });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "strict fetch"], {
+      SNIFFTEST_BIN: runner.bin,
+      SNIFFTEST_STRICT: "1",
+    });
+
+    expect(commit.code).not.toBe(0);
+  });
+
+  test("exit 1 with a flag line still blocks the commit", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner({
+      code: 1,
+      stdout: "post.md:1 dash_present 1.00 An em dash. Say it in two sentences.",
+    });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "real flag"], { SNIFFTEST_BIN: runner.bin });
+
+    expect(commit.code).not.toBe(0);
+    expect(commit.stderr).toContain("trips the rules");
+    expect(commit.stdout + commit.stderr).toContain("dash_present");
+  });
+
+  test("chatter that is not a flag line does not count as one", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner({
+      code: 1,
+      stdout: "Need to install the following packages: snifftest@0.1.0",
+    });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "chatter"], { SNIFFTEST_BIN: runner.bin });
+
+    expect(commit.code).toBe(0);
+    expect(commit.stderr).toContain("did not run");
+  });
+});
+
 describe("when the checker itself is broken", () => {
   test("a tool failure warns and lets the commit through", () => {
     const dir = scratchRepo();
-    const runner = recordingRunner(2);
+    const runner = recordingRunner({ code: 2 });
     writeFileSync(join(dir, "post.md"), CLEAN);
     git(dir, ["add", "post.md"]);
 
@@ -309,7 +406,7 @@ describe("when the checker itself is broken", () => {
 
   test("SNIFFTEST_STRICT=1 turns the same failure into a blocked commit", () => {
     const dir = scratchRepo();
-    const runner = recordingRunner(2);
+    const runner = recordingRunner({ code: 2 });
     writeFileSync(join(dir, "post.md"), CLEAN);
     git(dir, ["add", "post.md"]);
 

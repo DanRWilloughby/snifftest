@@ -16,13 +16,35 @@ curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.1.0/hoo
   -o .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
+Read the script once before you trust it. It is about a hundred lines of shell
+that will run on every commit you make, and you should no more install it
+unread than any other script fetched over the network.
+
+A git tag can be moved to point at different code, and `v0.1.0` above is a tag.
+Pin the commit instead if you want the stronger guarantee, exactly as you would
+for the Action below:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/<commit-sha>/hooks/pre-commit \
+  -o .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+```
+
+Take the SHA from the tag you meant to install:
+`git ls-remote https://github.com/DanRWilloughby/snifftest refs/tags/v0.1.0`.
+
+If you maintain a repository that publishes a hook this way, add a tag
+protection rule for `v*` so a released tag cannot be repointed after people
+have installed from it. That is a setting rather than a guarantee, which is why
+the SHA form is offered above.
+
 The hook checks the Markdown and text files you staged, as you staged them. A
 file you half-staged is checked as it will be committed, so it never blocks you
 over a sentence that is still only on disk.
 
 It is quiet when nothing trips, and it does nothing at all when the commit
-contains no prose. If the checker itself is broken or missing, it says so and
-lets the commit through, because a broken tool is not evidence of a bad draft.
+contains no prose. If the checker itself is broken, missing, or could not be
+fetched, it says so and lets the commit through, because a failed download is
+not evidence of a bad draft. `SNIFFTEST_STRICT=1` reverses that.
 
 Skip it once:
 
@@ -67,6 +89,8 @@ curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.1.0/hoo
   -o .husky/pre-commit && chmod +x .husky/pre-commit
 ```
 
+Read it first, and swap the tag for a commit SHA, exactly as above.
+
 Nothing else changes. The script finds the staged files itself, so it does not
 need `lint-staged` in front of it, and putting one there would hand it the
 working tree's content instead of the index's.
@@ -107,14 +131,15 @@ jobs:
   snifftest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
       - uses: DanRWilloughby/snifftest@v0.1.0
         with:
           paths: docs
 ```
 
 Pin the Action by commit SHA rather than by tag if you want the stronger
-guarantee; `@v0.1.0` above is the readable form.
+guarantee; `@v0.1.0` above is the readable form. A tag can be moved, a commit
+cannot, which is why `actions/checkout` is pinned by SHA in the example.
 
 To run the judgment rules on your own repository's pull requests, pass the key
 in explicitly. The Action reads no other secret, and reaches for nothing on its
