@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { chunkDocument, flagsFrom, mergeFlags, runJudgmentArm, runRegexArm } from "../src/engine.ts";
@@ -193,5 +193,47 @@ describe("mergeFlags", () => {
       "a.md:9:b",
       "b.md:1:z",
     ]);
+  });
+});
+
+// --- review fold-in: the merge key stays reviewable text ------------------
+
+describe("the flag dedup key is plain text", () => {
+  test("merging leaves no NUL byte anywhere in the sources", () => {
+    // A NUL byte inside a template literal makes git call the whole file
+    // binary, and a file git calls binary is a file nobody can review.
+    const root = join(here, "..");
+    const scan = (directory: string): string[] => {
+      const found: string[] = [];
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+        const path = join(directory, entry.name);
+        if (entry.isDirectory()) found.push(...scan(path));
+        else if (/\.(ts|tsx|js|mjs|json|yaml|yml|md)$/.test(entry.name)) found.push(path);
+      }
+      return found;
+    };
+
+    const guilty = [...scan(join(root, "src")), ...scan(join(root, "tests"))].filter((path) =>
+      readFileSync(path).includes(0),
+    );
+    expect(guilty).toEqual([]);
+  });
+
+  test("the same file, line and rule is still one flag, and near neighbours stay apart", () => {
+    const one = {
+      file: "a b.md",
+      line: 1,
+      rule: "c",
+      kind: "regex" as const,
+      probability: 1,
+      message: "m",
+    };
+    const twin = { ...one, message: "another wording of the same flag" };
+    const neighbour = { ...one, file: "a", rule: "b.md 1 c" };
+
+    const merged = mergeFlags([one, neighbour], [twin]);
+    expect(merged).toHaveLength(2);
+    expect(merged.map((flag) => flag.file)).toEqual(["a", "a b.md"]);
   });
 });

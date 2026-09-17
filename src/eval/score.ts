@@ -103,6 +103,15 @@ export interface OverallAtThreshold {
   readonly fp_rate_per_negative_cell: number | null;
 }
 
+/**
+ * The buckets hold answered cells only.
+ *
+ * A cell the arm gave no opinion on has no probability to bucket, and defaulting
+ * it to zero put it in `0.0-0.1` beside the readings where a model actually said
+ * "no" — which made a bucket the arm never spoke into look well calibrated. The
+ * unanswered cells are counted instead, in `calibration_unanswered`, and they
+ * are still misses everywhere recall is computed.
+ */
 export interface CalibrationBucket {
   readonly n: number;
   readonly defective: number;
@@ -142,6 +151,8 @@ export interface ArmScore {
   readonly overall: Record<string, OverallAtThreshold>;
   readonly per_rule: Record<string, RuleScore>;
   readonly calibration: Record<string, CalibrationBucket>;
+  /** Cells left out of the buckets because the arm gave no opinion on them. */
+  readonly calibration_unanswered: number;
   readonly misses_at_0_7: readonly GalleryRow[];
   readonly false_positives_at_0_7: readonly GalleryRow[];
 }
@@ -214,13 +225,20 @@ export function scoreArm(
     };
   }
 
-  // --- calibration over every cell
+  // --- calibration over every answered cell
   const calibration: Record<string, CalibrationBucket> = {};
   const counts = new Map<string, { n: number; defective: number }>();
+  let unansweredCells = 0;
   for (let i = 0; i < 10; i++) counts.set(bucketName(i), { n: 0, defective: 0 });
   for (const doc of observation.documents) {
     for (const rule of classes) {
-      const value = read(doc.id, rule);
+      const cell = cells.get(key(doc.id, rule));
+      // No cell at all is no opinion either, and it is counted the same way.
+      if (cell === undefined || !cell.answered) {
+        unansweredCells += 1;
+        continue;
+      }
+      const value = cell.probability;
       const bucket = counts.get(bucketName(Math.min(Math.floor(value * 10), 9)));
       if (bucket === undefined) continue;
       bucket.n += 1;
@@ -262,6 +280,7 @@ export function scoreArm(
     overall,
     per_rule: perRule,
     calibration,
+    calibration_unanswered: unansweredCells,
     misses_at_0_7: misses,
     false_positives_at_0_7: falsePositives,
   };
@@ -344,5 +363,5 @@ function bucketName(index: number): string {
 }
 
 function key(doc: string, rule: string): string {
-  return `${doc} ${rule}`;
+  return JSON.stringify([doc, rule]);
 }

@@ -51,7 +51,7 @@ import { PriceError, type PriceTable, parsePriceTable, priceCitation, priceFor }
 import { readAnthropicCatalog } from "./bench/anthropic.ts";
 import { type BenchDocument, runBench } from "./bench/run.ts";
 import { type JoinedArm, buildBenchReport, writeBenchReport } from "./bench/tables.ts";
-import { ConfigError, resolveRuleset } from "./config.ts";
+import { ConfigError, type ResolvedRuleset, resolveRuleset } from "./config.ts";
 import { type Destination, type Env, requestConsent } from "./consent.ts";
 import {
   type JudgmentUsage,
@@ -184,13 +184,14 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
     ...(deps.defaultRulesPath === undefined ? {} : { defaultRulesPath: deps.defaultRulesPath }),
   });
   const ruleset = resolved.ruleset;
+  warnAbout(deps, resolved);
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
 
   const files = collectFiles(options.paths, deps.cwd);
-  const chunks = files.flatMap((file) =>
+  const chunks = readDrafts(deps, files).flatMap((draft) =>
     // The cap is applied on every run, dry or not, so a chunk boundary — and so
     // a reported line number — never depends on whether the network was used.
-    chunkDocument(readDraft(file), display(file, deps.cwd), { maxChars: STATE_GUARD_CHARS }),
+    chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS }),
   );
 
   const countable = runRegexArm(chunks, ruleset);
@@ -283,13 +284,13 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
     ...(deps.defaultRulesPath === undefined ? {} : { defaultRulesPath: deps.defaultRulesPath }),
   });
   const ruleset = resolved.ruleset;
+  warnAbout(deps, resolved);
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
 
   const files = collectFiles(options.paths, deps.cwd);
   const candidates: BaseDocument[] = [];
-  for (const file of files) {
-    const shown = display(file, deps.cwd);
-    for (const chunk of chunkDocument(readDraft(file), shown, { maxChars: STATE_GUARD_CHARS })) {
+  for (const draft of readDrafts(deps, files)) {
+    for (const chunk of chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS })) {
       candidates.push({
         id: `C${String(candidates.length).padStart(2, "0")}`,
         file: chunk.file,
@@ -437,6 +438,7 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
     ...(deps.defaultRulesPath === undefined ? {} : { defaultRulesPath: deps.defaultRulesPath }),
   });
   const ruleset = resolvedRules.ruleset;
+  warnAbout(deps, resolvedRules);
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
   const runDate = today();
 
@@ -633,9 +635,8 @@ function benchCorpus(deps: CliDeps, options: Options, ruleset: Ruleset): BenchCo
 
   const files = collectFiles(options.paths, deps.cwd);
   const candidates: BaseDocument[] = [];
-  for (const file of files) {
-    const shown = display(file, deps.cwd);
-    for (const chunk of chunkDocument(readDraft(file), shown, { maxChars: STATE_GUARD_CHARS })) {
+  for (const draft of readDrafts(deps, files)) {
+    for (const chunk of chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS })) {
       candidates.push({
         id: `C${String(candidates.length).padStart(2, "0")}`,
         file: chunk.file,
@@ -713,6 +714,10 @@ function joinedArms(scores: Record<string, unknown>): JoinedArm[] {
   if (typeof arms !== "object" || arms === null) return [];
   const at = String(numberOf(scores["threshold"]));
 
+  // Only the arms that made a call carry a model; the others say so with a dash
+  // rather than borrowing the run's model string for a row it did not produce.
+  const served = typeof scores["served_model"] === "string" ? (scores["served_model"] as string) : null;
+
   const out: JoinedArm[] = [];
   for (const [id, value] of Object.entries(arms as Record<string, unknown>)) {
     const arm = value as Record<string, unknown>;
@@ -725,6 +730,7 @@ function joinedArms(scores: Record<string, unknown>): JoinedArm[] {
       fpPerCleanCell: ratioOf(overall?.["fp_rate_per_clean_cell"]),
       medianMs: numberOf(summary?.["median_latency_ms"]),
       usdPer100Documents: ratioOf(summary?.["usd_per_100_documents"]),
+      servedModel: arm["network"] === true ? served : null,
     });
   }
   return out;
@@ -810,6 +816,7 @@ function rules(deps: CliDeps, options: Options): number {
     ...(options.rulesPath === undefined ? {} : { rulesPath: options.rulesPath }),
     ...(deps.defaultRulesPath === undefined ? {} : { defaultRulesPath: deps.defaultRulesPath }),
   });
+  warnAbout(deps, resolved);
 
   if (options.format === "json") {
     deps.write(
@@ -1008,6 +1015,63 @@ function readDraft(file: string): string {
   } catch (error) {
     throw new UsageError(`${file} could not be read (${messageOf(error)})`);
   }
+}
+
+/** One input file the tool could read as prose. */
+interface Draft {
+  readonly shown: string;
+  readonly text: string;
+}
+
+/**
+ * The drafts among the files given, and a line on stderr for each one that is
+ * not prose at all.
+ *
+ * A directory of drafts collects a PDF or a screenshot sooner or later. Reading
+ * one as UTF-8 does not fail — the invalid bytes become replacement characters —
+ * so the tool used to check a paragraph of mojibake, find nothing, and exit 0
+ * with no output, which reads exactly like a clean draft. Saying which file was
+ * skipped is the difference between "nothing to flag" and "nothing was read".
+ * The exit code is unchanged: a binary file is not a finding.
+ */
+function readDrafts(deps: CliDeps, files: readonly string[]): Draft[] {
+  const drafts: Draft[] = [];
+
+  for (const file of files) {
+    const shown = display(file, deps.cwd);
+    const text = readTextOrNull(file);
+    if (text === null) {
+      deps.writeError(`${shown} skipped, not text.`);
+      continue;
+    }
+    drafts.push({ shown, text });
+  }
+
+  return drafts;
+}
+
+function readTextOrNull(file: string): string | null {
+  const bytes = readBytes(file);
+  // A NUL byte is the same signal git uses, and it costs one pass.
+  if (bytes.includes(0)) return null;
+  try {
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
+}
+
+function readBytes(file: string) {
+  try {
+    return readFileSync(file);
+  } catch (error) {
+    throw new UsageError(`${file} could not be read (${messageOf(error)})`);
+  }
+}
+
+/** Ruleset warnings go to stderr: they are about the config, not about a draft. */
+function warnAbout(deps: CliDeps, resolved: ResolvedRuleset): void {
+  for (const warning of resolved.warnings) deps.writeError(warning);
 }
 
 /** A path the reader can paste back, which means relative when it is below cwd. */
