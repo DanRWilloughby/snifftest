@@ -1,0 +1,184 @@
+name: Sniff Test
+description: Check prose against your house rules. Free rules only unless you opt in, and nothing leaves the runner on a fork's pull request.
+author: Daniel Willoughby
+
+branding:
+  icon: wind
+  color: purple
+
+# The caller decides what this Action may touch. Nothing here needs a token, so
+# the recommended workflow grants none at all:
+#
+#   permissions: {}
+#
+# Add `pull-requests: write` only if you also set `comment: true`, and pass the
+# token in yourself; this Action never reaches for one.
+
+inputs:
+  paths:
+    description: Files or directories to check, space separated.
+    required: false
+    default: "."
+  rules:
+    description: A ruleset to use instead of .snifftest.yaml or the built-in one.
+    required: false
+    default: ""
+  threshold:
+    description: The probability at or above which a judgment rule counts as a flag.
+    required: false
+    default: ""
+  version:
+    description: The exact version of the checker to run. An exact version, never a floating tag.
+    required: false
+    default: "0.1.0"
+  send:
+    description: Run the judgment rules, which sends the text to TypeSafe. Needs a key. Forced off for a pull request from a fork.
+    required: false
+    default: "false"
+  api-key:
+    description: A TYPESAFE_API_KEY, passed in by the caller. Read from nowhere else.
+    required: false
+    default: ""
+  comment:
+    description: Post the flags as a pull request comment. Off by default.
+    required: false
+    default: "false"
+  github-token:
+    description: A token with pull-requests write, used only when comment is on.
+    required: false
+    default: ""
+
+outputs:
+  exit-code:
+    description: 0 nothing tripped, 1 at least one flag, 2 the checker could not finish.
+    value: ${{ steps.run.outputs.exit-code }}
+  report:
+    description: Path on the runner to the checker's output.
+    value: ${{ steps.run.outputs.report }}
+
+runs:
+  using: composite
+  steps:
+    - id: guard
+      name: Decide what may leave the runner
+      shell: bash
+      env:
+        SNIFFTEST_SEND_INPUT: ${{ inputs.send }}
+        SNIFFTEST_IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+        # Whether a key was passed, never the key: it has no business being in
+        # this step's environment, and one copy of it is one place to leak from.
+        SNIFFTEST_HAS_KEY: ${{ inputs.api-key != '' }}
+        SNIFFTEST_VERSION: ${{ inputs.version }}
+      run: |
+        set -euo pipefail
+
+        # Refuse any event whose name ends in _target. Those run in the base
+        # repository's context, with its secret store and a writable token,
+        # against a branch the pull request's author controls. Written as a
+        # suffix match so the event's literal name stays out of this repository
+        # and nobody copies it out of here into a workflow.
+        case "${GITHUB_EVENT_NAME:-}" in
+          *_target)
+            echo "::error::Sniff Test will not run on a ${GITHUB_EVENT_NAME} event. Use pull_request."
+            exit 1
+            ;;
+        esac
+
+        case "$SNIFFTEST_VERSION" in
+          latest|"" )
+            echo "::error::version must be an exact version like 0.1.0, never a floating tag."
+            exit 1
+            ;;
+        esac
+
+        send="$SNIFFTEST_SEND_INPUT"
+
+        # A pull request from a fork is somebody else's branch running against
+        # our workflow. It gets the free rules, whatever the caller asked for.
+        if [ "${SNIFFTEST_IS_FORK:-}" = "true" ]; then
+          echo "::notice::Pull request from a fork: countable rules only. Nothing leaves the runner."
+          send=false
+        fi
+
+        if [ "$send" = "true" ] && [ "$SNIFFTEST_HAS_KEY" != "true" ]; then
+          echo "::error::send is on but api-key is empty. Pass your TYPESAFE_API_KEY in. Nothing was sent."
+          exit 1
+        fi
+
+        echo "send=$send" >> "$GITHUB_OUTPUT"
+
+    - id: run
+      name: Sniff Test
+      shell: bash
+      env:
+        SNIFFTEST_VERSION: ${{ inputs.version }}
+        SNIFFTEST_PATHS: ${{ inputs.paths }}
+        SNIFFTEST_RULES: ${{ inputs.rules }}
+        SNIFFTEST_THRESHOLD: ${{ inputs.threshold }}
+        SNIFFTEST_SEND: ${{ steps.guard.outputs.send == 'true' && '1' || '0' }}
+        TYPESAFE_API_KEY: ${{ inputs.api-key }}
+      run: |
+        set -uo pipefail
+
+        args=(check)
+        [ "$SNIFFTEST_SEND" = "1" ] || args+=(--dry-run)
+        [ -z "$SNIFFTEST_RULES" ] || args+=(--rules "$SNIFFTEST_RULES")
+        [ -z "$SNIFFTEST_THRESHOLD" ] || args+=(--threshold "$SNIFFTEST_THRESHOLD")
+
+        report="${RUNNER_TEMP:-/tmp}/snifftest-report.txt"
+
+        status=0
+        # shellcheck disable=SC2086 -- paths are space separated on purpose.
+        npx --yes "snifftest@${SNIFFTEST_VERSION}" "${args[@]}" -- $SNIFFTEST_PATHS \
+          > "$report" 2>&1 || status=$?
+
+        cat "$report"
+        echo "exit-code=$status" >> "$GITHUB_OUTPUT"
+        echo "report=$report" >> "$GITHUB_OUTPUT"
+
+        if [ "$status" = "0" ]; then
+          echo "### Sniff Test: nothing tripped" >> "$GITHUB_STEP_SUMMARY"
+        else
+          {
+            echo "### Sniff Test"
+            echo ""
+            echo '```'
+            cat "$report"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        fi
+
+    - id: comment
+      name: Post the flags on the pull request
+      if: ${{ inputs.comment == 'true' && github.event_name == 'pull_request' && inputs.github-token != '' && steps.run.outputs.exit-code != '0' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github-token }}
+        SNIFFTEST_REPORT: ${{ steps.run.outputs.report }}
+        SNIFFTEST_PR: ${{ github.event.pull_request.number }}
+      run: |
+        set -euo pipefail
+
+        # What travels is the checker's own output: file, line, rule id,
+        # probability, and the message the ruleset wrote. No sentence of the
+        # draft is ever read out of the file and into a comment, which is the
+        # whole reason this step posts a report rather than a diff.
+        body="${RUNNER_TEMP:-/tmp}/snifftest-comment.md"
+        {
+          echo "**Sniff Test** flagged the prose in this pull request."
+          echo ""
+          echo '```'
+          head -c 60000 "$SNIFFTEST_REPORT"
+          echo '```'
+        } > "$body"
+
+        gh pr comment "$SNIFFTEST_PR" --body-file "$body"
+
+    - id: verdict
+      name: Report the verdict
+      shell: bash
+      env:
+        SNIFFTEST_STATUS: ${{ steps.run.outputs.exit-code }}
+      run: |
+        set -euo pipefail
+        exit "$SNIFFTEST_STATUS"
