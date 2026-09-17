@@ -1,0 +1,6 @@
+version: 1
+defaults: &base
+  kind: regex
+rules:
+  - id: colon_heavy
+    message: "Anchors are outside the subset."
