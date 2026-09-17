@@ -33,7 +33,7 @@
  */
 
 import { type JevClient, questionsFromRules } from "./jev.ts";
-import { checkRegexRule } from "./rules.ts";
+import { PATTERN_TEXT_CAP, checkRegexRule } from "./rules.ts";
 import { type Chunk, type Flag, type Ruleset, isJudgmentRule, isRegexRule } from "./types.ts";
 
 export interface ChunkOptions {
@@ -96,8 +96,18 @@ export function chunkDocument(text: string, file: string, options: ChunkOptions 
   return paragraphs.flatMap((paragraph) => splitLong(paragraph, maxChars));
 }
 
-/** Run every countable rule over every chunk. No network, ever. */
-export function runRegexArm(chunks: readonly Chunk[], ruleset: Ruleset): Flag[] {
+/**
+ * Run every countable rule over every chunk. No network, ever.
+ *
+ * `note` is where a run says that a ruleset's own pattern read only part of a
+ * paragraph. That cap is a bound on what a hostile pattern can cost, and a cap
+ * nobody is told about is a rule that quietly stopped applying.
+ */
+export function runRegexArm(
+  chunks: readonly Chunk[],
+  ruleset: Ruleset,
+  note?: (line: string) => void,
+): Flag[] {
   const flags: Flag[] = [];
 
   for (const chunk of chunks) {
@@ -107,6 +117,12 @@ export function runRegexArm(chunks: readonly Chunk[], ruleset: Ruleset): Flag[] 
 
     for (const rule of ruleset.rules) {
       if (!isRegexRule(rule)) continue;
+      if (note !== undefined && rule.source === "pattern" && prose.length > PATTERN_TEXT_CAP) {
+        note(
+          `${chunk.file}:${chunk.line} ${rule.id} read the first ${PATTERN_TEXT_CAP} characters of ` +
+            "that paragraph, which is as far as a ruleset's own pattern is run.",
+        );
+      }
       for (const match of checkRegexRule(rule, prose)) {
         flags.push({
           file: chunk.file,

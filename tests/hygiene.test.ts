@@ -112,6 +112,25 @@ describe("what the published tarball may contain", () => {
   });
 });
 
+describe("the release notes keep the name-ownership step", () => {
+  // The one step in this repository that cannot be enforced by a test, because
+  // what it is about happens on somebody else's registry. It can at least be
+  // kept from being quietly edited out: the pins are public install
+  // instructions, and an unclaimed name means a stranger decides what they
+  // install.
+  const releasing = read("docs/releasing.md");
+
+  test("owning the name comes before the release checklist, with the reason", () => {
+    const ownership = releasing.indexOf("Own the name on npm first");
+    const checklist = releasing.indexOf("## The checklist");
+
+    expect(ownership).toBeGreaterThan(-1);
+    expect(ownership).toBeLessThan(checklist);
+    expect(releasing).toContain("npm view snifftest version");
+    expect(releasing.slice(ownership, checklist)).toContain("public");
+  });
+});
+
 describe("the version is pinned in one place at a time", () => {
   /**
    * Every file that names the version a stranger would fetch.
@@ -288,7 +307,18 @@ describe("CI never needs a key", () => {
   });
 
   test("the checker runs with the network off", () => {
-    expect(ci).toMatch(/cli\.ts check --dry-run/);
+    expect(ci).toMatch(/bin\.ts check --dry-run/);
+  });
+
+  test("CI runs the packed tarball through the link a package manager writes", () => {
+    // A bin that ends without running prints nothing and exits 0, which is this
+    // tool's word for "nothing tripped", so a dead release reads as a clean
+    // draft everywhere. Building it is not evidence that it runs.
+    for (const workflow of [ci, read(".github/workflows/release.yml")]) {
+      expect(workflow).toContain("npm pack");
+      expect(workflow).toContain("node_modules/.bin/snifftest");
+      expect(workflow).toContain('"$bin" --version');
+    }
   });
 
   test("the secret scan reads the history, not just the tip", () => {
