@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security problem
+    url: https://github.com/DanRWilloughby/snifftest/security/advisories/new
+    about: Report it privately. Do not open a public issue.
+  - name: Question or idea
+    url: https://github.com/DanRWilloughby/snifftest/discussions
+    about: Anything that is not a bug or a rule proposal.
