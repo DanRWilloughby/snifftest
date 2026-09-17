@@ -1,0 +1,1146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="snifftest-mode" content="__MODE__">
+<meta name="color-scheme" content="light dark">
+<meta name="referrer" content="no-referrer">
+<title>Sniff Test</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style nonce="__NONCE__">
+/*
+  A page of a sketchbook. Paper white or near black, never cream. Graphite for
+  everything that is said, one coloured pencil for everything that is marked.
+  Nothing here moves by CSS: every motion is driven from the script on the page
+  clock, so a capture on a paused virtual clock shoots the same frame every run.
+*/
+:root {
+  --ground: #fbfcfc;
+  --ink: #25272b;
+  --soft: #62656c;
+  --faint: #cfd2d6;
+  --nose-accent: #e4572e;
+  --accent-text: #ae3d1a;
+  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --gutter: 5rem;
+  --draft-size: clamp(1.125rem, 0.85rem + 0.62vw, 1.5rem);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #131415;
+    --ink: #e9e9e6;
+    --soft: #a4a7ad;
+    --faint: #3b3e43;
+    --nose-accent: #ff7d54;
+    --accent-text: #ff9b7a;
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  scrollbar-color: var(--faint) transparent;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+::selection { background: color-mix(in srgb, var(--nose-accent) 26%, transparent); }
+
+.quiet {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.sheet {
+  max-width: 105rem;
+  margin-inline: auto;
+  padding: clamp(1.25rem, 3.2vw, 3.5rem) clamp(1.25rem, 6vw, 7.5rem) 4rem;
+}
+
+/* --- the top: a name, and what the last round cost ------------------------- */
+
+.top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem 2.5rem;
+  flex-wrap: wrap;
+}
+
+h1 {
+  margin: 0;
+  font-family: var(--serif);
+  font-size: 1.625rem;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+}
+
+.tagline {
+  margin: 0.3rem 0 0;
+  color: var(--soft);
+  font-size: 0.9375rem;
+}
+
+.meter { text-align: right; margin-left: auto; }
+
+.reading {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 1.1875rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.source {
+  margin: 0.15rem 0 0;
+  color: var(--soft);
+  font-size: 0.8125rem;
+}
+
+.ruled {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin-top: 1rem;
+  overflow: visible;
+}
+
+.ruled path, .gutter path {
+  fill: none;
+  stroke: var(--faint);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* --- the desk: the draft on the left, the nose facing it on the right ------- */
+
+.desk {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(19rem, 29rem);
+  gap: clamp(2rem, 6vw, 7rem);
+  align-items: start;
+  margin-top: clamp(1.5rem, 3vw, 3rem);
+}
+
+.writing {
+  position: relative;
+  padding-left: var(--gutter);
+}
+
+.gutter {
+  position: absolute;
+  top: 0;
+  left: 0.375rem;
+  width: 6px;
+  height: 100%;
+  overflow: visible;
+}
+
+.writing:focus-within .gutter path { stroke: var(--soft); }
+
+#draft, .mirror {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-family: var(--serif);
+  font-size: var(--draft-size);
+  font-weight: 400;
+  line-height: 1.75;
+  letter-spacing: 0;
+  font-kerning: normal;
+  font-variant-ligatures: none;
+  tab-size: 4;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+
+#draft {
+  display: block;
+  width: 100%;
+  max-width: 68ch;
+  min-height: 55vh;
+  resize: none;
+  overflow: hidden;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  /* The caret is drawn in pencil by the script, on the page clock. */
+  caret-color: transparent;
+  border-radius: 0;
+  appearance: none;
+}
+
+#draft::placeholder { color: var(--soft); opacity: 1; }
+
+.mirror {
+  position: absolute;
+  top: 0;
+  left: var(--gutter);
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.marks {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.marks path {
+  fill: none;
+  stroke: var(--nose-accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.marks .ghost { stroke-width: 1.1; opacity: 0.45; }
+.marks .ring { stroke-width: 1.4; fill: var(--ground); }
+.marks .on .main { stroke-width: 3.2; }
+.marks .on .ring { stroke-width: 2; }
+
+.marks text, .tag text {
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 650;
+  fill: var(--accent-text);
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+
+.marks .caret { stroke: var(--ink); stroke-width: 1.8; }
+
+/* --- the margin: the actor, the verdict, the notes --------------------------- */
+
+.margin { position: sticky; top: 1.5rem; }
+
+.actor {
+  width: min(100%, 26rem);
+  margin-left: -0.75rem;
+}
+
+.nose {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  color: var(--ink);
+}
+
+.verdict {
+  margin: 1.25rem 0 0;
+  font-family: var(--serif);
+  font-size: 1.4375rem;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.flags {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 0.125rem;
+}
+
+.note {
+  display: grid;
+  grid-template-columns: 1.625rem minmax(0, 1fr);
+  column-gap: 0.75rem;
+  row-gap: 0.125rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.5rem 0.5rem 0.5rem 0;
+  border: 0;
+  border-radius: 0.375rem;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.note:focus-visible {
+  outline: 2px solid var(--nose-accent);
+  outline-offset: 2px;
+}
+
+.tag {
+  grid-row: 1 / span 2;
+  width: 1.625rem;
+  height: 1.625rem;
+  overflow: visible;
+}
+
+.tag path {
+  fill: none;
+  stroke: var(--nose-accent);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+}
+
+.say {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.0625rem;
+  line-height: 1.4;
+}
+
+.note:hover .say, .note:focus-visible .say { color: var(--accent-text); }
+
+.meta {
+  grid-column: 2;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  color: var(--soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.meta .score { color: var(--accent-text); }
+
+.mode {
+  max-width: 42ch;
+  margin: 1.5rem 0 0;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--faint);
+  color: var(--soft);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.mode.trouble { color: var(--accent-text); }
+
+/* --- one column ---------------------------------------------------------------- */
+
+@media (max-width: 56rem) {
+  :root { --gutter: 2.5rem; }
+  .desk { display: flex; flex-direction: column; gap: 1.25rem; }
+  .desk > * { width: 100%; }
+  .margin { display: contents; }
+  .stage {
+    order: -1;
+    display: flex;
+    flex-direction: row-reverse;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+  .gutter { left: 0; }
+  .actor { width: 7.5rem; flex: none; margin: 0; }
+  .verdict { margin: 0; font-size: 1.25rem; }
+  .flags, .mode { order: 2; }
+  .flags { margin-top: 0; }
+  #draft { min-height: 40vh; }
+  .meter { text-align: left; margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<div class="sheet">
+  <header class="top">
+    <div>
+      <h1>Sniff Test</h1>
+      <p class="tagline">Does the draft pass the sniff test?</p>
+    </div>
+    <div class="meter">
+      <p class="reading" id="reading">ready</p>
+      <p class="source" id="source">__METER_LABEL__</p>
+    </div>
+  </header>
+  <svg class="ruled" viewBox="0 0 1000 6" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+    <path d="M1 3.2C120 1.4 236 4.5 372 2.9S640 1.6 742 3.4 905 4.2 999 2.6"/>
+  </svg>
+
+  <main class="desk">
+    <section class="page">
+      <label class="quiet" for="draft">Your draft</label>
+      <div class="writing" id="writing">
+        <svg class="gutter" viewBox="0 0 6 1000" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+          <path d="M3.1 1C1.6 140 4.4 262 2.8 398S1.7 650 3.3 760 4.1 905 2.7 999"/>
+        </svg>
+        <div class="mirror" id="mirror" aria-hidden="true"></div>
+        <svg class="marks" id="marks" aria-hidden="true" focusable="false"></svg>
+        <textarea id="draft" rows="8" spellcheck="false" autocomplete="off" autocorrect="off" placeholder="Paste a draft, or start typing. Half a second after you stop, the nose has a sniff."></textarea>
+      </div>
+    </section>
+
+    <aside class="margin" aria-label="What the nose found">
+      <div class="stage">
+        <div class="actor"><!--NOSE--></div>
+        <p class="verdict" id="verdict" role="status">Nothing to sniff yet.</p>
+      </div>
+      <ol class="flags" id="flags" aria-live="polite" aria-relevant="additions"></ol>
+      <p class="mode" id="mode">__MODE_LINE__</p>
+    </aside>
+  </main>
+  <noscript><p>This page runs on a script it serves to itself, and it is switched off in this browser.</p></noscript>
+</div>
+
+<script nonce="__NONCE__">
+(() => {
+  "use strict";
+
+  // The capture lane reads this from outside the page. `generation` goes up when
+  // a keystroke arms a round, `rendered` when that round's answer is on screen,
+  // and `dueAt` is the page-clock time the next thing is owed at (null in flight).
+  window.__captureState = { generation: 0, rendered: 0, dueAt: null };
+  const capture = window.__captureState;
+
+  const CONFIG = __CONFIG_JSON__;
+  const RIG = __RIG_JSON__;
+  const SVG = "http://www.w3.org/2000/svg";
+
+  const draft = document.getElementById("draft");
+  const writing = document.getElementById("writing");
+  const mirror = document.getElementById("mirror");
+  const marksLayer = document.getElementById("marks");
+  const flagList = document.getElementById("flags");
+  const verdict = document.getElementById("verdict");
+  const modeLine = document.getElementById("mode");
+  const reading = document.getElementById("reading");
+  const source = document.getElementById("source");
+  const actor = document.getElementById("actor");
+
+  const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const MODE_TEXT = modeLine.textContent;
+  const SOURCE_TEXT = source.textContent;
+
+  // --- a clock of our own ------------------------------------------------------
+  // requestAnimationFrame and timers only. Both are the page clock, so both stand
+  // still when a capture pauses it and both move by exactly what it is advanced.
+
+  const running = new Set();
+  let frameId = 0;
+
+  function tween(ms, ease, step, done) {
+    if (calm || ms <= 0) {
+      step(1);
+      if (done) done();
+      return null;
+    }
+    const entry = { from: performance.now(), ms, ease, step, done };
+    running.add(entry);
+    if (!frameId) frameId = requestAnimationFrame(tick);
+    return entry;
+  }
+
+  function tick() {
+    frameId = 0;
+    const now = performance.now();
+    for (const entry of [...running]) {
+      const progress = Math.min(1, Math.max(0, (now - entry.from) / entry.ms));
+      entry.step(entry.ease(progress));
+      if (progress >= 1) {
+        running.delete(entry);
+        if (entry.done) entry.done();
+      }
+    }
+    if (running.size > 0) frameId = requestAnimationFrame(tick);
+  }
+
+  const beats = new Set();
+
+  // Beats keep their timing under reduced motion. It is the movement between
+  // poses that goes, not the order things happen in or how long a pose is held.
+  function later(ms, action) {
+    const id = setTimeout(() => {
+      beats.delete(id);
+      action();
+    }, ms);
+    beats.add(id);
+  }
+
+  function cancelBeats() {
+    for (const id of beats) clearTimeout(id);
+    beats.clear();
+  }
+
+  const easeOut = (t) => (t >= 1 ? 1 : 1 - Math.pow(2, -10 * t));
+  const easeSnap = (t) => {
+    const c = 1.9;
+    const u = t - 1;
+    return 1 + (c + 1) * u * u * u + c * u * u;
+  };
+
+  // --- the nose ---------------------------------------------------------------------
+  // One rigged drawing, six states. A state is every part's translate, rotate,
+  // scale and opacity, so moving between two is a field by field mix.
+
+  const FIELDS = ["tx", "ty", "r", "sx", "sy", "o"];
+  const parts = {};
+  for (const name of RIG.parts) parts[name] = actor.querySelector('[data-part="' + name + '"]');
+
+  function mix(a, b, t) {
+    const out = {};
+    for (const name of RIG.parts) {
+      const from = a[name];
+      const to = b[name];
+      const part = {};
+      for (const field of FIELDS) part[field] = from[field] + (to[field] - from[field]) * t;
+      out[name] = part;
+    }
+    return out;
+  }
+
+  const n3 = (value) => Math.round(value * 1000) / 1000;
+
+  function wear(pose) {
+    for (const name of RIG.parts) {
+      const element = parts[name];
+      if (!element) continue;
+      const p = pose[name];
+      const [px, py] = RIG.pivots[name];
+      element.setAttribute(
+        "transform",
+        "translate(" + n3(p.tx) + " " + n3(p.ty) + ") translate(" + px + " " + py + ") rotate(" + n3(p.r) +
+          ") scale(" + n3(p.sx) + " " + n3(p.sy) + ") translate(" + -px + " " + -py + ")",
+      );
+      element.setAttribute("opacity", String(n3(p.o)));
+    }
+  }
+
+  const REST = RIG.expressions.rest;
+  let pose = mix(REST, REST, 0);
+  let wearing = "rest";
+  let noseMove = null;
+  let sniffing = false;
+
+  function noseTo(name, ms, amount, ease) {
+    const from = pose;
+    const target = amount === undefined || amount === 1 ? RIG.expressions[name] : mix(REST, RIG.expressions[name], amount);
+    if (noseMove) running.delete(noseMove);
+    wearing = name;
+    noseMove = tween(ms, ease || easeOut, (t) => {
+      pose = mix(from, target, t);
+      wear(pose);
+    });
+  }
+
+  const easeMs = (name) => RIG.timing[name].easeMs;
+
+  /** React to one flag. The same reaction twice in a row dips first, so it reads as a second hit. */
+  function react(name) {
+    if (calm) {
+      noseTo(name, 0);
+      return;
+    }
+    if (name === "twitch") {
+      noseTo("twitch", easeMs("twitch"), 1);
+      later(170, () => noseTo("twitch", 110, 0.3));
+      later(300, () => noseTo("twitch", easeMs("twitch"), 1));
+      later(470, () => noseTo("twitch", 160, 0.55));
+      return;
+    }
+    if (wearing === name) {
+      noseTo(name, 100, 0.55);
+      later(100, () => noseTo(name, easeMs(name), 1, name === "recoil" ? easeSnap : easeOut));
+      return;
+    }
+    noseTo(name, easeMs(name), 1, name === "recoil" ? easeSnap : easeOut);
+  }
+
+  function startSniffing() {
+    cancelBeats();
+    finishReveals();
+    sniffing = true;
+    if (calm) {
+      noseTo("sniff", 0, 0.7);
+      return;
+    }
+    const breatheIn = () => {
+      if (!sniffing) return;
+      noseTo("sniff", easeMs("sniff"), 1);
+      later(easeMs("sniff") + 170, breatheOut);
+    };
+    const breatheOut = () => {
+      if (!sniffing) return;
+      noseTo("sniff", 240, 0.4);
+      later(300, breatheIn);
+    };
+    breatheIn();
+  }
+
+  function stopSniffing() {
+    sniffing = false;
+    cancelBeats();
+    finishReveals();
+  }
+
+  // --- pencil strokes ---------------------------------------------------------------
+  // The wobble comes from an integer hash of where the stroke is, never from chance,
+  // so the same draft draws the same marks every time.
+
+  function noise(seed) {
+    let n = seed | 0;
+    n = (n ^ 61) ^ (n >>> 16);
+    n = (n + (n << 3)) | 0;
+    n ^= n >>> 4;
+    n = Math.imul(n, 0x27d4eb2d);
+    n ^= n >>> 15;
+    return (n >>> 0) / 4294967295;
+  }
+
+  const sway = (seed, reach) => (noise(seed) - 0.5) * 2 * reach;
+  const n1 = (value) => Math.round(value * 10) / 10;
+
+  function curveTo(x0, y0, x1, y1, seed, reach) {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    return (
+      "C" + n1(x0 + dx * 0.32 + sway(seed + 1, reach)) + " " + n1(y0 + dy * 0.32 + sway(seed + 2, reach)) + " " +
+      n1(x0 + dx * 0.68 + sway(seed + 3, reach)) + " " + n1(y0 + dy * 0.68 + sway(seed + 4, reach)) + " " +
+      n1(x1) + " " + n1(y1)
+    );
+  }
+
+  const line = (x0, y0, x1, y1, seed, reach) => "M" + n1(x0) + " " + n1(y0) + curveTo(x0, y0, x1, y1, seed, reach);
+
+  /** A circle drawn by hand: it overshoots where it started and is never quite round. */
+  function ring(cx, cy, radius, seed) {
+    const steps = 22;
+    const begin = -2.2 + sway(seed, 0.4);
+    let d = "";
+    for (let i = 0; i <= steps + 3; i++) {
+      const angle = begin + (i / steps) * Math.PI * 2;
+      const r = radius + sway(seed + i * 7, 0.7) + (i > steps ? -0.9 : 0);
+      d += (i === 0 ? "M" : "L") + n1(cx + Math.cos(angle) * r) + " " + n1(cy + Math.sin(angle) * r);
+    }
+    return d;
+  }
+
+  function el(name, attributes, parent) {
+    const node = document.createElementNS(SVG, name);
+    for (const key in attributes) node.setAttribute(key, attributes[key]);
+    if (parent) parent.appendChild(node);
+    return node;
+  }
+
+  // --- the twin ------------------------------------------------------------------------
+  // A textarea cannot say where a character is on screen. An invisible twin with the
+  // same type and the same width can: the text, split at the caret by a marker that
+  // has no width and offers no line break.
+
+  const textBefore = document.createTextNode("");
+  const textAfter = document.createTextNode("");
+  const caretMarker = document.createElement("span");
+  caretMarker.textContent = "⁠";
+  mirror.append(textBefore, caretMarker, textAfter);
+
+  function syncTwin() {
+    const value = draft.value;
+    const at = Math.min(value.length, draft.selectionStart || 0);
+    textBefore.data = value.slice(0, at);
+    textAfter.data = value.slice(at);
+    mirror.style.width = draft.clientWidth + "px";
+  }
+
+  function grow() {
+    draft.style.height = "auto";
+    draft.style.height = draft.scrollHeight + "px";
+  }
+
+  function pointAt(offset) {
+    const split = textBefore.length;
+    return offset <= split ? [textBefore, offset] : [textAfter, Math.min(textAfter.length, offset - split)];
+  }
+
+  /** Where a range of the draft is on screen, one box per line, relative to the writing area. */
+  function boxesFor(start, end) {
+    const total = textBefore.length + textAfter.length;
+    const range = document.createRange();
+    const from = pointAt(Math.min(start, total));
+    const to = pointAt(Math.min(end, total));
+    range.setStart(from[0], from[1]);
+    range.setEnd(to[0], to[1]);
+
+    const origin = writing.getBoundingClientRect();
+    const lines = [];
+    for (const rect of range.getClientRects()) {
+      if (rect.width < 0.5) continue;
+      const box = { left: rect.left - origin.left, right: rect.right - origin.left, top: rect.top - origin.top, bottom: rect.bottom - origin.top };
+      const same = lines.find((other) => Math.abs(other.top - box.top) < 3);
+      if (same) {
+        same.left = Math.min(same.left, box.left);
+        same.right = Math.max(same.right, box.right);
+        same.bottom = Math.max(same.bottom, box.bottom);
+      } else {
+        lines.push(box);
+      }
+    }
+    return lines.sort((a, b) => a.top - b.top);
+  }
+
+  // --- the marks -----------------------------------------------------------------------
+  // A flag about words gets a pencil line under them. A flag about a paragraph gets a
+  // bracket in the margin, nested outward when one paragraph earns several.
+
+  // A paragraph flag stays the same flag while its paragraph grows, so its end is not part of its name.
+  const flagKey = (flag) => flag.rule + "|" + flag.start + "|" + (flag.scope === "paragraph" ? "p" : flag.end);
+  const shown = new Map();
+  let order = [];
+  let scored = "";
+  let hot = null;
+
+  /** Where the flagged paragraph ends in the draft as it stands, which may be past what was scored. */
+  function paragraphEnd(flag) {
+    const rest = draft.value.slice(flag.start);
+    const gap = rest.search(/\n[ \t]*\n/);
+    return Math.max(flag.end, flag.start + (gap === -1 ? rest.length : gap));
+  }
+
+  function drawMarks() {
+    while (marksLayer.firstChild) marksLayer.removeChild(marksLayer.firstChild);
+    const textLeft = draft.offsetLeft;
+    const narrow = textLeft < 56;
+    const step = narrow ? 10 : 19;
+    const nests = new Map();
+
+    order.forEach((key, index) => {
+      const mark = shown.get(key);
+      if (!mark || !mark.revealed) return;
+      const flag = mark.flag;
+      const lines = boxesFor(flag.start, flag.scope === "paragraph" ? paragraphEnd(flag) : flag.end);
+      if (lines.length === 0) return;
+
+      const group = el("g", { class: key === hot ? "on" : "" }, marksLayer);
+      const seed = (flag.start + 1) * 131 + index * 17;
+      mark.paths = [];
+      let tagX;
+      let tagY;
+
+      if (flag.scope === "paragraph") {
+        const depth = Math.min(nests.get(flag.start) || 0, 2);
+        nests.set(flag.start, (nests.get(flag.start) || 0) + 1);
+        const x = textLeft - (narrow ? 12 : 14) - depth * step;
+        const top = lines[0].top + 3;
+        const bottom = lines[lines.length - 1].bottom - 2;
+        const d =
+          "M" + n1(x + 8) + " " + n1(top) +
+          curveTo(x + 8, top, x, top + 5, seed, 1) +
+          curveTo(x, top + 5, x + sway(seed + 9, 1.4), bottom - 5, seed + 20, 1.6) +
+          curveTo(x, bottom - 5, x + 8, bottom, seed + 40, 1);
+        mark.paths.push(el("path", { class: "main", d, pathLength: "1" }, group));
+        tagX = x;
+        // In a narrow margin the brackets sit closer than a numeral is wide, so every other one is numbered at its foot.
+        tagY = narrow && depth % 2 === 1 ? bottom + 11 : top - 11;
+      } else {
+        lines.forEach((box, i) => {
+          const y = box.bottom - 1;
+          mark.paths.push(el("path", { class: "main", pathLength: "1", d: line(box.left - 1, y + sway(seed + i, 0.8), box.right + 2, y + sway(seed + i + 5, 0.8), seed + i * 11, 1.3) }, group));
+          mark.paths.push(el("path", { class: "ghost", pathLength: "1", d: line(box.left + 4, y + 2.4, box.right - 3, y + 2.1 + sway(seed + i + 8, 0.6), seed + i * 13 + 3, 1) }, group));
+        });
+        const last = lines[lines.length - 1];
+        tagX = last.right + 11;
+        tagY = last.bottom + 6;
+      }
+
+      mark.tag = el("g", {}, group);
+      el("path", { class: "ring", d: ring(tagX, tagY, narrow ? 7 : 8, seed + 77) }, mark.tag);
+      el("text", { x: n1(tagX), y: n1(tagY + 0.5) }, mark.tag).textContent = String(index + 1);
+      progressMark(mark);
+    });
+
+    drawCaret();
+  }
+
+  function progressMark(mark) {
+    if (!mark.paths) return;
+    const done = mark.progress >= 1;
+    for (const path of mark.paths) {
+      if (done) {
+        path.removeAttribute("stroke-dasharray");
+        path.removeAttribute("stroke-dashoffset");
+      } else {
+        path.setAttribute("stroke-dasharray", "1 2");
+        path.setAttribute("stroke-dashoffset", String(n3(1 - mark.progress)));
+      }
+      path.setAttribute("visibility", mark.progress <= 0 ? "hidden" : "visible");
+    }
+    if (mark.tag) mark.tag.setAttribute("opacity", String(n3(Math.max(0, (mark.progress - 0.6) / 0.4))));
+  }
+
+  function revealMark(mark) {
+    mark.revealed = true;
+    mark.progress = 0;
+    drawMarks();
+    mark.moves.push(
+      tween(300, easeOut, (t) => {
+        mark.progress = t;
+        progressMark(mark);
+      }),
+    );
+  }
+
+  /** A new round cuts the queue short: whatever was still waiting to be drawn is simply there. */
+  function finishReveals() {
+    let changed = false;
+    for (const mark of shown.values()) {
+      if (mark.revealed && mark.progress >= 1) continue;
+      for (const move of mark.moves) if (move) running.delete(move);
+      mark.moves = [];
+      mark.revealed = true;
+      mark.progress = 1;
+      mark.note.item.style.opacity = "1";
+      mark.note.item.style.transform = "none";
+      changed = true;
+    }
+    if (changed) drawMarks();
+  }
+
+  // --- the caret, in pencil ---------------------------------------------------------------
+
+  let caretLit = true;
+  let caretTimer = 0;
+  let caretPath = null;
+
+  function drawCaret() {
+    if (caretPath && caretPath.parentNode) caretPath.parentNode.removeChild(caretPath);
+    caretPath = null;
+    const focused = document.activeElement === draft && draft.selectionStart === draft.selectionEnd;
+    if (!focused || !caretLit) return;
+    const origin = writing.getBoundingClientRect();
+    const rect = caretMarker.getBoundingClientRect();
+    if (rect.height === 0) return;
+    const x = rect.left - origin.left + 0.5;
+    const top = rect.top - origin.top + 2;
+    const bottom = rect.bottom - origin.top - 2;
+    caretPath = el("path", { class: "caret", d: "M" + n1(x + 1) + " " + n1(top) + "L" + n1(x - 0.6) + " " + n1(bottom) }, marksLayer);
+  }
+
+  function holdCaret() {
+    clearTimeout(caretTimer);
+    caretLit = true;
+    drawCaret();
+    if (calm) return;
+    const blink = () => {
+      caretLit = !caretLit;
+      drawCaret();
+      caretTimer = setTimeout(blink, 530);
+    };
+    caretTimer = setTimeout(blink, 530);
+  }
+
+  // --- the notes ---------------------------------------------------------------------------
+
+  function noteFor(flag, key) {
+    const item = document.createElement("li");
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "note";
+
+    const tag = el("svg", { class: "tag", viewBox: "0 0 26 26", "aria-hidden": "true", focusable: "false" }, button);
+    el("path", { d: ring(13, 13, 9.5, flag.start * 31 + 5) }, tag);
+    const number = el("text", { x: "13", y: "13.5" }, tag);
+
+    const say = document.createElement("span");
+    say.className = "say";
+    say.textContent = flag.message;
+
+    const meta = document.createElement("span");
+    meta.className = "meta";
+    const score = document.createElement("span");
+    score.className = "score";
+    score.textContent = flag.kind === "regex" ? "counted" : flag.probability.toFixed(2);
+    meta.append(flag.rule + "  ", score);
+
+    const where = document.createElement("span");
+    where.className = "quiet";
+    where.textContent = " Line " + flag.line + ". Press to select it in the draft.";
+
+    button.append(say, meta, where);
+    item.append(button);
+
+    const light = (on) => () => {
+      hot = on ? key : hot === key ? null : hot;
+      drawMarks();
+    };
+    button.addEventListener("mouseenter", light(true));
+    button.addEventListener("mouseleave", light(false));
+    button.addEventListener("focus", light(true));
+    button.addEventListener("blur", light(false));
+    button.addEventListener("click", () => {
+      const mark = shown.get(key);
+      if (!mark) return;
+      draft.focus();
+      draft.setSelectionRange(mark.flag.start, mark.flag.end);
+    });
+
+    return { item, number };
+  }
+
+  function revealNote(mark) {
+    const item = mark.note.item;
+    mark.moves.push(
+      tween(280, easeOut, (t) => {
+        item.style.opacity = String(n3(t));
+        item.style.transform = "translateY(" + n3((1 - t) * 7) + "px)";
+      }),
+    );
+  }
+
+  function plural(count, one, many) {
+    return count === 1 ? one : many;
+  }
+
+  function money(usd) {
+    if (!(usd > 0)) return "$0";
+    return "$" + (usd < 0.01 ? usd.toFixed(5) : usd.toFixed(2));
+  }
+
+  // --- a round lands ---------------------------------------------------------------------------
+
+  function clearFindings() {
+    shown.clear();
+    order = [];
+    scored = "";
+    while (flagList.firstChild) flagList.removeChild(flagList.firstChild);
+    drawMarks();
+  }
+
+  function settle(round) {
+    capture.rendered = Math.max(capture.rendered, round);
+    if (capture.generation === round) capture.dueAt = null;
+  }
+
+  function present(round, text, result) {
+    stopSniffing();
+
+    // Flags are offsets into the text that was scored. They still hold if all
+    // that happened since is more typing at the end; otherwise they are dropped.
+    if (!draft.value.startsWith(text)) {
+      noseTo("rest", easeMs("rest"));
+      settle(round);
+      return;
+    }
+
+    scored = text;
+    const fresh = [];
+    const keys = result.flags.map(flagKey);
+    for (const [key, mark] of shown) {
+      if (keys.includes(key)) continue;
+      flagList.removeChild(mark.note.item);
+      shown.delete(key);
+    }
+
+    result.flags.forEach((flag, index) => {
+      const key = keys[index];
+      let mark = shown.get(key);
+      if (!mark) {
+        mark = { flag, revealed: false, progress: 0, moves: [], note: noteFor(flag, key) };
+        mark.note.item.style.opacity = "0";
+        shown.set(key, mark);
+        fresh.push(mark);
+      }
+      mark.flag = flag;
+      mark.note.number.textContent = String(index + 1);
+      flagList.insertBefore(mark.note.item, flagList.children[index] || null);
+    });
+    order = keys;
+
+    reading.textContent = result.ms + " ms · " + money(result.usd);
+    source.textContent = !result.judged
+      ? SOURCE_TEXT
+      : result.asked === 0
+        ? "nothing changed, nothing sent"
+        : SOURCE_TEXT + (result.skipped > 0 ? ", " + result.skipped + " unchanged " + plural(result.skipped, "paragraph", "paragraphs") + " not sent again" : "");
+
+    if (result.problem) {
+      modeLine.textContent = "The judgment rules could not run just now. " + result.problem + " The countable flags are still here.";
+      modeLine.classList.add("trouble");
+    } else {
+      modeLine.textContent = MODE_TEXT;
+      modeLine.classList.remove("trouble");
+    }
+
+    const count = result.flags.length;
+    verdict.textContent =
+      count === 0 ? "Nothing off. It passes." : count + " " + plural(count, "thing smells", "things smell") + " off.";
+
+    drawMarks();
+
+    if (count === 0) {
+      noseTo("approve", easeMs("approve"));
+      later(easeMs("approve") + 1300, () => noseTo("rest", 460));
+    } else {
+      // The nose reacts first; the pencil and the note follow it.
+      let at = 0;
+      fresh.forEach((mark, index) => {
+        if (index >= 5) {
+          mark.revealed = true;
+          mark.progress = 1;
+          mark.note.item.style.opacity = "1";
+          return;
+        }
+        later(at, () => react(mark.flag.reaction));
+        later(at + 150, () => revealMark(mark));
+        later(at + 230, () => revealNote(mark));
+        at += 520;
+      });
+      if (fresh.length === 0) react(result.reaction);
+      if (fresh.length > 5) drawMarks();
+      later(at + 1100, () => noseTo("rest", 520));
+    }
+
+    settle(round);
+  }
+
+  function presentEmpty(round) {
+    stopSniffing();
+    clearFindings();
+    verdict.textContent = "Nothing to sniff yet.";
+    reading.textContent = "ready";
+    source.textContent = SOURCE_TEXT;
+    noseTo("rest", easeMs("rest"));
+    settle(round);
+  }
+
+  function presentFailure(round, message) {
+    stopSniffing();
+    verdict.textContent = message;
+    noseTo("rest", easeMs("rest"));
+    settle(round);
+  }
+
+  // --- a round fires ---------------------------------------------------------------------------
+
+  let quiet = 0;
+  let owed = 0;
+  let inFlight = null;
+
+  function fire() {
+    quiet = 0;
+    const round = capture.generation;
+    const firedAt = Date.now();
+    const text = draft.value;
+    capture.dueAt = null;
+
+    clearTimeout(owed);
+    owed = 0;
+    if (inFlight) inFlight.abort();
+    inFlight = null;
+
+    if (text.trim() === "") {
+      presentEmpty(round);
+      return;
+    }
+
+    startSniffing();
+    verdict.textContent = "Sniffing.";
+    const request = new AbortController();
+    inFlight = request;
+
+    fetch("/score", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ draft: text }),
+      signal: request.signal,
+      credentials: "omit",
+      cache: "no-store",
+      referrerPolicy: "no-referrer",
+    })
+      .then((response) => response.json().then((body) => ({ ok: response.ok, body })))
+      .then(({ ok, body }) => {
+        if (inFlight === request) inFlight = null;
+        if (!ok) {
+          presentFailure(round, body && body.error ? body.error : "The local server said no.");
+          return;
+        }
+        // In replay the answer waits out its recorded latency on the page clock,
+        // counted from when the round fired, so the sniff is as long as the real
+        // request was and the answer lands on the same frame every time.
+        const landsAt = CONFIG.holdForRecordedLatency ? firedAt + body.ms : 0;
+        const wait = landsAt - Date.now();
+        if (wait > 0) {
+          if (capture.generation === round) capture.dueAt = landsAt;
+          owed = setTimeout(() => {
+            owed = 0;
+            present(round, text, body);
+          }, wait);
+        } else {
+          present(round, text, body);
+        }
+      })
+      .catch((error) => {
+        if (error && error.name === "AbortError") {
+          settle(round);
+          return;
+        }
+        if (inFlight === request) inFlight = null;
+        presentFailure(round, "The local server did not answer. Is snifftest serve still running?");
+      });
+  }
+
+  // --- typing --------------------------------------------------------------------------------------
+
+  draft.addEventListener("input", () => {
+    grow();
+    syncTwin();
+    if (!draft.value.startsWith(scored)) clearFindings();
+    else drawMarks();
+    holdCaret();
+
+    // The nose rests while you type, unless it is in the middle of saying something.
+    if (!sniffing && beats.size === 0 && wearing !== "rest") noseTo("rest", easeMs("rest"));
+
+    clearTimeout(quiet);
+    capture.generation += 1;
+    capture.dueAt = Date.now() + CONFIG.debounceMs;
+    quiet = setTimeout(fire, CONFIG.debounceMs);
+  });
+
+  document.addEventListener("selectionchange", () => {
+    if (document.activeElement !== draft) return;
+    syncTwin();
+    holdCaret();
+  });
+  draft.addEventListener("focus", () => {
+    syncTwin();
+    holdCaret();
+  });
+  draft.addEventListener("blur", () => {
+    clearTimeout(caretTimer);
+    drawCaret();
+  });
+
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(() => {
+      grow();
+      syncTwin();
+      drawMarks();
+    }).observe(writing);
+  }
+
+  wear(pose);
+  grow();
+  syncTwin();
+})();
+</script>
+</body>
+</html>
