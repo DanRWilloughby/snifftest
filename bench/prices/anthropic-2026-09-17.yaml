@@ -16,9 +16,8 @@
 
 version: 1
 source: >-
-  Anthropic published list prices as recorded in houston/src/producer/llm.ts
-  PRICES on 2026-09-17; re-verify against the published price list on the run
-  date before quoting these figures.
+  Anthropic published list prices, transcribed on 2026-09-17; re-verify against
+  the published price list on the run date before quoting these figures.
 verified_on: 2026-09-17
 currency: usd_per_million_tokens
 

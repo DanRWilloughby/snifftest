@@ -143,6 +143,56 @@ rules:
     expect(resolved.ruleset.rules.map((rule) => rule.id)).toEqual(["dash_present", "colon_heavy"]);
   });
 
+  test("a discovered ruleset may not extend a file outside its own tree", () => {
+    // The ruleset was found in the working directory, so it came from whatever
+    // repository the user pointed the tool at. A file up and out of that tree
+    // is not the user's choice to read, and the parse errors alone name the
+    // path and its top-level keys, which in a CI job is a public log.
+    const dir = sandbox();
+    const outside = sandbox();
+    write(outside, "private.yaml", DEFAULT_RULES);
+    write(dir, PROJECT_RULES_FILE, `version: 1\nextends: ${join(outside, "private.yaml")}\nrules: []\n`);
+
+    expect(() => resolveRuleset({ cwd: dir })).toThrow(ConfigError);
+    expect(() => resolveRuleset({ cwd: dir })).toThrow(/outside/i);
+  });
+
+  test("a discovered ruleset may not climb out with a relative path either", () => {
+    const dir = sandbox();
+    write(dir, "private.yaml", DEFAULT_RULES);
+    const inner = join(dir, "repo");
+    mkdirSync(inner, { recursive: true });
+    write(inner, PROJECT_RULES_FILE, "version: 1\nextends: ../private.yaml\nrules: []\n");
+
+    expect(() => resolveRuleset({ cwd: inner })).toThrow(/outside/i);
+  });
+
+  test("a discovered ruleset still extends the packaged default and its own tree", () => {
+    const dir = sandbox();
+    const fallback = write(dir, "packaged.yaml", DEFAULT_RULES);
+    write(dir, "house/base.yaml", PROJECT_RULES);
+    write(dir, PROJECT_RULES_FILE, "version: 1\nextends: house/base.yaml\nrules: []\n");
+
+    const nested = resolveRuleset({ cwd: dir, defaultRulesPath: fallback });
+    expect(nested.ruleset.rules.map((rule) => rule.id)).toEqual(["banned_words"]);
+
+    write(dir, PROJECT_RULES_FILE, "version: 1\nextends: default\nrules: []\n");
+    const packaged = resolveRuleset({ cwd: dir, defaultRulesPath: fallback });
+    expect(packaged.ruleset.rules.map((rule) => rule.id)).toEqual(["dash_present", "colon_heavy"]);
+  });
+
+  test("a ruleset the user named may still extend anywhere they can read", () => {
+    // --rules is the user saying which file to read, so the tree it sits in is
+    // theirs to leave. Only the file found by looking around is confined.
+    const dir = sandbox();
+    const outside = sandbox();
+    write(outside, "base.yaml", DEFAULT_RULES);
+    write(dir, "house.yaml", `version: 1\nextends: ${join(outside, "base.yaml")}\nrules: []\n`);
+
+    const resolved = resolveRuleset({ cwd: dir, rulesPath: "house.yaml" });
+    expect(resolved.ruleset.rules.map((rule) => rule.id)).toEqual(["dash_present", "colon_heavy"]);
+  });
+
   test("a cycle in extends is refused by name rather than followed", () => {
     const dir = sandbox();
     write(dir, "a.yaml", "version: 1\nextends: b.yaml\nrules: []\n");

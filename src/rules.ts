@@ -272,6 +272,7 @@ function validateRegexRule(
     } catch (error) {
       throw new RulesetError(`${where}: pattern is not a valid regular expression (${reason(error)})`);
     }
+    refuseNestedQuantifiers(pattern, where);
     return {
       ...common,
       kind: "regex",
@@ -369,12 +370,134 @@ function validateSeed(value: YamlValue | undefined, where: string): Seed | undef
   throw new RulesetError(`${where}: seed needs either a transform or a splice list`);
 }
 
+// --- refusing a pattern that cannot be interrupted ------------------------
+
+/**
+ * Refuse a pattern whose quantifiers nest, while the ruleset is being read.
+ *
+ * A ruleset is code in the one sense that matters here: it supplies regular
+ * expressions that run in this process, and a repository somebody else wrote
+ * supplies both the pattern and the paragraph that detonates it. `^(a+)+$`
+ * against forty characters took half a second when this was measured; fifty
+ * characters never returned. There is nothing to do about that once it starts,
+ * because JavaScript cannot interrupt a running regex: no timeout fires, no
+ * signal lands, the process is simply gone. A worker would only move the hang
+ * somewhere it can be killed, at the cost of a thread per rule.
+ *
+ * So the check happens before anything runs, and it is deliberately blunt: a
+ * quantifier that can match more than one length, applied to a group that
+ * already contains one. That is the shape of every exponential blowup anyone
+ * writes by accident. `{4}` matches exactly one length, so `(\d{4})?` and
+ * `(\d{4})+` are ordinary patterns and pass.
+ *
+ * What it does not catch is ambiguity through alternation, `(a|a)+`, which
+ * needs a real analyser to see. The cap below is the second layer under that,
+ * and it is a bound on the cost rather than a proof there is none.
+ */
+function refuseNestedQuantifiers(pattern: string, where: string): void {
+  interface Frame {
+    ambiguous: boolean;
+  }
+  const frames: Frame[] = [{ ambiguous: false }];
+  const top = (): Frame | undefined => frames[frames.length - 1];
+
+  let i = 0;
+  while (i < pattern.length) {
+    const ch = pattern[i];
+
+    if (ch === "(") {
+      frames.push({ ambiguous: false });
+      i++;
+      continue;
+    }
+
+    if (ch === ")") {
+      const frame = frames.pop();
+      // Unbalanced, which `new RegExp` has already refused; nothing to add.
+      if (frame === undefined || frames.length === 0) return;
+      const quantifier = quantifierAt(pattern, i + 1);
+      if (quantifier !== null && quantifier.ambiguous && frame.ambiguous) {
+        throw new RulesetError(
+          `${where}: pattern nests quantifiers. A repetition that can match more than one length, ` +
+            "applied to a group that already contains one, backtracks exponentially, and nothing can " +
+            "interrupt it once it starts. Make the inner repetition an exact count, or match the " +
+            "two parts separately.",
+        );
+      }
+      const parent = top();
+      if (parent !== undefined) {
+        parent.ambiguous =
+          parent.ambiguous || frame.ambiguous || (quantifier !== null && quantifier.ambiguous);
+      }
+      i = quantifier === null ? i + 1 : quantifier.end;
+      continue;
+    }
+
+    // Any other atom: an escape pair, a character class, or one character.
+    let end = i + 1;
+    if (ch === "\\") end = i + 2;
+    else if (ch === "[") end = classEnd(pattern, i);
+
+    const quantifier = quantifierAt(pattern, end);
+    if (quantifier !== null) {
+      const frame = top();
+      if (frame !== undefined && quantifier.ambiguous) frame.ambiguous = true;
+      end = quantifier.end;
+    }
+    i = end;
+  }
+}
+
+/** Where a character class ends, so its contents are read as literals. */
+function classEnd(pattern: string, start: number): number {
+  let i = start + 1;
+  if (pattern[i] === "^") i++;
+  if (pattern[i] === "]") i++;
+  while (i < pattern.length) {
+    if (pattern[i] === "\\") i += 2;
+    else if (pattern[i] === "]") return i + 1;
+    else i++;
+  }
+  return pattern.length;
+}
+
+/** A repetition at this position, and whether it can match more than one length. */
+function quantifierAt(pattern: string, start: number): { end: number; ambiguous: boolean } | null {
+  const lazy = (end: number): number => (pattern[end] === "?" ? end + 1 : end);
+  const ch = pattern[start];
+
+  if (ch === "*" || ch === "+") return { end: lazy(start + 1), ambiguous: true };
+  if (ch === "?") return { end: lazy(start + 1), ambiguous: true };
+  if (ch !== "{") return null;
+
+  const counted = /^\{(\d+)(,(\d*))?\}/.exec(pattern.slice(start));
+  if (counted === null) return null;
+  const end = lazy(start + counted[0].length);
+  // `{4}` is one length. `{2,}` and `{2,4}` are a range, and a range is what
+  // gives the engine something to backtrack through.
+  const ambiguous = counted[2] !== undefined && counted[3] !== String(counted[1]);
+  return { end, ambiguous };
+}
+
 // --- running the countable checks ----------------------------------------
+
+/**
+ * How much of one paragraph a ruleset's own pattern is run against.
+ *
+ * The second layer under the refusal above, for the shapes it cannot name. A
+ * paragraph longer than this is checked up to here by a pattern rule, and the
+ * run says so rather than quietly finding nothing; the built-in rules read the
+ * whole paragraph, because this tool wrote them.
+ */
+export const PATTERN_TEXT_CAP = 8_000;
 
 /** Run one countable rule over one chunk of text. Never touches the network. */
 export function checkRegexRule(rule: RegexRule, text: string): Match[] {
   if (rule.source === "pattern") {
-    return patternMatches(new RegExp(rule.pattern, withGlobal(rule.flags ?? "")), text);
+    return patternMatches(
+      new RegExp(rule.pattern, withGlobal(rule.flags ?? "")),
+      text.slice(0, PATTERN_TEXT_CAP),
+    );
   }
   const check = BUILTINS[rule.builtin];
   if (check === undefined) {

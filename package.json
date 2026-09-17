@@ -28,7 +28,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "bun build src/cli.ts --target=node --format=esm --banner='#!/usr/bin/env node' --outfile dist/snifftest.js && chmod +x dist/snifftest.js",
+    "build": "bun build src/bin.ts --target=node --format=esm --banner='#!/usr/bin/env node' --outfile dist/snifftest.js && chmod +x dist/snifftest.js",
     "prepare": "bun run build",
     "test": "bun test",
     "typecheck": "tsc --noEmit",

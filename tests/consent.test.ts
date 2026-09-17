@@ -107,13 +107,66 @@ describe("requestConsent", () => {
     expect(existsSync(consentPath({ HOME: home }, home))).toBe(false);
   });
 
-  test("a value other than 1 in SNIFFTEST_SEND is not an answer", async () => {
+  test("a value that names nothing is not an answer", async () => {
     const home = sandbox();
     const cwd = sandbox();
 
-    const outcome = await ask({ home, cwd, env: { SNIFFTEST_SEND: "true" } });
+    for (const value of ["true", "0", "yes", "   "]) {
+      const outcome = await ask({ home, cwd, env: { SNIFFTEST_SEND: value } });
+      expect([value, outcome.granted]).toEqual([value, false]);
+    }
+  });
 
-    expect(outcome.granted).toBe(false);
+  describe("an environment answer covers the destinations it names", () => {
+    // A CI job sets this so the judgment rules can run, which is a yes to one
+    // company. It used to be read before the destinations were looked at, so
+    // the same variable also authorised `bench` to ship the same paragraphs to
+    // two others, without anybody being told.
+    const OPENROUTER = { name: "OpenRouter", endpoint: "https://openrouter.ai/x", keyEnv: "OPENROUTER_API_KEY" };
+    const ANTHROPIC = { name: "Anthropic", endpoint: "https://api.anthropic.com/x", keyEnv: "ANTHROPIC_API_KEY" };
+
+    async function askFor(
+      destinations: readonly { name: string; endpoint: string; keyEnv: string }[],
+      send: string,
+      home: string,
+    ) {
+      return requestConsent({
+        env: { HOME: home, SNIFFTEST_SEND: send },
+        homedir: home,
+        assumeYes: false,
+        isTty: false,
+        ruleIds: ["restating_closer"],
+        fileCount: 1,
+        destinations,
+        say: () => {},
+      });
+    }
+
+    test("the shorthand answers for the one destination check uses, and no other", async () => {
+      const home = sandbox();
+
+      expect((await askFor([], "1", home)).granted).toBe(true);
+      expect((await askFor([OPENROUTER, ANTHROPIC], "1", home)).granted).toBe(false);
+      expect((await askFor([OPENROUTER], "1", home)).granted).toBe(false);
+    });
+
+    test("a named list answers for exactly those, whatever case it is written in", async () => {
+      const home = sandbox();
+
+      expect((await askFor([OPENROUTER, ANTHROPIC], "OpenRouter, Anthropic", home)).granted).toBe(true);
+      expect((await askFor([OPENROUTER], "openrouter", home)).granted).toBe(true);
+      expect((await askFor([OPENROUTER, ANTHROPIC], "openrouter", home)).granted).toBe(false);
+      expect((await askFor([], "OpenRouter", home)).granted).toBe(false);
+    });
+
+    test("an environment answer is still never written down", async () => {
+      const home = sandbox();
+
+      const outcome = await askFor([OPENROUTER], "OpenRouter", home);
+
+      expect(outcome.stored).toBe(false);
+      expect(existsSync(consentPath({ HOME: home }, home))).toBe(false);
+    });
   });
 
   test("no consent and no terminal prints the disclosure and refuses to send", async () => {

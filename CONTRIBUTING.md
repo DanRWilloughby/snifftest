@@ -25,7 +25,7 @@ bun run check      # typecheck, then the tests
 Run the checker straight from source while you work:
 
 ```sh
-bun src/cli.ts check --dry-run README.md
+bun src/bin.ts check --dry-run README.md
 ```
 
 `--dry-run` runs the countable rules only. Drop it and the judgment rules run,

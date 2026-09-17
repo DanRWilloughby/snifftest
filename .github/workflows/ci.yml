@@ -63,6 +63,39 @@ jobs:
           '
           bun pm ls
 
+      - name: The packed tarball works when it is installed
+        # Not "does it build" and not "does it parse": does the executable a
+        # user reaches actually run. Everything a user reaches goes through the
+        # symbolic link a package manager writes into node_modules/.bin, and a
+        # bin that ends without running prints nothing and exits 0, which is
+        # this tool's word for "nothing tripped". A dead release would look
+        # exactly like a clean draft on every surface, so the tarball is
+        # installed here and run through that link before anything ships.
+        run: |
+          set -euo pipefail
+          npm pack --silent > packed.txt
+          tarball="$(tail -n 1 packed.txt)"
+          smoke="$(mktemp -d)"
+          npm install --silent --prefix "$smoke" "./${tarball}"
+          bin="$smoke/node_modules/.bin/snifftest"
+          test -L "$bin"
+
+          version="$("$bin" --version)"
+          test -n "$version"
+          echo "the installed bin reports $version"
+
+          printf 'A sentence with a long dash \xe2\x80\x94 in the middle of it, and enough other words after it to read as a paragraph.\n' > "$smoke/draft.md"
+          status=0
+          "$bin" check --dry-run -- "$smoke/draft.md" > "$smoke/out.txt" 2>&1 || status=$?
+          cat "$smoke/out.txt"
+          if [ "$status" != "1" ]; then
+            echo "::error::the installed bin exited $status on prose that trips a rule; 1 was expected."
+            exit 1
+          fi
+          grep -q "dash_present" "$smoke/out.txt"
+
+          rm -rf "$smoke" "$tarball" packed.txt
+
       - name: The package carries only what the allowlist names
         run: |
           set -euo pipefail
@@ -114,7 +147,7 @@ jobs:
           git ls-files '*.md' \
             | grep -v '^examples/' \
             | grep -v '^tests/fixtures/' \
-            | xargs bun src/cli.ts check --dry-run
+            | xargs bun src/bin.ts check --dry-run
 
   secret-scan:
     name: Secret scan

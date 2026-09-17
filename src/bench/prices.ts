@@ -13,8 +13,7 @@
  *
  * A model that matches no row has no price. Not zero. A zero in a cost column
  * is the claim "this was free", which is the one claim an unpriced model cannot
- * support. Houston's `estimateCostUsd` makes the same choice for the same
- * reason (`src/producer/llm.ts`).
+ * support. An earlier tool of ours makes the same choice for the same reason.
  */
 
 import { type YamlValue, parseYaml } from "../yaml.ts";
