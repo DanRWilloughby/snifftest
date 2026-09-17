@@ -17,10 +17,13 @@ Point the eval at them:
 snifftest eval --dry-run examples/structure
 ```
 
-The countable rules should stay quiet on all of it. The judgment arm should
-never be asked about a heading, a table row, a front matter block, a link
-definition or an HTML comment, because a request about a heading costs what a
-request about a paragraph costs and answers a question nobody asked.
+The countable rules stay quiet on all of it. The judgment arm is never asked
+about a heading, a table row, a front matter block, a link definition or an
+HTML comment: it runs the same filter `check` runs, and a block that fails it
+is scored by the countable rules alone. A request about a heading costs what a
+request about a paragraph costs and answers a question nobody asked. The run
+says how many blocks it held back, in one sentence under the headline table, so
+the number is auditable rather than promised.
 
 | File | What it is made of |
 |---|---|

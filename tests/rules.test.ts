@@ -260,6 +260,30 @@ describe("a hostile pattern is refused when the ruleset is read", () => {
     }
   });
 
+  test("alternatives that can match the same text are refused too", () => {
+    // Nesting is not the only way to give the engine two ways through one
+    // stretch of characters. These four were measured accepted before this
+    // check existed, and `^(a|a)+$` against twenty-four characters took 174 ms,
+    // roughly 1.84 per character after that.
+    for (const pattern of ["^(a|a)+$", "^(a|ab)+$", "^(x|xx)*y$", "(ab|a)+", "(?:a|a)*"]) {
+      expect(reading(pattern)).toThrow(RulesetError);
+      expect(reading(pattern)).toThrow(/alternatives can match the same text/);
+    }
+
+    // A single-quoted scalar, so the backslashes reach the pattern rather than
+    // being read as escapes on the way through the YAML.
+    for (const pattern of ["^(\\s|\\s)*$", "(\\w|\\d)+"]) {
+      const source = `  - id: hostile\n    kind: regex\n    pattern: '${pattern}'\n    message: "m"\n`;
+      expect(() => ruleset(source)).toThrow(/alternatives can match the same text/);
+    }
+  });
+
+  test("a hostile pattern does not hang the reader that refuses it", () => {
+    const started = performance.now();
+    expect(reading("^(a|a)+$")).toThrow(RulesetError);
+    expect(performance.now() - started).toBeLessThan(1000);
+  });
+
   test("ordinary patterns are not caught by it", () => {
     for (const pattern of [
       "\\bhowever\\b",
@@ -269,9 +293,34 @@ describe("a hostile pattern is refused when the ruleset is read", () => {
       "[a-z]+\\s*,\\s*[a-z]+",
       "^\\s*> ",
       "colou?r",
+      // Branches that cannot begin on the same character, which is what a
+      // prose ruleset actually writes.
+      "(cat|dog)+",
+      "([a-z]|[0-9])+",
+      "(a|b|c)+",
+      "(?<word>foo|bar)+",
     ]) {
       expect(reading(pattern)).not.toThrow();
     }
+  });
+
+  test("a pattern that is merely slow is measured and refused", () => {
+    // Under the two shape rules, for a shape neither of them names. Ten
+    // adjacent repeats of one class is no kind of nesting and no kind of
+    // alternation, and it still climbs out of the budget by twenty characters.
+    const slow = `^${"[a-z]*".repeat(10)}!$`;
+    expect(reading(slow)).toThrow(RulesetError);
+    expect(reading(slow)).toThrow(/backtracks exponentially/);
+
+    // The probe is bounded: it climbs the lengths and stops at the first one
+    // that costs too much, so refusing is fast even when running is not.
+    const started = performance.now();
+    expect(reading(slow)).toThrow(RulesetError);
+    expect(performance.now() - started).toBeLessThan(2000);
+
+    // Six of the same repeats stay under it, so the probe is not simply
+    // refusing everything with a star in it.
+    expect(reading(`^${"[a-z]*".repeat(6)}!$`)).not.toThrow();
   });
 
   test("the ruleset that ships passes its own check", () => {
@@ -280,8 +329,10 @@ describe("a hostile pattern is refused when the ruleset is read", () => {
   });
 
   test("a pattern reads a bounded amount of one paragraph", () => {
-    // The second layer, for the shapes a static check cannot name. It is a
-    // bound on the cost, and it is reported rather than silent.
+    // The last layer, under the two refusals and the probe. On a pattern that
+    // backtracks exponentially a cap on the length is not a cap on the cost,
+    // which is why the refusals above carry the weight; this is reported
+    // rather than silent.
     const rule = patternRule("x$");
     const long = `${"a".repeat(PATTERN_TEXT_CAP + 10)}x`;
 

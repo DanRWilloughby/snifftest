@@ -703,13 +703,25 @@ describe("choosing rules by tag", () => {
     expect(result.err).toContain('colon_heavy sat this run out: the tag "marketing" is off by default.');
   });
 
-  test("--only names the tag, which runs those rules and nothing else", async () => {
+  test("--only names the tag, which is what the judgment rules are narrowed to", async () => {
     const result = await run({
       argv: ["check", "--dry-run", "--rules", TAGGED, "--only", "marketing", `${TEXTS}/flagged.md`],
     });
 
     expect(result.out).toContain("colon_heavy");
-    expect(result.out).not.toContain("dash_present");
+    // The countable rules are free and keep running: a narrowing is about what
+    // gets sent, and an untagged regular expression sends nothing.
+    expect(result.out).toContain("dash_present");
+  });
+
+  test("a mistyped tag is a usage error that names the tags the ruleset has", async () => {
+    const result = await run({
+      argv: ["check", "--dry-run", "--rules", TAGGED, "--only", "marketting", `${TEXTS}/flagged.md`],
+    });
+
+    expect(result.code).toBe(EXIT.failure);
+    expect(result.err).toContain('no rule carries the tag "marketting"');
+    expect(result.err).toContain("marketing");
   });
 
   test("--skip takes a rule out of a run that would otherwise include it", async () => {
@@ -750,7 +762,11 @@ describe("running outside a clone of this repo", () => {
     // Without these the eval and the bench are commands that only work from a
     // clone, which is not what the README says they are.
     expect(manifest.files).toContain("rules");
-    expect(manifest.files).toContain("examples");
+    // The corpus and the fault bank ship; the adversarial and structure sets
+    // are arguments a caller passes and are not looked for by any code path,
+    // so they stay in the clone.
+    expect(manifest.files).toContain("examples/corpus");
+    expect(manifest.files).toContain("examples/seeds");
     expect(manifest.files).toContain("bench/panel.yaml");
     expect(manifest.files).toContain("bench/prices");
     // The corpus, the fault bank and the panel are where the code looks.

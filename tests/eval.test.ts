@@ -11,6 +11,7 @@ import { buildReport, renderMarkdown } from "../src/eval/report.ts";
 import { runEval } from "../src/eval/run.ts";
 import { INJECTION_BAR, compareTwins, readManifest } from "../src/eval/twins.ts";
 import { type ArmObservation, THRESHOLDS, scoreArm } from "../src/eval/score.ts";
+import { JevHttpError } from "../src/jev.ts";
 import type { JevClient, JevRequest, JevResult } from "../src/jev.ts";
 import { parseRuleset } from "../src/rules.ts";
 import { checkRegexRule } from "../src/rules.ts";
@@ -681,7 +682,11 @@ describe("snifftest eval", () => {
     expect(result.code).toBe(EXIT.ok);
     expect(seen.length).toBeGreaterThan(0);
     expect(readdirSync(join(out, "raw"))).toContain("eval-jev.json");
-    expect(readdirSync(join(out, "inputs")).sort()).toEqual(["clean.json", "seeded.json"]);
+    expect(readdirSync(join(out, "inputs")).sort()).toEqual([
+      "clean.json",
+      "negatives.json",
+      "seeded.json",
+    ]);
 
     const scores = JSON.parse(readFileSync(join(out, "scores.json"), "utf8")) as {
       arms: Record<string, unknown>;
@@ -1157,5 +1162,222 @@ describe("the structure set", () => {
     for (const kind of ["front_matter", "heading", "table", "link_definition", "html_comment", "list", "block_quote"]) {
       expect(kinds.has(kind), `no ${kind} anywhere in the structure set`).toBe(true);
     }
+  });
+});
+
+// --- what the judgment arm refuses to do ----------------------------------
+
+describe("the judgment arm's own limits", () => {
+  // A 401 is the request, not the minute, so the arm stops on the first one.
+  const BAD_KEY = new JevHttpError(401, "the key was rejected");
+
+  function failing(error: unknown, calls: { n: number }): JevClient {
+    return {
+      async ask(): Promise<JevResult> {
+        calls.n += 1;
+        throw error;
+      },
+    };
+  }
+
+  test("three bad minutes in a row stop the arm and the rest go unasked", async () => {
+    const calls = { n: 0 };
+    const set = ruleset([DASH_RULE, judgmentRule("closer", "end")].join(""));
+    const many = Array.from({ length: 12 }, (_, index) =>
+      base(`C${String(index).padStart(2, "0")}`, index % 2 === 0 ? DRAWER : COUNTER),
+    );
+
+    const outcome = await runEval({
+      ruleset: set,
+      candidates: many,
+      threshold: 0.7,
+      perRule: 1,
+      client: failing(new JevHttpError(503, "busy"), calls),
+    });
+
+    expect(calls.n).toBe(3);
+    expect(outcome.judgment?.stopped).toContain("busy");
+    expect(outcome.judgment?.answered).toBe(0);
+    expect(outcome.judgment?.notSent).toBeGreaterThan(0);
+  });
+
+  test("a rejected key stops the arm on the first request, not the third", async () => {
+    const calls = { n: 0 };
+    const set = ruleset([DASH_RULE, judgmentRule("closer", "end")].join(""));
+    const many = Array.from({ length: 6 }, (_, index) =>
+      base(`C${String(index).padStart(2, "0")}`, index % 2 === 0 ? DRAWER : COUNTER),
+    );
+
+    const outcome = await runEval({
+      ruleset: set,
+      candidates: many,
+      threshold: 0.7,
+      perRule: 1,
+      client: failing(BAD_KEY, calls),
+    });
+
+    expect(calls.n).toBe(1);
+    expect(outcome.judgment?.stopped).toContain("the key was rejected");
+  });
+
+  test("a heading is scored by the countable rules and never sent", async () => {
+    const seen: JevRequest[] = [];
+    const set = ruleset([DASH_RULE, judgmentRule("closer", "end")].join(""));
+    const candidates = [
+      base("C00", DRAWER),
+      base("C01", COUNTER),
+      base("C02", "## A heading, which is not prose"),
+      base("C03", "| one | two |\n|---|---|\n| three | four |"),
+    ];
+
+    const outcome = await runEval({
+      ruleset: set,
+      candidates,
+      threshold: 0.7,
+      perRule: 1,
+      client: recordedClient(seen),
+    });
+
+    for (const request of seen) {
+      expect(String(request.state)).not.toContain("A heading, which is not prose");
+      expect(String(request.state)).not.toContain("| three | four |");
+    }
+    expect(outcome.judgment?.structure).toBeGreaterThan(0);
+  });
+
+  test("a run that answered nothing exits 2 and says the tables hold no judgment", async () => {
+    const out = sandbox();
+    const result = await cli({
+      argv: ["eval", "--yes", "--rules", "tests/fixtures/eval/rules.yaml", "--out", out, CORPUS],
+      client: {
+        async ask(): Promise<JevResult> {
+          // A 200 with nothing in it, which is the failure the band exists for.
+          return {
+            model: "jev-1.13.0",
+            nouls: {},
+            inputTokens: 10,
+            outputTokens: 0,
+            estimatedCostUsd: 0,
+            usageReported: true,
+            latencyMs: 4,
+            attempts: 1,
+          };
+        },
+      },
+    });
+
+    expect(result.code).toBe(EXIT.failure);
+    expect(result.err).toContain("no usable answer");
+    expect(result.err).toContain("countable arms only");
+  });
+});
+
+// --- what the written report says about itself ----------------------------
+
+describe("the near misses in the report", () => {
+  test("every rule that flagged one is named, not only the rule it was planted for", () => {
+    // N01 was planted beside `closer` and a different rule fired on it. The
+    // table used to drop that flag on the floor, which made a paragraph that
+    // tripped the tool look like one that had not.
+    const outcome = {
+      seeding: {
+        seedValue: 1,
+        perRule: 1,
+        seedVersion: 2,
+        negatives: [
+          {
+            id: "N01",
+            base_id: "C00",
+            base_file: "C00.md",
+            rule: "closer",
+            why: "a closer that lands something new",
+            text: DRAWER,
+          },
+        ],
+        clean: [],
+        dropped: [],
+        seeded: [],
+        skipped: [],
+      },
+      documents: [],
+      classes: ["closer", "opener"],
+      thresholds: [0.7],
+      observations: [],
+      scores: {
+        C: {
+          arm: "C",
+          label: "C (countable rules plus judgment)",
+          false_positives_at_0_7: [
+            { doc: "N01", rule: "opener", probability: 0.9, text: DRAWER },
+            { doc: "C07", rule: "closer", probability: 0.8, text: COUNTER },
+          ],
+        },
+      },
+      failures: [],
+    } as unknown as Parameters<typeof buildReport>[0];
+
+    const report = buildReport(outcome, { runDate: "2026-09-17", threshold: 0.7 });
+
+    expect(report.hard_negatives[0]?.flagged_by).toEqual([
+      "C (countable rules plus judgment): opener",
+    ]);
+  });
+
+  test("the false-alarm sentence is computed from the run, not printed from a constant", () => {
+    const outcome = {
+      seeding: {
+        seedValue: 1,
+        perRule: 8,
+        seedVersion: 2,
+        negatives: [],
+        clean: [],
+        dropped: [],
+        seeded: [],
+        skipped: [],
+      },
+      documents: [],
+      classes: ["closer"],
+      thresholds: [0.7],
+      observations: [],
+      scores: {
+        B: {
+          arm: "B",
+          label: "B (countable rules only)",
+          summary: { documents: 0, requests: 0, retries: 0, unanswered: 0, median_latency_ms: 0, p95_latency_ms: 0, usd_total: null, usd_per_paragraph: null, usd_per_100_paragraphs: null, paragraphs_without_usage: 0 },
+          overall: { "0.7": { fp_clean_paragraphs: 2, clean_paragraphs: 54, clean_cells: 54, fp_cells: 2, fireable_clean_cells: 54, recall: null, hits: 0, positives: 0, fp_rate_per_clean_cell: null, fp_rate_per_fireable_clean_cell: null, fp_rate_per_negative_cell: null, fp_paragraph_interval: null } },
+          per_rule: {},
+          calibration: {},
+          calibration_unanswered: 0,
+          misses_at_0_7: [],
+          false_positives_at_0_7: [],
+        },
+      },
+      failures: [],
+    } as unknown as Parameters<typeof buildReport>[0];
+
+    const markdown = renderMarkdown(buildReport(outcome, { runDate: "2026-09-17", threshold: 0.7 }));
+
+    // 1 - (1 - 2/54)^8 is about 0.26, and the old text said one in three
+    // whatever the run measured.
+    expect(markdown).toContain("26 in 100 chance");
+    expect(markdown).not.toContain("one-in-three");
+    expect(markdown).toContain("a rate over 8 seeds is one of 9 possible");
+  });
+
+  test("the tables disclose which rules were reworded against these seeds", () => {
+    const outcome = {
+      seeding: { seedValue: 1, perRule: 8, seedVersion: 2, negatives: [], clean: [], dropped: [], seeded: [], skipped: [] },
+      documents: [],
+      classes: ["self_undercutting"],
+      thresholds: [0.7],
+      observations: [],
+      scores: {},
+      failures: [],
+    } as unknown as Parameters<typeof buildReport>[0];
+
+    const markdown = renderMarkdown(buildReport(outcome, { runDate: "2026-09-17", threshold: 0.7 }));
+
+    expect(markdown).toContain("Tuning disclosure");
+    expect(markdown).toContain("self_undercutting");
   });
 });

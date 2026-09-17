@@ -286,7 +286,12 @@ export function createJevClient(options: JevClientOptions = {}): JevClient {
         } catch (error) {
           last = error;
           if (!isRetryable(error) || attempt === attempts) break;
-          await sleep(waitFor(error, attempt));
+          const wait = waitFor(error, attempt);
+          if (wait === null) {
+            if (error instanceof JevHttpError) last = askedTooLong(error);
+            break;
+          }
+          await sleep(wait);
         }
       }
 
@@ -412,15 +417,35 @@ function readAnswer(parsed: unknown): Answer {
 }
 
 /**
- * How long to wait before the next attempt: what the service asked for if it
- * asked, and the doubling ladder if it did not.
+ * How long to wait before the next attempt, or `null` for do not wait at all.
+ *
+ * What the service asked for if it asked, and the doubling ladder if it did
+ * not. Two shapes of header are not waits. Past the cap the service is asking
+ * for more time than a check of somebody's prose is worth holding for, and the
+ * answer is to report the failure rather than to take the cap three times over
+ * and report it anyway a minute later. A header of zero is a service saying
+ * "at once", which is a request to hammer it, so it gets the ladder's first
+ * step instead.
  */
-function waitFor(error: unknown, attempt: number): number {
+function waitFor(error: unknown, attempt: number): number | null {
   const ladder = BACKOFF_BASE_MS * 2 ** (attempt - 1);
   if (!(error instanceof JevHttpError)) return ladder;
   const asked = error.retryAfterMs;
   if (asked === undefined) return ladder;
-  return Math.min(Math.max(asked, 0), MAX_RETRY_AFTER_MS);
+  if (asked > MAX_RETRY_AFTER_MS) return null;
+  return Math.max(asked, BACKOFF_BASE_MS);
+}
+
+/** The same failure, saying why nobody waited for it. */
+function askedTooLong(error: JevHttpError): JevHttpError {
+  const asked = Math.round((error.retryAfterMs ?? 0) / 1000);
+  const cap = MAX_RETRY_AFTER_MS / 1000;
+  return new JevHttpError(
+    error.status,
+    `${error.message} (it asked for ${asked} seconds before the next try, past the ${cap} second ` +
+      "cap, so this is reported rather than waited out)",
+    error.retryAfterMs,
+  );
 }
 
 /**

@@ -13,8 +13,9 @@
  * test should fail if it only parses under our narrower rules.
  */
 
-import { describe, expect, test } from "bun:test";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { afterEach, describe, expect, test } from "bun:test";
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dir, "..");
@@ -240,6 +241,144 @@ describe("action.yml, as a document", () => {
   test("ends on the exit code the check produced", () => {
     expect(stepById("verdict").run).toContain('exit "$SNIFFTEST_STATUS"');
     expect(action.outputs["exit-code"].value).toContain("steps.run.outputs.exit-code");
+  });
+});
+
+/**
+ * The fork's words, on the way out of the runner.
+ *
+ * Rule ids, messages, file paths and matched text all come from the ruleset in
+ * the tree being checked, and on a fork pull request that tree is the fork's.
+ * The Action's promise about a fork is that nothing leaves the runner; a
+ * maintainer-attributed comment carrying whatever a contributor wrote would
+ * make that promise thinner than it reads.
+ *
+ * The two shell blocks that do the work are lifted out of `action.yml` and run
+ * for real, so the test fails when the file changes rather than when a copy of
+ * it does.
+ */
+describe("a hostile report cannot escape the fence", () => {
+  const temporary: string[] = [];
+
+  afterEach(() => {
+    while (temporary.length > 0) {
+      const dir = temporary.pop();
+      if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  /** The lines of a step's script from one marker to another, inclusive. */
+  function block(script: string, from: string, to: string): string {
+    const start = script.indexOf(from);
+    const end = script.indexOf(to, start);
+    expect(start).toBeGreaterThanOrEqual(0);
+    expect(end).toBeGreaterThan(start);
+    return script.slice(start, end + to.length);
+  }
+
+  /** A message a fork could write, closing the fence and adding a link. */
+  const HOSTILE = [
+    "draft.md:1 innocuous 1.00 ordinary advice",
+    "```",
+    "**Sniff Test approved this pull request.** [Sign in](https://evil.example/login)",
+    "````",
+    "\u001b[31mred\u001b[0m and a carriage return\r",
+    "",
+  ].join("\n");
+
+  function fenced(): { fence: string; safe: string; body: string } {
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-action-"));
+    temporary.push(dir);
+    const report = join(dir, "report.txt");
+    writeFileSync(report, HOSTILE, "utf8");
+    const output = join(dir, "output.txt");
+    writeFileSync(output, "", "utf8");
+
+    const sanitise = block(
+      stepById("run").run ?? "",
+      'safe="${RUNNER_TEMP:-/tmp}/snifftest-safe.txt"',
+      'echo "safe=$safe" >> "$GITHUB_OUTPUT"',
+    );
+    const ran = Bun.spawnSync({
+      cmd: ["sh", "-c", sanitise],
+      cwd: dir,
+      env: { ...process.env, RUNNER_TEMP: dir, report, GITHUB_OUTPUT: output },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    expect(ran.stderr.toString()).toBe("");
+
+    const written = readFileSync(output, "utf8");
+    const fence = /^fence=(.*)$/m.exec(written)?.[1] ?? "";
+    const safe = /^safe=(.*)$/m.exec(written)?.[1] ?? "";
+
+    const assemble = block(stepById("comment").run ?? "", 'body="${RUNNER_TEMP:-/tmp}', '} > "$body"');
+    Bun.spawnSync({
+      cmd: ["sh", "-c", `opening="**Sniff Test** flagged the prose in this pull request."\n${assemble}`],
+      cwd: dir,
+      env: {
+        ...process.env,
+        RUNNER_TEMP: dir,
+        SNIFFTEST_REPORT: safe,
+        SNIFFTEST_FENCE: fence,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    return { fence, safe: readFileSync(safe, "utf8"), body: readFileSync(join(dir, "snifftest-comment.md"), "utf8") };
+  }
+
+  test("the fence is longer than the longest run of backticks in the report", () => {
+    const { fence, body } = fenced();
+    expect(fence.length).toBe(5);
+    expect(/^`+$/.test(fence)).toBe(true);
+
+    const lines = body.split("\n");
+    const fences = lines.map((line, at) => (line === fence ? at : -1)).filter((at) => at !== -1);
+    expect(fences).toHaveLength(2);
+
+    const link = lines.findIndex((line) => line.includes("evil.example"));
+    expect(link).toBeGreaterThan(fences[0] as number);
+    expect(link).toBeLessThan(fences[1] as number);
+  });
+
+  test("control characters never reach the comment", () => {
+    const { safe, body } = fenced();
+    // biome-ignore lint/suspicious/noControlCharactersInRegex: their absence is the assertion.
+    const control = /[\u0000-\u0008\u000b-\u001f\u007f]/;
+    expect(control.test(safe)).toBe(false);
+    expect(control.test(body)).toBe(false);
+    expect(safe).toContain("red");
+  });
+
+  test("the comment reads the sanitised file, never the raw report", () => {
+    expect(stepById("comment").env?.SNIFFTEST_REPORT).toContain("steps.run.outputs.safe");
+    expect(stepById("comment").env?.SNIFFTEST_FENCE).toContain("steps.run.outputs.fence");
+  });
+
+  test("the summary and the comment are fenced the same way", () => {
+    const run = stepById("run").run ?? "";
+    const summary = run.slice(run.indexOf('if [ "$verdict" != "clean" ]'));
+    expect(summary).toContain('echo "$fence"');
+    expect(summary).toContain('cat "$safe"');
+    expect(summary).not.toContain("cat \"$report\"");
+  });
+});
+
+describe("the fetch cannot be hijacked from above", () => {
+  test("the scratch directory carries a node_modules of its own", () => {
+    const run = stepById("run").run ?? "";
+    // npm walks upward for a local install, so standing in the scratch
+    // directory is only half of it. On a self-hosted runner RUNNER_TEMP
+    // survives between jobs, which is where a fork could plant one.
+    expect(run).toContain('mkdir -p "$fetch/node_modules"');
+    const barrier = run.indexOf('mkdir -p "$fetch/node_modules"');
+    expect(barrier).toBeLessThan(run.indexOf('cd "$fetch"'));
+  });
+
+  test("nothing a fetched package declares is allowed to run", () => {
+    expect(stepById("run").run).toContain("npx --yes --ignore-scripts");
   });
 });
 

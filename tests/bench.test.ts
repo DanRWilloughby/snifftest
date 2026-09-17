@@ -1052,8 +1052,8 @@ describe("the comparison tables", () => {
     const markdown = renderBenchMarkdown(report);
 
     expect(markdown).toContain(
-      "| Model | Tier | Model served | Recall, own flag | Spread over repeats | Recall, p >= 0.7 | " +
-        "Median ms | $ per 100 paragraphs |",
+      "| Model | Tier | Model served | Judgment recall, own flag | Pooled recall, own flag | " +
+        "Spread over repeats | Judgment recall, p >= 0.7 | Median ms | $ per 100 paragraphs |",
     );
     expect(markdown).toContain("| Fast | fast |");
     // Unknown price prints as unknown. A zero would read as "this model is free".
@@ -1245,6 +1245,61 @@ describe("snifftest bench", () => {
     expect(code).toBe(EXIT.consent);
   });
 
+  test("a bench given paths seeds from the same bank the eval uses", async () => {
+    const dir = sandbox();
+    panelIn(dir);
+
+    const rules = join(dir, "rules.yaml");
+    writeFileSync(
+      rules,
+      `version: 1\nthreshold: 0.7\nrules:\n` +
+        `  - id: restating_closer\n    kind: judgment\n` +
+        `    what: The last sentence only restates what the paragraph already said.\n` +
+        `    criteria:\n      true: "The final sentence adds nothing new."\n` +
+        `      false: "The final sentence adds something."\n` +
+        `    message: "The last line says it again."\n` +
+        `    seed: { splice: ["In short, everything above is what we said."], position: end }\n`,
+      "utf8",
+    );
+
+    const corpus = join(dir, "corpus", "drawer.md");
+    mkdirSync(dirname(corpus), { recursive: true });
+    writeFileSync(
+      corpus,
+      "The first draft went out on a Tuesday, which is the day the office is quietest. " +
+        "Nobody read it. A week later it came back with three comments, two about the title.\n\n" +
+        "The counter in the hallway has been wrong since the day it was installed, and nobody " +
+        "minds. It reads high by four. Visitors who notice are told the story.\n",
+      "utf8",
+    );
+
+    const models = JSON.parse(readFileSync(MODELS_FIXTURE, "utf8")) as unknown;
+    const fetchLike = async (url: string): Promise<Response> => {
+      if (url.includes("/models")) return new Response(JSON.stringify(models), { status: 200 });
+      return okResponse(reply({ restating_closer: 0.88 }));
+    };
+
+    const run = deps(
+      ["bench", "--rules", "rules.yaml", "--panel", "bench/panel.yaml", "--out", "results", "corpus"],
+      dir,
+      fetchLike,
+    );
+    const code = await runCli({
+      ...run.deps,
+      env: { OPENROUTER_API_KEY: "or-key-0123456789abcdefghij", SNIFFTEST_SEND: "OpenRouter" },
+    });
+
+    expect(code).toBe(EXIT.ok);
+    const report = JSON.parse(
+      readFileSync(join(dir, "results", "bench-scores.json"), "utf8"),
+    ) as { corpus: { clean: number; seeded: number } };
+
+    // Two paragraphs in the file. The bank plants its near misses beside them,
+    // and they are clean documents, so the clean count is above two. Without
+    // the bank a bare bench measured an easier corpus than the eval did.
+    expect(report.corpus.clean).toBeGreaterThan(2);
+  });
+
   test("reuses an eval run's own corpus, joins its arms, and writes raw per model per repeat", async () => {
     const dir = sandbox();
     panelIn(dir);
@@ -1326,6 +1381,17 @@ describe("snifftest bench", () => {
     // The eval's own arms come across, so the headline table is one corpus.
     expect(report.joined.map((arm) => arm.arm).sort()).toEqual(["A", "B"]);
     expect(report.corpus.seeded).toBeGreaterThan(0);
+
+    // The near misses are the hardest clean paragraphs the eval planted, and
+    // the bench sees them as clean documents rather than not at all.
+    const negatives = JSON.parse(
+      readFileSync(join(results, "inputs", "negatives.json"), "utf8"),
+    ) as { paragraphs: { id: string; text: string }[] };
+    const cleanFile = JSON.parse(readFileSync(join(results, "inputs", "clean.json"), "utf8")) as {
+      paragraphs: { id: string }[];
+    };
+    expect(negatives.paragraphs.length).toBeGreaterThan(0);
+    expect(report.corpus.clean).toBe(cleanFile.paragraphs.length + negatives.paragraphs.length);
     expect(report.system_prompt).toContain("[restating_closer]");
 
     const tables = readFileSync(join(results, "bench-tables.md"), "utf8");
@@ -1429,8 +1495,8 @@ describe("the headline table names the model each row was served by", () => {
     const rowFor = (label: string): string => headline.find((line) => line.startsWith(`| ${label} `)) ?? "";
 
     expect(headline).toContain(
-      "| Model | Tier | Model served | Recall, own flag | Spread over repeats | Recall, p >= 0.7 | " +
-        "Median ms | $ per 100 paragraphs |",
+      "| Model | Tier | Model served | Judgment recall, own flag | Pooled recall, own flag | " +
+        "Spread over repeats | Judgment recall, p >= 0.7 | Median ms | $ per 100 paragraphs |",
     );
     expect(rowFor("C (countable rules plus judgment)")).toContain("jev-1.2");
     expect(rowFor("Fast")).toContain(report.models[0]?.served_model ?? "no served model recorded");

@@ -88,6 +88,13 @@ scratch=$(mktemp -d 2>/dev/null || mktemp -d -t snifftest) || {
 }
 trap 'rm -rf "$scratch"' EXIT HUP INT TERM
 
+# An empty node_modules of its own, because npm resolves a local install by
+# walking *up* from the working directory rather than by looking in it. Without
+# this, a node_modules/snifftest at the matching version anywhere above the
+# scratch directory is what runs, and on Linux `mktemp -d` sits under a
+# world-writable /tmp where any local user can plant one.
+mkdir -p "$scratch/node_modules"
+
 inside_root() {
   candidate=$(cd "$(dirname "$1")" 2>/dev/null && pwd -P) || return 1
   case $candidate in
@@ -113,7 +120,9 @@ run_snifftest() {
   elif command -v bunx >/dev/null 2>&1; then
     (cd "$scratch" && bunx "snifftest@$SNIFFTEST_VERSION" "$@")
   elif command -v npx >/dev/null 2>&1; then
-    (cd "$scratch" && npx --yes "snifftest@$SNIFFTEST_VERSION" "$@")
+    # --ignore-scripts: a fetched package's lifecycle scripts have no business
+    # running in an agent's session because somebody asked about a draft.
+    (cd "$scratch" && npx --yes --ignore-scripts "snifftest@$SNIFFTEST_VERSION" "$@")
   else
     echo "snifftest: no snifftest, bunx or npx on PATH." >&2
     return 2
