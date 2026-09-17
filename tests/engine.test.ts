@@ -346,6 +346,219 @@ describe("fenced code blocks", () => {
   });
 });
 
+// --- a fence is still a fence inside its container -------------------------
+
+describe("fences inside a list item", () => {
+  const LIST = [
+    "A paragraph before the list.",
+    "",
+    "- The first item, which explains the snippet below.",
+    "",
+    "    ```yaml",
+    "    one: two",
+    "    three: four",
+    "    five: six",
+    "    ```",
+    "",
+    "- The second item, on line eleven.",
+    "",
+  ].join("\n");
+
+  test("the snippet reaches neither arm", () => {
+    const chunks = chunkDocument(LIST, "d.md");
+
+    expect(chunks.map((c) => c.text)).toEqual([
+      "A paragraph before the list.",
+      "- The first item, which explains the snippet below.",
+      "- The second item, on line eleven.",
+    ]);
+    expect(runRegexArm(chunks, pair)).toEqual([]);
+  });
+
+  test("the list prose keeps the line it is written on", () => {
+    expect(chunkDocument(LIST, "d.md").map((c) => c.line)).toEqual([1, 3, 11]);
+  });
+
+  test("an ordered marker sets the content column the same way", () => {
+    const document = [
+      "1. The first step.",
+      "",
+      "    ```sh",
+      "    echo a: b: c:",
+      "    ```",
+      "",
+      "2. The second step, on line seven.",
+    ].join("\n");
+
+    const chunks = chunkDocument(document, "d.md");
+    expect(chunks.map((c) => c.text)).toEqual(["1. The first step.", "2. The second step, on line seven."]);
+    expect(chunks.map((c) => c.line)).toEqual([1, 7]);
+  });
+
+  test("the closing fence has to be at the item's own depth", () => {
+    // The closing row is written at the left margin, outside the item, so the
+    // block stays open and everything after it is code, which is what a reader
+    // sees too.
+    const document = [
+      "- An item.",
+      "",
+      "    ```",
+      "    a: b: c:",
+      "```",
+      "",
+      "Prose that is still inside the block.",
+    ].join("\n");
+
+    expect(chunkDocument(document, "d.md").map((c) => c.text)).toEqual(["- An item."]);
+  });
+
+  test("four spaces with no list marker above them are still prose", () => {
+    // The documented scope-out. An indented run with no fence is as often a
+    // quotation as it is code, and this rule must not start eating it.
+    const document = [
+      "A paragraph.",
+      "",
+      "    one: two: three: four",
+      "",
+      "Another paragraph.",
+    ].join("\n");
+
+    const chunks = chunkDocument(document, "d.md");
+    expect(chunks.map((c) => c.text)).toEqual([
+      "A paragraph.",
+      "    one: two: three: four",
+      "Another paragraph.",
+    ]);
+    expect(runRegexArm(chunks, pair).map((f) => f.rule)).toEqual(["colon_heavy"]);
+  });
+
+  test("a fence at four spaces with no list above it is not a fence either", () => {
+    const document = ["A paragraph.", "", "    ```", "    a: b: c:", "    ```", ""].join("\n");
+    // Nothing opened a list, so this is an indented block, and the scope-out
+    // says an indented block stays prose: three lines with no blank between
+    // them, which is one paragraph.
+    expect(chunkDocument(document, "d.md").map((c) => c.text)).toEqual([
+      "A paragraph.",
+      "    ```\n    a: b: c:\n    ```",
+    ]);
+  });
+
+  test("a list that has closed no longer lends its indent to a fence", () => {
+    const document = [
+      "- An item.",
+      "",
+      "A paragraph at the margin, which closes the list.",
+      "",
+      "    ```",
+      "    a: b: c:",
+      "    ```",
+      "",
+    ].join("\n");
+
+    const chunks = chunkDocument(document, "d.md");
+    expect(chunks.map((c) => c.text)).toEqual([
+      "- An item.",
+      "A paragraph at the margin, which closes the list.",
+      "    ```\n    a: b: c:\n    ```",
+    ]);
+  });
+});
+
+describe("fences inside a block quote", () => {
+  const QUOTED = [
+    "> A quoted paragraph before the snippet.",
+    "",
+    "> ```yaml",
+    "> one: two",
+    "> three: four",
+    "> five: six",
+    "> ```",
+    "",
+    "> Quoted prose after the fence closes, on line nine.",
+    "",
+  ].join("\n");
+
+  test("the snippet reaches neither arm and the quoted prose survives", () => {
+    const chunks = chunkDocument(QUOTED, "d.md");
+
+    expect(chunks.map((c) => c.text)).toEqual([
+      "> A quoted paragraph before the snippet.",
+      "> Quoted prose after the fence closes, on line nine.",
+    ]);
+    expect(chunks.map((c) => c.line)).toEqual([1, 9]);
+    expect(runRegexArm(chunks, pair)).toEqual([]);
+  });
+
+  test("a nested quote holds its own fence", () => {
+    const document = [
+      "> > A doubly quoted line.",
+      "",
+      "> > ```",
+      "> > a: b: c:",
+      "> > ```",
+      "",
+      "> > The last quoted line, on line seven.",
+    ].join("\n");
+
+    const chunks = chunkDocument(document, "d.md");
+    expect(chunks.map((c) => c.text)).toEqual([
+      "> > A doubly quoted line.",
+      "> > The last quoted line, on line seven.",
+    ]);
+    expect(chunks.map((c) => c.line)).toEqual([1, 7]);
+  });
+
+  test("a row of backticks outside the quote does not close the block inside it", () => {
+    const document = [
+      "> A quoted line.",
+      "",
+      "> ```",
+      "> a: b: c:",
+      "```",
+      "> still inside: the: block:",
+      "",
+    ].join("\n");
+
+    expect(chunkDocument(document, "d.md").map((c) => c.text)).toEqual(["> A quoted line."]);
+  });
+
+  test("a quoted fence does not swallow the prose that follows the quote", () => {
+    const document = [
+      "> ```",
+      "> a: b: c:",
+      "> ```",
+      "",
+      "Ordinary prose after the quote, with three: colons: in: it.",
+    ].join("\n");
+
+    const chunks = chunkDocument(document, "d.md");
+    expect(chunks.map((c) => c.text)).toEqual([
+      "Ordinary prose after the quote, with three: colons: in: it.",
+    ]);
+    expect(runRegexArm(chunks, pair).map((f) => f.rule)).toEqual(["colon_heavy"]);
+  });
+
+  test("a fence inside a list inside a quote is recognised too", () => {
+    const document = [
+      "> - An item in a quoted list.",
+      ">     ```",
+      ">     a: b: c:",
+      ">     ```",
+      "",
+      "> The last quoted line, on line six.",
+    ].join("\n");
+
+    // Both containers at once: the quote marker comes off, and what is left is
+    // four spaces under a list marker, which the ordinary rule would refuse.
+    const chunks = chunkDocument(document, "d.md");
+    expect(chunks.map((c) => c.text)).toEqual([
+      "> - An item in a quoted list.",
+      "> The last quoted line, on line six.",
+    ]);
+    expect(chunks.map((c) => c.line)).toEqual([1, 6]);
+  });
+});
+
 describe("inline code spans", () => {
   test("the countable rules ignore what is inside them", () => {
     const document = "Set `a: b: c:` in the file, and that is the only colon-ish thing here.\n";

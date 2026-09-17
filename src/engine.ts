@@ -17,10 +17,19 @@
  * sentence, and a judgment question about the sentence needs it, so the span
  * stays in the chunk and only the countable rules blank it out.
  *
+ * A fence counts wherever a reader would see one, which means inside a list
+ * item and behind a block quote's `> ` as well as at the left margin. Measured
+ * against the bare line those two do not look like fences at all, so the
+ * snippet inside them used to be linted as prose and sent as prose, which is
+ * the thing the paragraph above says must never happen. The closing fence has
+ * to sit at the same depth as the one that opened the block: a row of backticks
+ * outside a quote does not close a block inside it.
+ *
  * Indented code blocks — four spaces, no fence — are deliberately out of scope:
  * in ordinary prose that indent is as often a quotation or a wrapped list item,
  * and dropping those would lose real sentences to catch snippets that a fence
- * already covers.
+ * already covers. Four spaces under a list marker are a different thing, and
+ * are only ever read as code when a fence is drawn there.
  */
 
 import { type JevClient, questionsFromRules } from "./jev.ts";
@@ -40,6 +49,7 @@ export function chunkDocument(text: string, file: string, options: ChunkOptions 
   let buffer: string[] = [];
   let startLine = 1;
   let fence: Fence | null = null;
+  let container: Container = NO_CONTAINER;
 
   const flush = (): void => {
     if (buffer.length === 0) return;
@@ -57,7 +67,13 @@ export function chunkDocument(text: string, file: string, options: ChunkOptions 
       if (closesFence(line, fence)) fence = null;
       continue;
     }
-    const opened = opensFence(line);
+
+    // What quotes and list items the line sits inside, so a fence drawn at
+    // their indent is still a fence. Never updated inside a block: a line of
+    // shell script starting with a dash is not a list item.
+    container = containerOf(line, container);
+
+    const opened = opensFence(line, container);
     if (opened !== null) {
       flush();
       fence = opened;
@@ -248,17 +264,111 @@ export function mergeFlags(...groups: readonly (readonly Flag[])[]): Flag[] {
 
 // --- code, which is not prose ---------------------------------------------
 
-/** An open fence: which character drew it, and how long it was. */
-interface Fence {
-  readonly char: string;
-  readonly length: number;
+/**
+ * What a line sits inside: block quotes, and the column a list item's content
+ * starts at.
+ *
+ * This is the smallest amount of Markdown structure a fence detector can get
+ * away with, and it exists for one reason. A fence indented under a list item,
+ * or written behind a `> `, is a real fenced block that a reader sees as code.
+ * Measured against the bare line it does not look like a fence at all, so
+ * before this the snippet inside it was linted as prose and sent as prose.
+ */
+interface Container {
+  /** How many block-quote markers stand in front of the line's own content. */
+  readonly quoteDepth: number;
+  /** The column an open list item's content starts at, or zero outside one. */
+  readonly listIndent: number;
 }
+
+const NO_CONTAINER: Container = { quoteDepth: 0, listIndent: 0 };
+
+/** One `>`, with the space that usually follows it. Applied until it stops matching. */
+const QUOTE_MARKER = /^ {0,3}> ?/;
+
+/** A bullet or an ordered marker, and the run of spaces that sets the content column. */
+const LIST_MARKER = /^( *)([-*+]|\d{1,9}[.)])( +)/;
 
 /** Three or more backticks or tildes, indented no more than three spaces. */
 const FENCE_LINE = /^ {0,3}(`{3,}|~{3,})(.*)$/;
 
-function opensFence(line: string): Fence | null {
-  const match = FENCE_LINE.exec(line);
+/** An open fence: which character drew it, how long it was, and what it sits inside. */
+interface Fence {
+  readonly char: string;
+  readonly length: number;
+  readonly container: Container;
+}
+
+/**
+ * The line's containers, carried forward from the line before it.
+ *
+ * A list item stays open across the blank lines inside it, which is how a list
+ * item holds more than one paragraph, and closes at the first non-blank line
+ * that starts to the left of its content column and is not a marker of its own.
+ */
+function containerOf(line: string, previous: Container): Container {
+  const quoted = stripQuotes(line);
+  // A line at a different quote depth is in a different container, so whatever
+  // list was open in the old one has nothing to do with this line.
+  const carried = quoted.quoteDepth === previous.quoteDepth ? previous.listIndent : 0;
+
+  const marker = LIST_MARKER.exec(quoted.text);
+  if (marker !== null) {
+    const indent = (marker[1] ?? "").length + (marker[2] ?? "").length + (marker[3] ?? "").length;
+    return { quoteDepth: quoted.quoteDepth, listIndent: indent };
+  }
+
+  if (quoted.text.trim() === "") return { quoteDepth: quoted.quoteDepth, listIndent: carried };
+
+  const leading = quoted.text.length - quoted.text.trimStart().length;
+  return { quoteDepth: quoted.quoteDepth, listIndent: leading >= carried ? carried : 0 };
+}
+
+interface Quoted {
+  readonly text: string;
+  readonly quoteDepth: number;
+}
+
+function stripQuotes(line: string): Quoted {
+  let text = line;
+  let quoteDepth = 0;
+
+  for (;;) {
+    const match = QUOTE_MARKER.exec(text);
+    if (match === null) return { text, quoteDepth };
+    text = text.slice(match[0].length);
+    quoteDepth += 1;
+  }
+}
+
+/**
+ * The line as its container sees it: quote markers gone, list indent removed.
+ *
+ * Removing the list indent is what keeps the bare indented code block out of
+ * scope. Four spaces with no list marker above them leave `listIndent` at zero,
+ * nothing is removed, and the ordinary three-space rule refuses the line. That
+ * indent is as often a quotation or a wrapped list item as it is code.
+ *
+ * A line that starts to the left of the container is not in it at all, and gets
+ * nothing back. That is what stops a row of backticks at the margin from
+ * closing a block that was opened inside a list item or behind a `> `. It
+ * cannot refuse a fence that should have opened: a line outdented past an open
+ * list has already closed that list by the time this is asked.
+ */
+function insideContainer(line: string, container: Container): string | null {
+  const quoted = stripQuotes(line);
+  if (quoted.quoteDepth !== container.quoteDepth) return null;
+
+  const leading = quoted.text.length - quoted.text.trimStart().length;
+  if (leading < container.listIndent) return null;
+  return quoted.text.slice(container.listIndent);
+}
+
+function opensFence(line: string, container: Container): Fence | null {
+  const body = insideContainer(line, container);
+  if (body === null) return null;
+
+  const match = FENCE_LINE.exec(body);
   if (match === null) return null;
 
   const marker = match[1] ?? "";
@@ -268,12 +378,22 @@ function opensFence(line: string): Fence | null {
   // three backticks and a closing one is a span, not the start of a block.
   if (marker.startsWith("`") && info.includes("`")) return null;
 
-  return { char: marker[0] ?? "`", length: marker.length };
+  return { char: marker[0] ?? "`", length: marker.length, container };
 }
 
-/** A closing fence: the same character, at least as long, and nothing after it. */
+/**
+ * A closing fence: the same character, at least as long, nothing after it, and
+ * at the depth the opening fence was drawn at.
+ *
+ * The depth matters. A block quote holding a fence is closed by a fence behind
+ * the same `> `, and a line of backticks written outside the quote belongs to
+ * whatever is out there, not to the block inside it.
+ */
 function closesFence(line: string, fence: Fence): boolean {
-  const match = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(line);
+  const body = insideContainer(line, fence.container);
+  if (body === null) return false;
+
+  const match = /^ {0,3}(`{3,}|~{3,})[ \t]*$/.exec(body);
   if (match === null) return false;
 
   const marker = match[1] ?? "";
