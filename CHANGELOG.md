@@ -48,7 +48,13 @@ rather than shipping an empty one.
   same corpus and puts cost, speed and accuracy side by side, with consent
   asked per destination.
 - `snifftest serve` opens a local page where you type and the nose reacts,
-  live or from a recorded replay that needs no key.
+  live or from a recorded replay that needs no key. `serve --record` writes
+  that replay from a live run, with the measured time and cost of each answer.
+- The judgment arm carries a budget, twenty seconds a paragraph with a floor
+  of a minute, and a run that gets no answer at all exits non-zero instead of
+  reporting a pass. An unknown tag on `--only` or `--skip` is a usage error.
+- The tarball is checked against an allowlist in both release workflows, and
+  the hook, the Action and the plugin install with `--ignore-scripts`.
 - A git pre-commit hook, two entries for the pre-commit framework, and a
   composite GitHub Action. All of them run the countable rules only unless you
   opt in, and a pull request from a fork never sends anything.
