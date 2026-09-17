@@ -32,7 +32,7 @@
  * are only ever read as code when a fence is drawn there.
  */
 
-import { type AnswerCache, cacheKey } from "./cache.ts";
+import { type AnswerCache, cacheKey, wordingHash } from "./cache.ts";
 import {
   type JevClient,
   JevStateRefusedError,
@@ -460,8 +460,18 @@ export async function runJudgmentArm(
     // about this paragraph. A rerun after an outage therefore pays only for the
     // paragraphs that were never answered.
     const questions = questionsFor(applicable);
+    // The cache is told what is being asked, not only which key it is filed
+    // under, so an entry that leaves a rule out or answers different words is a
+    // miss rather than a question reported as asked and unanswered.
+    const expect =
+      cache === undefined
+        ? undefined
+        : { rules: applicable.map((rule) => rule.id), wording: wordingHash(questions) };
     const key = cache === undefined ? undefined : cacheKey(chunk.text, questions, MODEL);
-    const held = cache === undefined || key === undefined ? undefined : cache.get(key);
+    const held =
+      cache === undefined || key === undefined || expect === undefined
+        ? undefined
+        : cache.get(key, expect);
 
     let nouls: Readonly<Record<string, number>>;
     if (held !== undefined) {
@@ -511,8 +521,11 @@ export async function runJudgmentArm(
       latencyMs += answer.latencyMs;
       retries += Math.max(0, answer.attempts - 1);
       nouls = answer.nouls;
-      if (cache !== undefined && key !== undefined) {
-        cache.set(key, { model: answer.model, nouls: answer.nouls });
+      if (cache !== undefined && key !== undefined && expect !== undefined) {
+        // What served this answer, so an entry from a version the alias no
+        // longer points at is a miss for the rest of the run.
+        cache.noteServed(answer.model);
+        cache.set(key, { model: answer.model, nouls: answer.nouls }, expect);
       }
     }
 

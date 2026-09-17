@@ -56,10 +56,22 @@ the reason. A line is reopened by new evidence, not by asking again.
   The compromise is that a cache entry is keyed by the paragraph, the exact
   wording of every question asked about it and the model it was asked of, so a
   reworded rule is never answered from an old reading, and entries expire after
-  a fortnight so nothing reports a stale opinion as today's. The paragraph is
-  never written to disk: the file name is a hash of it and the file holds rule
-  ids, probabilities, a model name and a date. `--no-cache` turns it off for a
-  run and `SNIFFTEST_CACHE_DIR=off` turns it off for good.
+  a fortnight so nothing reports a stale opinion as today's. Only an answer is
+  kept: a reply that came back empty, left a question out, or put every one of
+  its numbers inside the no-judgment band is never written down, because the
+  alternative is that one bad minute pins "asked, and nothing came back" to a
+  paragraph for a fortnight at no cost. A read checks the same things again, and
+  once a run has had a live answer it stops accepting entries served by a
+  different version of the model. A run answered entirely from disk cannot know
+  the alias moved under it, which is the limit of doing this without spending a
+  request, and the reason entries expire at all. The paragraph is never written
+  to disk: the file name is a hash of it and the file holds rule ids,
+  probabilities, the wording they answered, a model name and a date, written
+  0600 inside 0700 directories through a temporary file and a rename. Expired
+  entries are deleted the first time a run writes. `--no-cache` turns it off for
+  a run and `SNIFFTEST_CACHE_DIR=off` turns it off for good; a relative
+  `SNIFFTEST_CACHE_DIR` is a place in the home directory, never in the tree
+  being checked.
 
 - **`Retry-After` is honoured, up to a cap.** A service that says how long to
   wait knows better than the doubling ladder, so its number is used. It is also

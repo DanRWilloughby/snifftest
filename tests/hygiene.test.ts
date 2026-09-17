@@ -453,6 +453,21 @@ describe("the tool passes the dash rule it enforces", () => {
     },
   ];
 
+  /**
+   * A committed eval run holds the faults it planted.
+   *
+   * The seeder's whole job is to put a long dash into a clean paragraph, so the
+   * seeded inputs and the scores that name the edit carry the character by
+   * construction. Naming the directory rather than each file keeps the next run
+   * from having to edit this list.
+   */
+  const allowedDirectories: readonly { readonly directory: string; readonly why: string }[] = [
+    {
+      directory: "bench/results/",
+      why: "A recorded run's seeded inputs carry the faults the seeder planted.",
+    },
+  ];
+
   test("the allowlist names only files that are still there", () => {
     for (const { file } of allowed) {
       expect(existsSync(join(repoRoot, file))).toBe(true);
@@ -463,7 +478,8 @@ describe("the tool passes the dash rule it enforces", () => {
     const exempt = new Set(allowed.map((entry) => entry.file));
     const tracked = (await Bun.$`git ls-files`.cwd(repoRoot).text())
       .split("\n")
-      .filter((path) => path !== "" && !exempt.has(path));
+      .filter((path) => path !== "" && !exempt.has(path))
+      .filter((path) => !allowedDirectories.some((entry) => path.startsWith(entry.directory)));
 
     const offenders: string[] = [];
     for (const path of tracked) {

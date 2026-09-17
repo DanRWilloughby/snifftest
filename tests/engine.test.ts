@@ -992,4 +992,55 @@ describe("the judgment arm with answers already paid for", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test("a rerun after a run of flat middle numbers asks again", async () => {
+    // Jev answers HTTP 200 with about 0.5 for every question on state it cannot
+    // read. Keeping that would report a paragraph as judged and undecided, for
+    // a fortnight, at no cost, with nothing saying it was a replay.
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-cache-"));
+    try {
+      const cache = openCache({ env: { SNIFFTEST_CACHE_DIR: dir } });
+      const chunks = chunkDocument(draft, "d.md");
+
+      const flat = counting({ restating_closer: 0.5 });
+      const bad = await runJudgmentArm(chunks, mixedRules, flat.client, {
+        cache: cache as AnswerCache,
+      });
+      expect(flat.calls()).toBe(3);
+      expect(bad.tally.noJudgment).toBe(3);
+
+      const better = counting({ restating_closer: 0.81 });
+      const rerun = await runJudgmentArm(chunks, mixedRules, better.client, {
+        cache: cache as AnswerCache,
+      });
+
+      expect(better.calls()).toBe(3);
+      expect(rerun.usage.cached).toBe(0);
+      expect(rerun.tally.answered).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a reply that leaves a rule out is asked again rather than reported unanswered", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-cache-"));
+    try {
+      const cache = openCache({ env: { SNIFFTEST_CACHE_DIR: dir } });
+      const chunks = chunkDocument(draft, "d.md");
+
+      const empty = counting({});
+      await runJudgmentArm(chunks, mixedRules, empty.client, { cache: cache as AnswerCache });
+      expect(empty.calls()).toBe(3);
+
+      const answering = counting({ restating_closer: 0.81 });
+      const rerun = await runJudgmentArm(chunks, mixedRules, answering.client, {
+        cache: cache as AnswerCache,
+      });
+
+      expect(answering.calls()).toBe(3);
+      expect(rerun.tally.unanswered).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
