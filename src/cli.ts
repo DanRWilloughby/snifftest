@@ -20,7 +20,7 @@
  * someone into agreeing to a request it was never going to make.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -62,7 +62,7 @@ import {
   runJudgmentArm,
   runRegexArm,
 } from "./engine.ts";
-import { buildReport, writeReport } from "./eval/report.ts";
+import { type WrittenReport, buildReport, writeReport } from "./eval/report.ts";
 import { type RunEvalOptions, runEval } from "./eval/run.ts";
 import { DEFAULT_PER_RULE, DEFAULT_SEED, SeedError, type BaseDocument, seedCorpus } from "./eval/seed.ts";
 import {
@@ -141,6 +141,8 @@ interface Options {
   readonly modelsPath?: string;
   /** An `eval` results directory: its corpus is reused and its arms are joined. */
   readonly evalDir?: string;
+  /** The tree this run is about, when the process is not standing in it. */
+  readonly root?: string;
 }
 
 // --- the entry point ------------------------------------------------------
@@ -166,16 +168,51 @@ export async function runCli(deps: CliDeps): Promise<number> {
   }
 
   try {
-    if (options.command === "check") return await check(deps, options);
-    if (options.command === "rules") return rules(deps, options);
-    if (options.command === "eval") return await evaluate(deps, options);
-    if (options.command === "bench") return await bench(deps, options);
+    const scoped = rooted(deps, options);
+    if (options.command === "check") return await check(scoped, options);
+    if (options.command === "rules") return rules(scoped, options);
+    if (options.command === "eval") return await evaluate(scoped, options);
+    if (options.command === "bench") return await bench(scoped, options);
     throw new UsageError(
       `"snifftest ${options.command}" is planned but not built yet. Today there is check, rules, eval and bench.`,
     );
   } catch (error) {
     return fail(deps, error);
   }
+}
+
+/**
+ * `--root <dir>`: the tree this run is about, when the process is standing
+ * somewhere else on purpose.
+ *
+ * The shells that fetch this tool have to run the fetch from a directory
+ * outside the checkout they are checking. A package manager asked for
+ * `snifftest@<version>` while standing in a repository runs that repository's
+ * own `node_modules/snifftest` instead of going to a registry, which on a
+ * fork's pull request is somebody else's code on your runner, with your
+ * environment. Moving the working directory out is the fix; this flag is how
+ * the run still knows which tree it is checking, so ruleset discovery, relative
+ * paths and the paths printed in the flags all read as they always did.
+ *
+ * It replaces the working directory for everything the command does, and for
+ * nothing else: where the consent answer is kept is a property of the person,
+ * not of the tree, and it is not touched here.
+ */
+function rooted(deps: CliDeps, options: Options): CliDeps {
+  if (options.root === undefined) return deps;
+
+  const root = isAbsolute(options.root) ? options.root : resolve(deps.cwd, options.root);
+  let stats;
+  try {
+    stats = statSync(root);
+  } catch {
+    throw new UsageError(`no directory at ${options.root}`);
+  }
+  if (!stats.isDirectory()) {
+    throw new UsageError(`--root takes a directory, and ${options.root} is not one.`);
+  }
+
+  return { ...deps, cwd: root };
 }
 
 // --- check ----------------------------------------------------------------
@@ -190,14 +227,14 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
   warnAbout(deps, resolved);
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
 
-  const files = collectFiles(options.paths, deps.cwd);
+  const files = collectFiles(deps, options.paths);
   const chunks = readDrafts(deps, files).flatMap((draft) =>
     // The cap is applied on every run, dry or not, so a chunk boundary (and so
     // a reported line number) never depends on whether the network was used.
     chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS }),
   );
 
-  const countable = runRegexArm(chunks, ruleset);
+  const countable = runRegexArm(chunks, ruleset, deps.writeError);
   const judgmentRules = ruleset.rules.filter(isJudgmentRule);
 
   if (options.dryRun || judgmentRules.length === 0 || chunks.length === 0) {
@@ -290,7 +327,7 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
   warnAbout(deps, resolved);
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
 
-  const files = collectFiles(options.paths, deps.cwd);
+  const files = collectFiles(deps, options.paths);
   const candidates: BaseDocument[] = [];
   for (const draft of readDrafts(deps, files)) {
     for (const chunk of chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS })) {
@@ -366,7 +403,7 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
   if (options.format === "json") {
     deps.write(JSON.stringify(report, null, 2));
   } else {
-    for (const line of evalSummary(report, written.markdown, deps.cwd)) deps.write(line);
+    for (const line of evalSummary(report, written, deps.cwd)) deps.write(line);
   }
 
   for (const failure of outcome.failures) {
@@ -377,7 +414,7 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
 
 function evalSummary(
   report: ReturnType<typeof buildReport>,
-  markdownPath: string,
+  written: WrittenReport,
   cwd: string,
 ): string[] {
   const at = String(report.threshold);
@@ -398,7 +435,14 @@ function evalSummary(
   }
 
   for (const row of report.corpus.skipped) lines.push(`skipped ${row.rule}: ${row.reason}`);
-  lines.push("", `wrote ${display(markdownPath, cwd)}`);
+  // Both files are named, because one of them is the report and the other is
+  // every paragraph of the corpus in full. A user should learn where their
+  // prose was written from the run that wrote it, not from a later look around.
+  lines.push("", `wrote ${display(written.markdown, cwd)}`);
+  lines.push(
+    `wrote ${display(dirname(written.cleanInputs), cwd)}, which holds the paragraphs in full; ` +
+      "the directory carries a .gitignore so they are not committed by accident",
+  );
   return lines;
 }
 
@@ -479,11 +523,30 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
         : createAnthropicAdapter(adapterOptions);
   }
 
-  // The catalogues. A recorded payload means a dry run touches no network at
-  // all; otherwise each provider's own list is read, which is a catalogue read
-  // and not a model call.
+  /** The panel against whatever catalogues are known by the time it is called. */
+  const resolvedPanel = (): ResolvedModel[] =>
+    resolvePanel(panel, catalogs, (model) => ({
+      runDate,
+      catalogPriceSource: model.provider === "openrouter" ? OPENROUTER_PRICE_SOURCE : undefined,
+      priceLookup: (served: string) => {
+        const table = priceTables.get(model.provider);
+        return table === undefined ? undefined : priceFor(table, served);
+      },
+    }));
+
+  // The catalogues.
+  //
+  // Reading a provider's model list is an ordinary authenticated request: it
+  // carries the key, it tells that company a run is happening, and it is not
+  // a model call, which is the only part of it the old ordering noticed. So it
+  // sits behind the same two gates everything else does. A dry run does not
+  // make it at all, and a real run asks first.
+  //
+  // A recorded payload is read from disk either way, which is how a dry run
+  // still resolves the panel with no network in it.
   const catalogs: Partial<Record<Provider, readonly CatalogEntry[]>> = {};
   const catalogNotes: string[] = [];
+  const recorded = options.modelsPath !== undefined;
 
   if (options.modelsPath !== undefined) {
     const file = at(options.modelsPath, deps.cwd);
@@ -494,53 +557,44 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
       catalogs.anthropic = readAnthropicCatalog(payload["anthropic"]);
     }
     catalogNotes.push(`model lists read from ${display(file, deps.cwd)}, not from the providers`);
-  } else {
-    for (const provider of wanted) {
-      const adapter = adapters[provider];
-      if (adapter === undefined) {
-        catalogNotes.push(`${DESTINATIONS[provider].keyEnv} is not set, so ${provider} rows cannot run`);
-        continue;
-      }
-      try {
-        catalogs[provider] = await adapter.listModels();
-      } catch (error) {
-        catalogNotes.push(`the ${provider} model list could not be read: ${messageOf(error)}`);
-      }
-    }
   }
 
-  const resolved = resolvePanel(panel, catalogs, (model) => ({
-    runDate,
-    catalogPriceSource: model.provider === "openrouter" ? OPENROUTER_PRICE_SOURCE : undefined,
-    priceLookup: (served: string) => {
-      const table = priceTables.get(model.provider);
-      return table === undefined ? undefined : priceFor(table, served);
-    },
-  }));
-
-  for (const line of panelLines(resolved, catalogNotes)) deps.write(line);
-
   if (options.dryRun) {
+    if (!recorded) {
+      catalogNotes.push(
+        "--dry-run makes no request of any kind, so no model list was read and no row was checked " +
+          "against a provider. Record one with --models <file> to resolve the panel offline.",
+      );
+    }
+    for (const line of panelLines(resolvedPanel(), catalogNotes)) deps.write(line);
     deps.write("");
-    deps.write("--dry-run: the panel above is resolved and no model was called.");
+    deps.write("--dry-run: the panel above is as far as this goes and no model was called.");
     return EXIT.ok;
   }
 
   // --- the corpus, which must be the eval's own
+  //
+  // Before the question rather than after it: a run that cannot work should not
+  // talk anyone into agreeing to requests it was never going to make.
   const corpus = benchCorpus(deps, options, ruleset);
   if (corpus.documents.length === 0) {
     throw new UsageError("that corpus holds no paragraphs to judge.");
   }
 
-  const runnable = resolved.filter((model) => model.available);
-  if (runnable.length === 0) {
+  const reachable = [...wanted].filter((provider) => adapters[provider] !== undefined);
+  for (const provider of wanted) {
+    if (adapters[provider] === undefined) {
+      catalogNotes.push(`${DESTINATIONS[provider].keyEnv} is not set, so ${provider} rows cannot run`);
+    }
+  }
+  if (!recorded && reachable.length === 0) {
     deps.writeError("no model in the panel could be run, so nothing was sent.");
     return EXIT.failure;
   }
 
-  const destinations = [...new Set(runnable.map((model) => model.entry.provider))].map(
-    (provider) => DESTINATIONS[provider],
-  );
+  // Every provider the panel names and a key exists for, because every one of
+  // them is about to be sent a request, starting with the model list.
+  const destinations = reachable.map((provider) => DESTINATIONS[provider]);
   const consent = await requestConsent({
     env: deps.env,
     homedir: deps.homedir,
@@ -553,6 +607,27 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
     ...(deps.prompt === undefined ? {} : { prompt: deps.prompt }),
   });
   if (!consent.granted) return EXIT.consent;
+
+  if (!recorded) {
+    for (const provider of reachable) {
+      // SAFETY: `reachable` is exactly the providers an adapter was built for.
+      const adapter = adapters[provider] as ModelAdapter;
+      try {
+        catalogs[provider] = await adapter.listModels();
+      } catch (error) {
+        catalogNotes.push(`the ${provider} model list could not be read: ${messageOf(error)}`);
+      }
+    }
+  }
+
+  const resolved = resolvedPanel();
+  for (const line of panelLines(resolved, catalogNotes)) deps.write(line);
+
+  const runnable = resolved.filter((model) => model.available);
+  if (runnable.length === 0) {
+    deps.writeError("no model in the panel could be run, so nothing was sent.");
+    return EXIT.failure;
+  }
 
   const outcome = await runBench({
     ruleset,
@@ -638,7 +713,7 @@ function benchCorpus(deps: CliDeps, options: Options, ruleset: Ruleset): BenchCo
     );
   }
 
-  const files = collectFiles(options.paths, deps.cwd);
+  const files = collectFiles(deps, options.paths);
   const candidates: BaseDocument[] = [];
   for (const draft of readDrafts(deps, files)) {
     for (const chunk of chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS })) {
@@ -865,6 +940,7 @@ function parseArgs(argv: readonly string[]): Options {
   let modelsPath: string | undefined;
   let evalDir: string | undefined;
   let repeats: number | undefined;
+  let root: string | undefined;
 
   for (let i = 1; i < argv.length; i++) {
     const argument = argv[i] ?? "";
@@ -915,6 +991,9 @@ function parseArgs(argv: readonly string[]): Options {
       case "--repeats":
         repeats = wholeNumber(valueFor(argv, ++i, "--repeats"), "--repeats", 1);
         break;
+      case "--root":
+        root = valueFor(argv, ++i, "--root");
+        break;
       default:
         throw new UsageError(`unknown option "${argument}". Try snifftest --help.`);
     }
@@ -939,6 +1018,7 @@ function parseArgs(argv: readonly string[]): Options {
     ...(modelsPath === undefined ? {} : { modelsPath }),
     ...(evalDir === undefined ? {} : { evalDir }),
     ...(repeats === undefined ? {} : { repeats }),
+    ...(root === undefined ? {} : { root }),
   };
 }
 
@@ -979,20 +1059,51 @@ function thresholdValue(value: string): number {
 
 // --- files ----------------------------------------------------------------
 
-function collectFiles(paths: readonly string[], cwd: string): string[] {
+/**
+ * The files to read, and the links that are refused instead.
+ *
+ * A symbolic link is a path to somewhere else, and reading one reads what it
+ * points at. That is fine in your own directory and a hole in a repository
+ * somebody else wrote: `docs/notes.md` can be a link to any file the person
+ * running the check can read, and with the judgment pass on its contents go
+ * into the request body. `readdirSync` reports a link as not-a-directory, so
+ * one named `.md` used to fall straight through the extension test.
+ *
+ * The rule is therefore the short one: a link is never read. Not contained,
+ * not resolved, not followed once. Containment would need a root, and an
+ * explicitly named file has no root to be contained by; it would also have to
+ * be explained, while "a link is never read" can be checked by a reader in one
+ * sentence. The way to check what a link points at is to name what it points
+ * at, which costs the one person who wanted that nothing.
+ *
+ * Each skipped link is named once, on stderr, and the run carries on. A link is
+ * not a finding about anybody's prose.
+ */
+function collectFiles(deps: CliDeps, paths: readonly string[]): string[] {
   const found = new Set<string>();
+  const skipped = new Set<string>();
+
+  const skip = (path: string): void => {
+    if (skipped.has(path)) return;
+    skipped.add(path);
+    deps.writeError(`${display(path, deps.cwd)} skipped, a symbolic link.`);
+  };
 
   for (const given of paths) {
-    const path = isAbsolute(given) ? given : resolve(cwd, given);
+    const path = isAbsolute(given) ? given : resolve(deps.cwd, given);
     let stats;
     try {
-      stats = statSync(path);
+      stats = lstatSync(path);
     } catch {
       throw new UsageError(`no file or directory at ${given}`);
     }
 
+    if (stats.isSymbolicLink()) {
+      skip(path);
+      continue;
+    }
     if (stats.isDirectory()) {
-      for (const file of walk(path)) found.add(file);
+      for (const file of walk(path, skip)) found.add(file);
     } else {
       found.add(path);
     }
@@ -1002,14 +1113,20 @@ function collectFiles(paths: readonly string[], cwd: string): string[] {
   return [...found].sort();
 }
 
-function walk(directory: string): string[] {
+function walk(directory: string, skip: (path: string) => void): string[] {
   const out: string[] = [];
 
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     // A dot directory or a dependency tree is somebody else's prose.
     if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) out.push(...walk(path));
+    if (entry.isSymbolicLink()) {
+      // Only worth a line when it looks like something that would have been
+      // read; a link to a directory or a binary was never a draft anyway.
+      if (DRAFT_EXTENSIONS.has(extname(entry.name).toLowerCase())) skip(path);
+      continue;
+    }
+    if (entry.isDirectory()) out.push(...walk(path, skip));
     else if (DRAFT_EXTENSIONS.has(extname(entry.name).toLowerCase())) out.push(path);
   }
 
@@ -1132,9 +1249,12 @@ function helpLines(): string[] {
     "",
     "Options",
     "  --rules <path>      use this ruleset instead of .snifftest.yaml or the built-in one",
+    "  --root <dir>        the tree being checked, when it is not the directory you are in;",
+    "                      relative paths and the ruleset are found there, not here",
     "  --threshold <0-1>   the probability at or above which a judgment counts as a flag",
     "  --format text|json  how to print the flags (default text)",
-    "  --dry-run           run the countable rules only; nothing leaves the machine",
+    "  --dry-run           make no network request of any kind, whatever the command;",
+    "                      for check that means the countable rules and nothing else",
     "  --yes, -y           answer the send question for this run and remember the answer",
     "  --help, --version",
     "",
@@ -1148,13 +1268,16 @@ function helpLines(): string[] {
     "  --eval <dir>        an eval results directory: its corpus is reused and its arms joined",
     `  --repeats <n>       how many times each document is asked of each model (default ${DEFAULT_REPEATS})`,
     "  --models <file>     a recorded models-endpoint payload, so a dry run needs no network",
-    "  --dry-run           resolve and print the panel and its prices; call no model",
+    "  --dry-run           print the panel and go no further. With --models it resolves",
+    "                      offline; without one, no model list is read either",
     "",
     "Environment",
     `  ${KEY_ENV}    the key the judgment rules are sent with`,
     `  ${OPENROUTER_KEY_ENV}  the key the bench panel is routed with`,
     `  ${ANTHROPIC_KEY_ENV}   the key the bench's direct overhead control uses`,
-    "  SNIFFTEST_SEND=1    answer the send question in CI, without remembering it",
+    "  SNIFFTEST_SEND=…    answer the send question in CI, without remembering it. It names",
+    "                      the destinations it answers for, comma separated; 1 is the",
+    "                      shorthand for TypeSafe, which is where check sends and nowhere else",
     "",
     "Exit codes",
     "  0  nothing tripped a rule",
@@ -1187,18 +1310,23 @@ export function processDeps(argv: readonly string[]): CliDeps {
   };
 }
 
-async function main(): Promise<void> {
+/**
+ * Run the tool against this process, and leave the exit code behind.
+ *
+ * This file is a library and never runs itself. `src/bin.ts` is the only entry
+ * point, in development and in the published package alike, and it calls this
+ * without asking any question first.
+ *
+ * The question it used to ask was whether `import.meta.url` matched `argv[1]`.
+ * A package manager installs `node_modules/.bin/snifftest` as a symbolic link,
+ * Node resolves that link for one of those and not for the other, and the
+ * answer through the link was therefore no: the program ended having done
+ * nothing, and exit 0 with no output is this tool's word for "nothing tripped".
+ * Every install path goes through that link, so the failure arrived everywhere
+ * as a clean bill of health. A file that is either a library or the program,
+ * decided by which file it is rather than at run time, cannot fail that way.
+ */
+export async function main(): Promise<void> {
   process.exitCode = await runCli(processDeps(process.argv.slice(2)));
 }
 
-const invokedDirectly = (): boolean => {
-  const entry = process.argv[1];
-  if (entry === undefined) return false;
-  try {
-    return import.meta.url === new URL(`file://${resolve(entry)}`).href;
-  } catch {
-    return false;
-  }
-};
-
-if (invokedDirectly()) await main();

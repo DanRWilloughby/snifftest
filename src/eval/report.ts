@@ -12,7 +12,7 @@
  * were dropped, requests that failed.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { EvalOutcome, RawRun } from "./run.ts";
@@ -249,11 +249,28 @@ export interface WrittenReport {
   readonly raw?: string;
 }
 
+/**
+ * What the results directory gets on first creation.
+ *
+ * `inputs/clean.json` holds every paragraph of the corpus verbatim, and the
+ * default destination is inside the user's own repository. An unpublished draft
+ * should not be one `git add .` away from being committed, or one glob away
+ * from being uploaded as a CI artifact, because the tool chose a convenient
+ * place to write. A file the user wrote themselves is never overwritten.
+ */
+const RESULTS_GITIGNORE = `# Written by snifftest. These files carry your prose in full.
+# Delete this file if you mean to commit them.
+*
+`;
+
 export function writeReport(
   report: EvalReport,
   outcome: EvalOutcome,
   outDir: string,
 ): WrittenReport {
+  const ignore = join(outDir, ".gitignore");
+  if (!existsSync(ignore)) write(ignore, RESULTS_GITIGNORE);
+
   const json = join(outDir, "scores.json");
   const markdown = join(outDir, "tables.md");
   const cleanInputs = join(outDir, "inputs", "clean.json");

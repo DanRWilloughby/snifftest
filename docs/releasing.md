@@ -9,6 +9,25 @@ which version to fetch. A bump that misses one of them ships a plugin that
 installs a version of the tool the plugin was not tested against, so a test
 holds them together and fails the release rather than letting that through.
 
+## Before the repository is public, once
+
+**Own the name on npm first.** `snifftest` is the name five separate pins point
+at: the Action's `version` input, both `.pre-commit-hooks.yaml` entries, the
+hook, and the skill's script. Every one of them is a copy-pasteable install
+instruction, and the README tells a reader to install the hook before anything
+has been published.
+
+While the name is unclaimed, anyone who reads the public repository can publish
+`snifftest` at the pinned version themselves. Every hook, Action and skill
+installation then fetches and runs their code, with `TYPESAFE_API_KEY` in scope
+wherever the judgment pass is on. The window opens the moment the repository is
+public and closes the moment the name is owned, so the order is the whole
+control.
+
+Check with `npm view snifftest version`. A 404 means the name is free and this
+repository must not be public yet. Publish `0.1.0` through the checklist below,
+or reserve the name with a placeholder release, before making it public.
+
 ## The checklist
 
 1. **Bump `package.json` first.** The workflow compares the tag with

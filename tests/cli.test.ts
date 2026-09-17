@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -133,6 +133,101 @@ describe("check, dry run", () => {
 
     expect(result.out).toContain("tests/fixtures/texts/closer.md");
     expect(result.out).toContain("tests/fixtures/texts/flagged.md");
+  });
+});
+
+describe("symbolic links", () => {
+  // A link is a path to somewhere else, and the tool reads what it points at.
+  // In a repository somebody else wrote, `docs/notes.md` can point at any file
+  // the person running the check can read, and the judgment pass would put its
+  // contents in the request body. So a link is never read, and saying which one
+  // was skipped is the difference between containment and a silent gap.
+  function tree(): { dir: string; secret: string } {
+    const dir = sandbox();
+    const secret = join(sandbox(), "private.txt");
+    writeFileSync(secret, "PRIVATE-MATERIAL-THAT-MUST-NOT-TRAVEL\n");
+    mkdirSync(join(dir, "docs"), { recursive: true });
+    writeFileSync(join(dir, "docs", "real.md"), "A paragraph that trips nothing at all.\n");
+    symlinkSync(secret, join(dir, "docs", "notes.md"));
+    return { dir, secret };
+  }
+
+  test("a link inside a walked directory is skipped and named", async () => {
+    const { dir } = tree();
+
+    const result = await run({
+      argv: ["check", "--dry-run", "--rules", join(repoRoot, MIXED), "--", join(dir, "docs")],
+    });
+
+    expect(result.code).toBe(EXIT.ok);
+    expect(result.err).toContain("notes.md skipped, a symbolic link.");
+  });
+
+  test("a link named on the command line is skipped too", async () => {
+    const { dir } = tree();
+
+    const result = await run({
+      argv: ["check", "--dry-run", "--rules", join(repoRoot, MIXED), "--", join(dir, "docs", "notes.md")],
+    });
+
+    // Nothing left to read, which is a usage failure rather than a clean bill.
+    expect(result.code).toBe(EXIT.failure);
+    expect(result.err).toContain("notes.md skipped, a symbolic link.");
+  });
+
+  test("what a link points at never reaches the request body", async () => {
+    const { dir } = tree();
+    const seen: JevRequest[] = [];
+
+    await run({
+      argv: ["check", "--yes", "--rules", join(repoRoot, MIXED), "--", join(dir, "docs")],
+      client: stubClient(always({ restating_closer: 0.01 }), seen),
+    });
+
+    expect(seen.length).toBeGreaterThan(0);
+    for (const request of seen) {
+      expect(String(request.state)).not.toContain("PRIVATE-MATERIAL-THAT-MUST-NOT-TRAVEL");
+    }
+  });
+});
+
+describe("--root", () => {
+  // The shells that fetch this tool run it from a scratch directory, because a
+  // package manager asked for it while standing in the tree being checked runs
+  // that tree's own copy. So the tree has to be nameable from outside.
+  test("finds the project ruleset and the relative paths there, not here", async () => {
+    const tree = sandbox();
+    writeFileSync(
+      join(tree, ".snifftest.yaml"),
+      "version: 1\nrules:\n  - id: dash_present\n    kind: regex\n    builtin: dash_present\n    message: \"An em dash.\"\n",
+    );
+    writeFileSync(join(tree, "post.md"), "A sentence broken \u2014 right here.\n");
+
+    const result = await run({
+      argv: ["check", "--dry-run", "--root", tree, "--", "post.md"],
+      cwd: sandbox(),
+    });
+
+    expect(result.code).toBe(EXIT.flags);
+    // Reported the way the caller staged it, not as an absolute path.
+    expect(result.out).toBe("post.md:1 dash_present 1.00 An em dash.");
+  });
+
+  test("a root that is not a directory is a usage failure, not a silent fallback", async () => {
+    const tree = sandbox();
+    writeFileSync(join(tree, "post.md"), "A clean sentence.\n");
+
+    const missing = await run({
+      argv: ["check", "--dry-run", "--root", join(tree, "nowhere"), "--", "post.md"],
+    });
+    const file = await run({
+      argv: ["check", "--dry-run", "--root", join(tree, "post.md"), "--", "post.md"],
+    });
+
+    expect(missing.code).toBe(EXIT.failure);
+    expect(missing.err).toContain("no directory at");
+    expect(file.code).toBe(EXIT.failure);
+    expect(file.err).toContain("--root takes a directory");
   });
 });
 

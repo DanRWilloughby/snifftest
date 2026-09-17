@@ -8,8 +8,8 @@
  *
  * The Messages API publishes no prices, so this row is the one priced from a
  * dated file (`src/bench/prices.ts`). A served model the file has no row for is
- * metered with no cost at all, which is Houston's rule at
- * `src/producer/llm.ts` and for its reason: an invented zero reads as "free".
+ * metered with no cost at all, which is the rule an earlier tool of ours used
+ * and for its reason: an invented zero reads as "free".
  *
  * This adapter honours the row's own completion budget, and has no extended
  * thinking wired into it. A panel row that asks for reasoning on this provider

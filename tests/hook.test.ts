@@ -15,7 +15,17 @@
  */
 
 import { afterAll, afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync,
+  cpSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -143,7 +153,7 @@ beforeAll(() => {
   realRunner = join(dir, "snifftest");
   writeFileSync(
     realRunner,
-    `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(join(repoRoot, "src", "cli.ts"))} "$@"\n`,
+    `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(join(repoRoot, "src", "bin.ts"))} "$@"\n`,
   );
   chmodSync(realRunner, 0o755);
 });
@@ -225,6 +235,20 @@ describe("the pre-commit hook, against the real checker", () => {
   });
 });
 
+/**
+ * The arguments with the `--root <dir>` pair taken out.
+ *
+ * The hook runs the checker from a scratch directory, because a package manager
+ * asked for the tool while standing in the repository being committed to runs
+ * that repository's own copy. `--root` names the extraction tree instead, and
+ * it is asserted on its own; every other assertion here is about the shape of
+ * the path list, which it would otherwise clutter.
+ */
+function handed(args: readonly string[]): string[] {
+  const at = args.indexOf("--root");
+  return at === -1 ? [...args] : [...args.slice(0, at), ...args.slice(at + 2)];
+}
+
 describe("what the hook asks the checker to do", () => {
   test("runs nothing at all when no prose is staged", () => {
     const dir = scratchRepo();
@@ -246,7 +270,7 @@ describe("what the hook asks the checker to do", () => {
 
     git(dir, ["commit", "-m", "default"], { SNIFFTEST_BIN: runner.bin });
 
-    expect(runner.args()).toEqual(["check", "--dry-run", "--", "post.md"]);
+    expect(handed(runner.args())).toEqual(["check", "--dry-run", "--", "post.md"]);
     expect(runner.args()).not.toContain("--yes");
     expect(runner.args()).not.toContain("-y");
     // Run from the extraction directory, never from the repository itself.
@@ -261,7 +285,7 @@ describe("what the hook asks the checker to do", () => {
 
     git(dir, ["commit", "-m", "spaced"], { SNIFFTEST_BIN: runner.bin });
 
-    expect(runner.args()).toEqual(["check", "--dry-run", "--", "a draft.md"]);
+    expect(handed(runner.args())).toEqual(["check", "--dry-run", "--", "a draft.md"]);
   });
 
   test("SNIFFTEST_SEND=1 with no key stays dry and says why", () => {
@@ -304,7 +328,7 @@ describe("what the hook asks the checker to do", () => {
 
     const commit = git(dir, ["commit", "-m", "dashed"], { SNIFFTEST_BIN: runner.bin });
 
-    expect(runner.args()).toEqual(["check", "--dry-run", "--", "-dashfile.md"]);
+    expect(handed(runner.args())).toEqual(["check", "--dry-run", "--", "-dashfile.md"]);
     expect(commit.code).toBe(0);
   });
 
@@ -319,7 +343,26 @@ describe("what the hook asks the checker to do", () => {
       SNIFFTEST_THRESHOLD: "0.9",
     });
 
-    expect(runner.args()).toEqual(["check", "--dry-run", "--threshold", "0.9", "--", "post.md"]);
+    expect(handed(runner.args())).toEqual(["check", "--dry-run", "--threshold", "0.9", "--", "post.md"]);
+  });
+
+  test("names the extraction tree as the root, never the repository", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner();
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    git(dir, ["commit", "-m", "root"], { SNIFFTEST_BIN: runner.bin });
+
+    const args = runner.args();
+    const at = args.indexOf("--root");
+    const root = args[at + 1] ?? "";
+
+    expect(at).toBeGreaterThan(-1);
+    // The staged copies, which is what the hook checks, and not the working
+    // tree the commit came from.
+    expect(root.endsWith("/tree")).toBe(true);
+    expect(root.startsWith(realpathSync(dir))).toBe(false);
   });
 });
 
@@ -391,6 +434,75 @@ describe("when the checker never got as far as an opinion", () => {
   });
 });
 
+describe("a tool failure never makes the hook more permissive than no key at all", () => {
+  // Turning the judgment pass on and having the service refuse the key made the
+  // hook let a draft through that the free rules had already flagged: the CLI
+  // prints the countable flags and exits 2, and exit 2 was read as "the checker
+  // did not run". The countable result is local, it is complete, and it does
+  // not depend on the arm that failed.
+  const FLAG = "post.md:1 dash_present 1.00 A long dash. Give the sentence a full stop instead.";
+
+  test("exit 2 with a flag line blocks the commit and blames the tool, not the draft", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner({
+      code: 2,
+      stdout: FLAG,
+      stderr: "the judgment rules could not run: HTTP 401",
+    });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "bad key"], { SNIFFTEST_BIN: runner.bin });
+
+    expect(commit.code).not.toBe(0);
+    expect(commit.stdout + commit.stderr).toContain("dash_present");
+    expect(commit.stderr).toContain("did not finish");
+    expect(git(dir, ["log", "--oneline"]).stdout).not.toContain("bad key");
+  });
+
+  test("exit 3 with a flag line blocks on the countable result", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner({ code: 3, stdout: FLAG });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "no answer"], { SNIFFTEST_BIN: runner.bin });
+
+    expect(commit.code).not.toBe(0);
+    expect(commit.stdout + commit.stderr).toContain("dash_present");
+  });
+
+  test("exit 3 with nothing flagged is not a verdict on the prose", () => {
+    // Nothing was sent and nothing was read, so there is no finding to report.
+    // The hook says what happened and how to answer, and steps aside.
+    const dir = scratchRepo();
+    const runner = recordingRunner({ code: 3 });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "unanswered"], { SNIFFTEST_BIN: runner.bin });
+
+    expect(commit.code).toBe(0);
+    expect(commit.stderr).toContain("SNIFFTEST_SEND");
+    expect(commit.stderr).not.toContain("trips the rules");
+    expect(git(dir, ["log", "--oneline"]).stdout).toContain("unanswered");
+  });
+
+  test("SNIFFTEST_STRICT=1 blocks an unanswered run as well", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner({ code: 3 });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "strict unanswered"], {
+      SNIFFTEST_BIN: runner.bin,
+      SNIFFTEST_STRICT: "1",
+    });
+
+    expect(commit.code).not.toBe(0);
+  });
+});
+
 describe("when the checker itself is broken", () => {
   test("a tool failure warns and lets the commit through", () => {
     const dir = scratchRepo();
@@ -401,7 +513,11 @@ describe("when the checker itself is broken", () => {
     const commit = git(dir, ["commit", "-m", "broken tool"], { SNIFFTEST_BIN: runner.bin });
 
     expect(commit.code).toBe(0);
-    expect(commit.stderr).toContain("could not finish");
+    expect(commit.stderr).toContain("did not finish");
+    // The wording matters as much as the exit code: an exit 2 says nothing
+    // about the draft, and the hook has to say so rather than leave a writer
+    // reading a tool failure as a verdict.
+    expect(commit.stderr).toContain("the tool, not your draft");
   });
 
   test("SNIFFTEST_STRICT=1 turns the same failure into a blocked commit", () => {

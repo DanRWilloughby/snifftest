@@ -10,10 +10,13 @@
  * directory, because a consent file committed to a repo would answer for every
  * person who ever clones it.
  *
- * `--yes` is a person typing an answer, so it is remembered. `SNIFFTEST_SEND=1`
+ * `--yes` is a person typing an answer, so it is remembered. `SNIFFTEST_SEND`
  * is a CI setting, so it answers for that run and is not written down: a build
  * agent's home directory is thrown away anyway, and writing files nobody asked
  * for is how a tool earns a reputation.
+ *
+ * Every answer names the destinations it covers, the stored one and the
+ * environment one alike. A yes given to one company is not a yes to another.
  */
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -22,9 +25,15 @@ import { dirname, join } from "node:path";
 import { ENDPOINT, KEY_ENV } from "./jev.ts";
 import { asRecord } from "./types.ts";
 
-/** The one environment variable that answers, and the one value it answers with. */
+/** The environment variable that answers, and the value that means TypeSafe. */
 export const SEND_ENV = "SNIFFTEST_SEND";
-const SEND_VALUE = "1";
+
+/**
+ * `SNIFFTEST_SEND=1`, kept for the hook and the Action, which only ever run
+ * `check`. It answers for TypeSafe and for nothing else, so it can never cover
+ * a bench provider by accident.
+ */
+const SEND_SHORTHAND = "1";
 
 const CONSENT_VERSION = 1;
 
@@ -108,13 +117,33 @@ export function disclosure(facts: DisclosureFacts): string[] {
   ];
 }
 
-export async function requestConsent(request: ConsentRequest): Promise<ConsentOutcome> {
-  if (request.env[SEND_ENV] === SEND_VALUE) {
-    return { granted: true, asked: false, stored: false };
-  }
+/**
+ * The destinations an environment answer covers.
+ *
+ * It used to be read before the destinations were looked at, so a build that
+ * set it so the judgment rules could run had also, without being told,
+ * authorised `bench` to send the same paragraphs to two other companies. An
+ * answer now names who it is an answer to: a comma separated list, or the `1`
+ * shorthand for the single destination `check` uses.
+ */
+export function sendEnvNames(value: string | undefined): readonly string[] {
+  const text = (value ?? "").trim();
+  if (text === "" || text === "0") return [];
+  if (text === SEND_SHORTHAND) return [TYPESAFE_DESTINATION.name];
+  return text
+    .split(",")
+    .map((name) => name.trim())
+    .filter((name) => name !== "");
+}
 
+export async function requestConsent(request: ConsentRequest): Promise<ConsentOutcome> {
   const path = consentPath(request.env, request.homedir);
   const names = destinationsOf(request).map((where) => where.name);
+
+  const answered = sendEnvNames(request.env[SEND_ENV]).map((name) => name.toLowerCase());
+  if (names.every((name) => answered.includes(name.toLowerCase()))) {
+    return { granted: true, asked: false, stored: false };
+  }
 
   if (request.assumeYes) {
     return { granted: true, asked: false, stored: remember(path, names) };
@@ -128,7 +157,8 @@ export async function requestConsent(request: ConsentRequest): Promise<ConsentOu
   if (!request.isTty || request.prompt === undefined) {
     request.say("");
     request.say(
-      `No answer is possible here, so nothing was sent. Answer with --yes, or set ${SEND_ENV}=${SEND_VALUE} in CI.`,
+      `No answer is possible here, so nothing was sent. Answer with --yes, or set ` +
+        `${SEND_ENV}=${names.join(",")} in CI.`,
     );
     return { granted: false, asked: true, stored: false };
   }

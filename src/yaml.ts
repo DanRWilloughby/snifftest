@@ -12,7 +12,8 @@
  *
  * Not supported: anchors, aliases, tags, merge keys, complex keys, multiple
  * documents, tab indentation, duplicate keys, explicit block scalar indentation
- * indicators, and any flow collection that spans a line break.
+ * indicators, any flow collection that spans a line break, the key `__proto__`,
+ * and flow collections nested past `MAX_FLOW_DEPTH`.
  *
  * Mapping keys are always strings and are never type-coerced, so a ruleset can
  * write `criteria:` with `true:` and `false:` beneath it.
@@ -42,6 +43,27 @@ interface SourceLine {
   /** The line exactly as it appeared, used for block scalar bodies. */
   readonly raw: string;
 }
+
+/**
+ * How deep one line of flow collections may nest.
+ *
+ * `readFlow` calls itself for every `[` or `{`, so a line of fifty thousand of
+ * them used to exhaust the stack, and a stack overflow reaches the caller as
+ * "could not finish" rather than as a named line of a named file. A ruleset
+ * arrives from a repository somebody else wrote, so which of those two a run
+ * gets is not its choice to make. Sixteen is far past anything a person writes
+ * in a ruleset and far short of anything that troubles the stack.
+ */
+const MAX_FLOW_DEPTH = 16;
+
+/**
+ * The one mapping key that is an instruction rather than a name.
+ *
+ * Assigning it on a plain object runs the prototype setter instead of creating
+ * an own property, so the value becomes configuration that no own-key walk sees
+ * and no unknown-key warning mentions. Refused by name, the way a merge key is.
+ */
+const PROTOTYPE_KEY = "__proto__";
 
 const BLOCK_SCALAR_HEADER = /^[|>]/;
 const INTEGER = /^[-+]?\d+$/;
@@ -163,6 +185,7 @@ class Parser {
 
       const { key, rest } = this.splitKey(line, text);
       if (key === "<<") this.fail(line, "merge keys are not supported");
+      if (key === PROTOTYPE_KEY) this.fail(line, `the key "${PROTOTYPE_KEY}" is not supported`);
       if (key === "") this.fail(line, "a mapping key may not be empty");
       if (seen.has(key)) this.fail(line, `duplicate key "${key}"`);
       seen.add(key);
@@ -318,7 +341,15 @@ class Parser {
     return plainScalar(text);
   }
 
-  private readFlow(line: SourceLine, text: string, start: number): { value: YamlValue; end: number } {
+  private readFlow(
+    line: SourceLine,
+    text: string,
+    start: number,
+    depth = 0,
+  ): { value: YamlValue; end: number } {
+    if (depth > MAX_FLOW_DEPTH) {
+      this.fail(line, `flow collections are nested more than ${MAX_FLOW_DEPTH} deep`);
+    }
     const open = text[start];
     const isSeq = open === "[";
     const close = isSeq ? "]" : "}";
@@ -344,7 +375,7 @@ class Parser {
       first = false;
 
       if (isSeq) {
-        const entry = this.readFlowValue(line, text, pos, close, unterminated);
+        const entry = this.readFlowValue(line, text, pos, close, unterminated, depth);
         seq.push(entry.value);
         pos = entry.end;
         continue;
@@ -356,7 +387,10 @@ class Parser {
       if (text[pos] !== ":") this.fail(line, 'expected ":" in a flow mapping');
       pos = skipSpaces(text, pos + 1);
       if (pos >= text.length) this.fail(line, unterminated);
-      const entry = this.readFlowValue(line, text, pos, close, unterminated);
+      const entry = this.readFlowValue(line, text, pos, close, unterminated, depth);
+      if (keyRead.key === PROTOTYPE_KEY) {
+        this.fail(line, `the key "${PROTOTYPE_KEY}" is not supported`);
+      }
       if (Object.hasOwn(map, keyRead.key)) this.fail(line, `duplicate key "${keyRead.key}"`);
       map[keyRead.key] = entry.value;
       pos = entry.end;
@@ -388,12 +422,13 @@ class Parser {
     start: number,
     close: string,
     unterminated: string,
+    depth: number,
   ): { value: YamlValue; end: number } {
     const head = text[start];
     if (head === "&") this.fail(line, "anchors are not supported");
     if (head === "*") this.fail(line, "aliases are not supported");
     if (head === "!") this.fail(line, "tags are not supported");
-    if (head === "[" || head === "{") return this.readFlow(line, text, start);
+    if (head === "[" || head === "{") return this.readFlow(line, text, start, depth + 1);
     if (head === '"' || head === "'") {
       const read = this.readQuoted(line, text, start);
       return { value: read.value, end: read.end };

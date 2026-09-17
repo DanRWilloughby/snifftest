@@ -8,14 +8,27 @@
  * rejected. So the removal is exact rather than heuristic: we hold the value,
  * and we take it out.
  *
- * Prefixes count, not just the whole value. The gateway quotes at most a couple
+ * Both ends count, not just the whole value. The gateway quotes at most a couple
  * of hundred characters of a failure body, so a rejection that echoes the key
  * can arrive with it cut in half, and half a credential is still a credential in
- * a scrollback or a screenshot. Sixteen characters is the floor: below that a
- * "fragment" is short enough to appear in ordinary prose, and redacting real
- * words would make the message useless without making anyone safer.
+ * a scrollback or a screenshot. Some services record the head of a credential
+ * and some record the tail, so a run of characters is removed whenever it starts
+ * at the beginning of the value or ends at the end of it. Sixteen characters is
+ * the floor: below that a "fragment" is short enough to appear in ordinary
+ * prose, and redacting real words would make the message useless without making
+ * anyone safer.
  *
- * Ported from Houston's `src/scrub.ts`, which has the same job.
+ * What this does not cover, said plainly, because a scrubber that quietly misses
+ * a shape is worse than one that names it:
+ *
+ *   - Any re-encoding of the value. Base64, URL escaping, JSON escaping of a
+ *     character the value does not contain, a hash: none of those contain the
+ *     characters we hold, so none of them can be matched by holding the value.
+ *   - A fragment taken out of the middle, which no service we send to produces.
+ *   - A provider's own redaction, such as a prefix and the last four characters.
+ *     That is the provider choosing what to show, and it is not ours to widen.
+ *
+ * Ported from an internal tool of the same name, which has the same job.
  */
 
 const MIN_SECRET_FRAGMENT = 16;
@@ -40,6 +53,14 @@ export function scrubSecrets(text: string, secrets: readonly string[]): string {
     const floor = Math.min(secret.length, MIN_SECRET_FRAGMENT);
     for (let end = secret.length; end >= floor; end--) {
       const fragment = secret.slice(0, end);
+      if (out.includes(fragment)) out = out.split(fragment).join(HIDDEN);
+    }
+
+    // The same walk from the other end, for a service that logs the tail rather
+    // than the head. The whole value was tried above, so this starts one
+    // character in; everything else about it is the prefix rule turned around.
+    for (let start = 1; start <= secret.length - floor; start++) {
+      const fragment = secret.slice(start);
       if (out.includes(fragment)) out = out.split(fragment).join(HIDDEN);
     }
   }
