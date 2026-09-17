@@ -25,7 +25,7 @@
   --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
   --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
-  --gutter: 4.5rem;
+  --gutter: 5rem;
   --draft-size: clamp(1.125rem, 0.85rem + 0.62vw, 1.5rem);
 }
 @media (prefers-color-scheme: dark) {
@@ -151,7 +151,7 @@ h1 {
 .gutter {
   position: absolute;
   top: 0;
-  left: calc(var(--gutter) - 1.375rem);
+  left: 0.375rem;
   width: 6px;
   height: 100%;
   overflow: visible;
@@ -253,7 +253,7 @@ h1 {
 }
 
 .verdict {
-  margin: 0.25rem 0 0;
+  margin: 1.25rem 0 0;
   font-family: var(--serif);
   font-size: 1.4375rem;
   font-weight: 500;
@@ -352,6 +352,7 @@ h1 {
     justify-content: space-between;
     gap: 1rem;
   }
+  .gutter { left: 0; }
   .actor { width: 7.5rem; flex: none; margin: 0; }
   .verdict { margin: 0; font-size: 1.25rem; }
   .flags, .mode { order: 2; }
@@ -466,11 +467,13 @@ h1 {
 
   const beats = new Set();
 
+  // Beats keep their timing under reduced motion. It is the movement between
+  // poses that goes, not the order things happen in or how long a pose is held.
   function later(ms, action) {
     const id = setTimeout(() => {
       beats.delete(id);
       action();
-    }, calm ? 0 : ms);
+    }, ms);
     beats.add(id);
   }
 
@@ -544,6 +547,10 @@ h1 {
 
   /** React to one flag. The same reaction twice in a row dips first, so it reads as a second hit. */
   function react(name) {
+    if (calm) {
+      noseTo(name, 0);
+      return;
+    }
     if (name === "twitch") {
       noseTo("twitch", easeMs("twitch"), 1);
       later(170, () => noseTo("twitch", 110, 0.3));
@@ -561,6 +568,7 @@ h1 {
 
   function startSniffing() {
     cancelBeats();
+    finishReveals();
     sniffing = true;
     if (calm) {
       noseTo("sniff", 0, 0.7);
@@ -582,6 +590,7 @@ h1 {
   function stopSniffing() {
     sniffing = false;
     cancelBeats();
+    finishReveals();
   }
 
   // --- pencil strokes ---------------------------------------------------------------
@@ -692,24 +701,32 @@ h1 {
   // A flag about words gets a pencil line under them. A flag about a paragraph gets a
   // bracket in the margin, nested outward when one paragraph earns several.
 
-  const flagKey = (flag) => flag.rule + "|" + flag.start + "|" + flag.end;
+  // A paragraph flag stays the same flag while its paragraph grows, so its end is not part of its name.
+  const flagKey = (flag) => flag.rule + "|" + flag.start + "|" + (flag.scope === "paragraph" ? "p" : flag.end);
   const shown = new Map();
   let order = [];
   let scored = "";
   let hot = null;
 
+  /** Where the flagged paragraph ends in the draft as it stands, which may be past what was scored. */
+  function paragraphEnd(flag) {
+    const rest = draft.value.slice(flag.start);
+    const gap = rest.search(/\n[ \t]*\n/);
+    return Math.max(flag.end, flag.start + (gap === -1 ? rest.length : gap));
+  }
+
   function drawMarks() {
     while (marksLayer.firstChild) marksLayer.removeChild(marksLayer.firstChild);
     const textLeft = draft.offsetLeft;
     const narrow = textLeft < 56;
-    const step = narrow ? 11 : 19;
+    const step = narrow ? 10 : 19;
     const nests = new Map();
 
     order.forEach((key, index) => {
       const mark = shown.get(key);
       if (!mark || !mark.revealed) return;
       const flag = mark.flag;
-      const lines = boxesFor(flag.start, flag.end);
+      const lines = boxesFor(flag.start, flag.scope === "paragraph" ? paragraphEnd(flag) : flag.end);
       if (lines.length === 0) return;
 
       const group = el("g", { class: key === hot ? "on" : "" }, marksLayer);
@@ -721,7 +738,7 @@ h1 {
       if (flag.scope === "paragraph") {
         const depth = Math.min(nests.get(flag.start) || 0, 2);
         nests.set(flag.start, (nests.get(flag.start) || 0) + 1);
-        const x = textLeft - 14 - depth * step;
+        const x = textLeft - (narrow ? 12 : 14) - depth * step;
         const top = lines[0].top + 3;
         const bottom = lines[lines.length - 1].bottom - 2;
         const d =
@@ -731,7 +748,8 @@ h1 {
           curveTo(x, bottom - 5, x + 8, bottom, seed + 40, 1);
         mark.paths.push(el("path", { class: "main", d, pathLength: "1" }, group));
         tagX = x;
-        tagY = top - 11;
+        // In a narrow margin the brackets sit closer than a numeral is wide, so every other one is numbered at its foot.
+        tagY = narrow && depth % 2 === 1 ? bottom + 11 : top - 11;
       } else {
         lines.forEach((box, i) => {
           const y = box.bottom - 1;
@@ -772,10 +790,28 @@ h1 {
     mark.revealed = true;
     mark.progress = 0;
     drawMarks();
-    tween(300, easeOut, (t) => {
-      mark.progress = t;
-      progressMark(mark);
-    });
+    mark.moves.push(
+      tween(300, easeOut, (t) => {
+        mark.progress = t;
+        progressMark(mark);
+      }),
+    );
+  }
+
+  /** A new round cuts the queue short: whatever was still waiting to be drawn is simply there. */
+  function finishReveals() {
+    let changed = false;
+    for (const mark of shown.values()) {
+      if (mark.revealed && mark.progress >= 1) continue;
+      for (const move of mark.moves) if (move) running.delete(move);
+      mark.moves = [];
+      mark.revealed = true;
+      mark.progress = 1;
+      mark.note.item.style.opacity = "1";
+      mark.note.item.style.transform = "none";
+      changed = true;
+    }
+    if (changed) drawMarks();
   }
 
   // --- the caret, in pencil ---------------------------------------------------------------
@@ -861,10 +897,12 @@ h1 {
 
   function revealNote(mark) {
     const item = mark.note.item;
-    tween(280, easeOut, (t) => {
-      item.style.opacity = String(n3(t));
-      item.style.transform = "translateY(" + n3((1 - t) * 7) + "px)";
-    });
+    mark.moves.push(
+      tween(280, easeOut, (t) => {
+        item.style.opacity = String(n3(t));
+        item.style.transform = "translateY(" + n3((1 - t) * 7) + "px)";
+      }),
+    );
   }
 
   function plural(count, one, many) {
@@ -915,7 +953,7 @@ h1 {
       const key = keys[index];
       let mark = shown.get(key);
       if (!mark) {
-        mark = { flag, revealed: false, progress: 0, note: noteFor(flag, key) };
+        mark = { flag, revealed: false, progress: 0, moves: [], note: noteFor(flag, key) };
         mark.note.item.style.opacity = "0";
         shown.set(key, mark);
         fresh.push(mark);
