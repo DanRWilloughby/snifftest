@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { type AnswerCache, openCache } from "../src/cache.ts";
 
 import {
+  MINIMUM_ARM_BUDGET_MS,
+  OUT_OF_TIME_REASON,
   chunkDocument,
   classifyChunk,
   flagsFrom,
@@ -801,6 +803,40 @@ describe("the judgment arm when the service falters", () => {
       },
     };
   }
+
+  test("the arm stops asking once its overall budget is gone, and says so", async () => {
+    // The breaker catches a service that fails. A service that answers every
+    // request slowly has nothing to catch it, and a hook with a few hundred
+    // paragraphs in front of it had no ceiling at all.
+    const chunks = chunkDocument(draft, "d.md");
+    const { client, calls } = scripted([0.9, 0.2, 0.3, 0.25, 0.1]);
+
+    let clock = 0;
+    const result = await runJudgmentArm(chunks, rules, client, {
+      // Two paragraphs go out, then the clock jumps past the whole budget.
+      now: () => {
+        clock += 1;
+        return clock <= 2 ? 0 : MINIMUM_ARM_BUDGET_MS * 100;
+      },
+    });
+
+    expect(calls()).toBeLessThan(5);
+    expect(result.stopped?.reason).toBe(OUT_OF_TIME_REASON);
+    expect(result.stopped?.notSent).toBeGreaterThan(0);
+    expect(result.skipped.every((row) => row.reason === OUT_OF_TIME_REASON)).toBe(true);
+    // Whatever was answered before the budget ran out is still reported.
+    expect(result.readings.length).toBe(calls());
+  });
+
+  test("a run inside its budget is never cut short by it", async () => {
+    const chunks = chunkDocument(draft, "d.md");
+    const { client, calls } = scripted([0.9, 0.2, 0.3, 0.25, 0.1]);
+
+    const result = await runJudgmentArm(chunks, rules, client, { now: () => 0 });
+
+    expect(calls()).toBe(5);
+    expect(result.stopped).toBeUndefined();
+  });
 
   test("a 503 on one request keeps every answer received before it", async () => {
     const chunks = chunkDocument(draft, "d.md");

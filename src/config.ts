@@ -22,7 +22,7 @@
  * public log; naming the key names of a file somebody else chose is enough.
  */
 
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -200,6 +200,15 @@ export function selectRules(ruleset: Ruleset, selection: TagSelection = {}): Sel
   return { ruleset: { ...ruleset, rules }, dropped };
 }
 
+/** Whether a path is itself a link, without following it. */
+function isLink(path: string): boolean {
+  try {
+    return lstatSync(path).isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
 /** The real directory a file sits in, so a symbolic link cannot widen a root. */
 function realDirectory(file: string): string {
   try {
@@ -231,7 +240,19 @@ function startingFile(options: ResolveRulesetOptions, defaultPath: string): stri
 
   for (const name of [PROJECT_RULES_FILE, PROJECT_RULES_ALT]) {
     const candidate = join(options.cwd, name);
-    if (existsSync(candidate)) return candidate;
+    if (!existsSync(candidate)) continue;
+    // A ruleset found by looking rather than by being named is one nobody
+    // typed. A link there reads a file from somewhere else in the tree, or
+    // outside it, under a name that says the rules are local. A ruleset the
+    // caller names with --rules is their own business and is followed.
+    if (isLink(candidate)) {
+      throw new ConfigError(
+        `${name} in this directory is a symbolic link, and a ruleset found by discovery is not ` +
+          "followed through one. Name the file it points at with --rules <path>, or replace the " +
+          "link with the file.",
+      );
+    }
+    return candidate;
   }
 
   if (!existsSync(defaultPath)) {

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -214,6 +214,28 @@ describe("resolveRuleset failures", () => {
     expect(() => resolveRuleset({ cwd: dir, defaultRulesPath: join(dir, "absent.yaml") })).toThrow(
       /--rules/,
     );
+  });
+
+  test("a discovered ruleset that is a symbolic link is refused, and says what to do", () => {
+    // Nobody typed this path: it was found by looking in the directory. A link
+    // there reads a file from somewhere else under a name that says the rules
+    // are local.
+    const dir = sandbox();
+    const elsewhere = write(dir, "elsewhere.yaml", PROJECT_RULES);
+    symlinkSync(elsewhere, join(dir, PROJECT_RULES_FILE));
+
+    expect(() => resolveRuleset({ cwd: dir })).toThrow(ConfigError);
+    expect(() => resolveRuleset({ cwd: dir })).toThrow(/symbolic link/);
+    expect(() => resolveRuleset({ cwd: dir })).toThrow(/--rules/);
+  });
+
+  test("a ruleset named with --rules is the caller's own business, link or not", () => {
+    const dir = sandbox();
+    const elsewhere = write(dir, "elsewhere.yaml", PROJECT_RULES);
+    const link = join(dir, "named.yaml");
+    symlinkSync(elsewhere, link);
+
+    expect(resolveRuleset({ cwd: dir, rulesPath: "named.yaml" }).ruleset.rules).toHaveLength(1);
   });
 
   test("a ruleset outside the YAML subset keeps its line number", () => {

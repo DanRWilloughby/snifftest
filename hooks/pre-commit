@@ -3,8 +3,10 @@
 # Sniff Test pre-commit hook.
 #
 # Checks the prose you are about to commit against your house rules. By default
-# it runs the countable rules only, so nothing leaves your machine and the hook
-# costs nothing but a few milliseconds.
+# it runs the countable rules only, so nothing leaves your machine. The check
+# itself is fast; what you wait for is finding snifftest. An installed one runs
+# at once, and bunx or npx fetches the package the first time, which is a
+# download and not a few milliseconds.
 #
 # Install, from the root of your repository, one command:
 #

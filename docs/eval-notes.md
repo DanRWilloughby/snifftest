@@ -32,6 +32,13 @@ the reason. A line is reopened by new evidence, not by asking again.
   out. A measurement that quietly skipped half the ruleset would report a
   recall figure for a ruleset nobody runs.
 
+  The consequence belongs beside the numbers rather than only here. The
+  headline recall and the cost per hundred paragraphs describe a request that
+  asks about every judgment rule in the file. An ordinary `check` asks about
+  the ones that are not tagged `marketing`, which is fewer questions per
+  request, so it is cheaper than the eval's figure and its recall is measured
+  over a smaller set of rules.
+
 - **`--only` narrows what gets asked, not what gets checked.** The countable
   rules are regular expressions: they send nothing, they cost nothing, and a
   narrowing meant to limit what a model is asked about has no reason to stop
@@ -79,8 +86,8 @@ the reason. A line is reopened by new evidence, not by asking again.
   nothing, so it exits 2 rather than 0. A model that returns the middle of the
   range for everything is the failure this band exists to make visible.
 
-- **A service failure part way through stops the judgment arm.** Revised after a
-  real run: over 94 files and 4,587 paragraphs, eight minutes in, the service
+- **A service failure part way through no longer stops the judgment arm on the
+  first one.** Revised after a real run: over 94 files and 4,587 paragraphs, eight minutes in, the service
   answered 503 once. Stopping on the first failure threw away eight minutes of
   answers to learn that one minute was bad. Three kinds of failure are now told
   apart. A paragraph the local guard refuses is that paragraph's business and
@@ -117,9 +124,32 @@ the reason. A line is reopened by new evidence, not by asking again.
 
 - **`Retry-After` is honoured, up to a cap.** A service that says how long to
   wait knows better than the doubling ladder, so its number is used. It is also
-  a number somebody else controls, and a header asking for an hour would park a
-  check for an hour, so the wait is capped at eight seconds and a header past
-  that is treated as a failure to report rather than a wait to take.
+  a number somebody else controls. A header asking for an hour would park a
+  check for an hour, so anything past eight seconds is reported as the failure
+  it is and not waited for at all; the cap used to be applied to the wait
+  instead, which meant taking eight seconds three times over and reporting the
+  same failure anyway. A header of zero is a service saying "at once", which is
+  a request to hammer it, so it gets the ladder's first step.
+
+- **The judgment arm has an overall budget as well as a breaker.** The breaker
+  catches a service that fails. It does not catch one that answers every
+  request slowly, and four attempts with three backoffs and a ten second
+  timeout make a worst case near fifty seconds for a single paragraph. The
+  budget is twenty seconds for every paragraph the arm means to send, with a
+  floor of a minute so one slow paragraph keeps its full retry ladder. It is a
+  budget rather than a timeout: it is consulted before each request, a request
+  already in flight finishes, every answer already received is kept, and the
+  paragraphs that went unasked are named with the reason.
+
+- **A `.snifftest.yaml` found by looking is not followed through a symbolic
+  link.** Nobody typed that path. A link there reads a ruleset from somewhere
+  else in the tree, or outside it, under a name that says the rules are local.
+  A ruleset named with `--rules` is the caller's own business and is followed.
+
+- **The hook's "a few milliseconds" line has been retired.** The countable
+  check itself is that fast. Finding snifftest is not: an installed one runs at
+  once, and the `bunx` and `npx` paths fetch the package the first time, which
+  is a download. The hook now says so.
 
 - **The judgment service's price prints as unknown in the bench and as a
   disclosed constant in the eval.** No dated published price has been recorded
