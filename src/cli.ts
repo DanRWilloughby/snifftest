@@ -36,6 +36,9 @@ import {
   runJudgmentArm,
   runRegexArm,
 } from "./engine.ts";
+import { buildReport, writeReport } from "./eval/report.ts";
+import { type RunEvalOptions, runEval } from "./eval/run.ts";
+import { DEFAULT_PER_RULE, DEFAULT_SEED, SeedError, type BaseDocument } from "./eval/seed.ts";
 import {
   type JevClient,
   type JevClientOptions,
@@ -97,6 +100,10 @@ interface Options {
   readonly format: "text" | "json";
   readonly dryRun: boolean;
   readonly assumeYes: boolean;
+  /** `eval` only: the seed value, the seeds per rule, and where results land. */
+  readonly seed?: number;
+  readonly perRule?: number;
+  readonly outDir?: string;
 }
 
 // --- the entry point ------------------------------------------------------
@@ -123,8 +130,9 @@ export async function runCli(deps: CliDeps): Promise<number> {
   try {
     if (options.command === "check") return await check(deps, options);
     if (options.command === "rules") return rules(deps, options);
+    if (options.command === "eval") return await evaluate(deps, options);
     throw new UsageError(
-      `"snifftest ${options.command}" is planned but not built yet. Today there is check and rules.`,
+      `"snifftest ${options.command}" is planned but not built yet. Today there is check, rules and eval.`,
     );
   } catch (error) {
     return fail(deps, error);
@@ -222,6 +230,148 @@ function usageLine(usage: JudgmentUsage): string {
   return `${requests}, ${usage.inputTokens} input tokens, $${usage.estimatedCostUsd.toFixed(6)}, ${usage.latencyMs} ms${retries}.`;
 }
 
+// --- eval -----------------------------------------------------------------
+
+/**
+ * Measure the checker on the caller's own clean writing.
+ *
+ * The order is the same promise `check` makes: the corpus is seeded and the two
+ * offline arms run before anything could leave the machine, so a refused
+ * consent still leaves a complete seeded corpus and two arms of numbers on
+ * disk. `--dry-run` is that path taken deliberately.
+ */
+async function evaluate(deps: CliDeps, options: Options): Promise<number> {
+  const resolved = resolveRuleset({
+    cwd: deps.cwd,
+    ...(options.rulesPath === undefined ? {} : { rulesPath: options.rulesPath }),
+    ...(deps.defaultRulesPath === undefined ? {} : { defaultRulesPath: deps.defaultRulesPath }),
+  });
+  const ruleset = resolved.ruleset;
+  const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
+
+  const files = collectFiles(options.paths, deps.cwd);
+  const candidates: BaseDocument[] = [];
+  for (const file of files) {
+    const shown = display(file, deps.cwd);
+    for (const chunk of chunkDocument(readDraft(file), shown, { maxChars: STATE_GUARD_CHARS })) {
+      candidates.push({
+        id: `C${String(candidates.length).padStart(2, "0")}`,
+        file: chunk.file,
+        line: chunk.line,
+        text: chunk.text,
+      });
+    }
+  }
+  if (candidates.length === 0) throw new UsageError("those paths hold no paragraphs to seed.");
+
+  const judgmentRules = ruleset.rules.filter(isJudgmentRule);
+  const wantsNetwork = !options.dryRun && judgmentRules.length > 0;
+  const runDate = today();
+  const outDir = isAbsolute(options.outDir ?? "")
+    ? (options.outDir as string)
+    : resolve(deps.cwd, options.outDir ?? join("bench", "results", runDate));
+
+  let client: JevClient | undefined;
+  if (wantsNetwork) {
+    const key = deps.env[KEY_ENV];
+    if (key === undefined || key.trim() === "") {
+      deps.writeError(
+        `${KEY_ENV} is not set, so arm C cannot run. Export it, or use --dry-run for arms A and B.`,
+      );
+      return EXIT.failure;
+    }
+
+    const consent = await requestConsent({
+      env: deps.env,
+      homedir: deps.homedir,
+      assumeYes: options.assumeYes,
+      isTty: deps.isTty,
+      ruleIds: judgmentRules.map((rule) => rule.id),
+      fileCount: files.length,
+      say: deps.writeError,
+      ...(deps.prompt === undefined ? {} : { prompt: deps.prompt }),
+    });
+    if (!consent.granted) return EXIT.consent;
+
+    client = (deps.createClient ?? createJevClient)({ apiKey: key });
+  }
+
+  const runOptions: RunEvalOptions = {
+    ruleset,
+    candidates,
+    threshold,
+    ...(options.seed === undefined ? {} : { seed: options.seed }),
+    ...(options.perRule === undefined ? {} : { perRule: options.perRule }),
+    ...(client === undefined ? {} : { client }),
+  };
+
+  let outcome;
+  try {
+    outcome = await runEval(runOptions);
+  } catch (error) {
+    if (error instanceof SeedError) {
+      deps.writeError(`the corpus could not be seeded: ${messageOf(error)}`);
+      return EXIT.failure;
+    }
+    throw error;
+  }
+
+  const report = buildReport(outcome, {
+    runDate,
+    threshold,
+    rulesetSources: resolved.sources.map((file) => display(file, deps.cwd)),
+    corpusPaths: files.map((file) => display(file, deps.cwd)),
+  });
+  const written = writeReport(report, outcome, outDir);
+
+  if (options.format === "json") {
+    deps.write(JSON.stringify(report, null, 2));
+  } else {
+    for (const line of evalSummary(report, written.markdown, deps.cwd)) deps.write(line);
+  }
+
+  for (const failure of outcome.failures) {
+    deps.writeError(`request failed on ${failure.doc}: ${failure.reason}`);
+  }
+  return EXIT.ok;
+}
+
+function evalSummary(
+  report: ReturnType<typeof buildReport>,
+  markdownPath: string,
+  cwd: string,
+): string[] {
+  const at = String(report.threshold);
+  const lines = [
+    `seeded ${report.corpus.seeded} paragraphs from ${report.corpus.clean} clean ones ` +
+      `(${report.corpus.dropped} dropped), ${report.per_rule} per rule, seed ${report.seed}`,
+    "",
+  ];
+
+  for (const arm of Object.values(report.arms)) {
+    const overall = arm.overall[at];
+    lines.push(
+      `arm ${arm.arm} ${arm.label.replace(/^[ABC] /, "").padEnd(34)} ` +
+        `recall ${fixed(overall?.recall)}  fp/cell ${fixed(overall?.fp_rate_per_clean_cell)}  ` +
+        `median ${arm.summary.median_latency_ms.toFixed(0)} ms  ` +
+        `$${arm.summary.usd_per_100_documents.toFixed(4)} per 100 documents`,
+    );
+  }
+
+  for (const row of report.corpus.skipped) lines.push(`skipped ${row.rule}: ${row.reason}`);
+  lines.push("", `wrote ${display(markdownPath, cwd)}`);
+  return lines;
+}
+
+function fixed(value: number | null | undefined): string {
+  return value === null || value === undefined ? "  n/a" : value.toFixed(3);
+}
+
+/** The run date, in the one format the results directory is named with. */
+function today(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
 // --- rules ----------------------------------------------------------------
 
 function rules(deps: CliDeps, options: Options): number {
@@ -266,6 +416,9 @@ function parseArgs(argv: readonly string[]): Options {
   let dryRun = false;
   let assumeYes = false;
   let endOfOptions = false;
+  let seed: number | undefined;
+  let perRule: number | undefined;
+  let outDir: string | undefined;
 
   for (let i = 1; i < argv.length; i++) {
     const argument = argv[i] ?? "";
@@ -295,13 +448,22 @@ function parseArgs(argv: readonly string[]): Options {
       case "--threshold":
         threshold = thresholdValue(valueFor(argv, ++i, "--threshold"));
         break;
+      case "--seed":
+        seed = wholeNumber(valueFor(argv, ++i, "--seed"), "--seed", 0);
+        break;
+      case "--per-rule":
+        perRule = wholeNumber(valueFor(argv, ++i, "--per-rule"), "--per-rule", 1);
+        break;
+      case "--out":
+        outDir = valueFor(argv, ++i, "--out");
+        break;
       default:
         throw new UsageError(`unknown option "${argument}". Try snifftest --help.`);
     }
   }
 
-  if (first === "check" && paths.length === 0) {
-    throw new UsageError("snifftest check needs at least one file or directory.");
+  if ((first === "check" || first === "eval") && paths.length === 0) {
+    throw new UsageError(`snifftest ${first} needs at least one file or directory.`);
   }
 
   return {
@@ -312,6 +474,9 @@ function parseArgs(argv: readonly string[]): Options {
     format,
     dryRun,
     assumeYes,
+    ...(seed === undefined ? {} : { seed }),
+    ...(perRule === undefined ? {} : { perRule }),
+    ...(outDir === undefined ? {} : { outDir }),
   };
 }
 
@@ -330,6 +495,14 @@ function valueFor(argv: readonly string[], index: number, name: string): string 
 function formatValue(value: string): "text" | "json" {
   if (value === "text" || value === "json") return value;
   throw new UsageError(`--format takes text or json, not "${value}".`);
+}
+
+function wholeNumber(value: string, name: string, least: number): number {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < least) {
+    throw new UsageError(`${name} takes a whole number of at least ${least}, not "${value}".`);
+  }
+  return parsed;
 }
 
 function thresholdValue(value: string): number {
@@ -428,6 +601,8 @@ function helpLines(): string[] {
     "Usage",
     "  snifftest check <paths...>   check files or directories against the ruleset",
     "  snifftest rules              print the ruleset that would be used, and where it came from",
+    "  snifftest eval <paths...>    plant one known fault per rule in your own clean text,",
+    "                               run it three ways, and report what each way caught",
     "",
     "Options",
     "  --rules <path>      use this ruleset instead of .snifftest.yaml or the built-in one",
@@ -436,6 +611,11 @@ function helpLines(): string[] {
     "  --dry-run           run the countable rules only; nothing leaves the machine",
     "  --yes, -y           answer the send question for this run and remember the answer",
     "  --help, --version",
+    "",
+    "Options for eval",
+    `  --seed <n>          the value every choice is derived from (default ${DEFAULT_SEED})`,
+    `  --per-rule <n>      seeded paragraphs per rule (default ${DEFAULT_PER_RULE})`,
+    "  --out <dir>         where the report is written (default bench/results/<today>)",
     "",
     "Environment",
     `  ${KEY_ENV}    the key the judgment rules are sent with`,

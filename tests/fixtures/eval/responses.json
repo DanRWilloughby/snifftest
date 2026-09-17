@@ -1,0 +1,27 @@
+{
+  "_note": "Recorded judgment answers, replayed by the tests so no test ever reaches the network. Keys are a phrase the paragraph contains; the first key the state contains wins, and anything unmatched gets the fallback. Shapes and magnitudes follow the T1 spike: a planted defect lands high, a clean paragraph lands near zero.",
+  "answers": {
+    "A spliced sentence for closer.": {
+      "closer": 0.93,
+      "opener": 0.04,
+      "middle": 0.03,
+      "restating_closer": 0.06,
+      "first_x_that": 0.02
+    },
+    "Put simply, that is the whole of what was said just above.": {
+      "restating_closer": 0.91,
+      "first_x_that": 0.03
+    },
+    "We were the first team anywhere to count them this way.": {
+      "restating_closer": 0.05,
+      "first_x_that": 0.88
+    }
+  },
+  "fallback": {
+    "closer": 0.04,
+    "opener": 0.03,
+    "middle": 0.02,
+    "restating_closer": 0.05,
+    "first_x_that": 0.02
+  }
+}
