@@ -404,6 +404,10 @@ describe("the tool passes the dash rule it enforces", () => {
       file: "tests/fixtures/texts/flagged.md",
       why: "The smallest draft that trips the dash rule, used wherever a flag is expected.",
     },
+    {
+      file: "tests/fixtures/texts/structure.md",
+      why: "Every Markdown shape a countable rule must stay quiet on, ranges included.",
+    },
   ];
 
   test("the allowlist names only files that are still there", () => {

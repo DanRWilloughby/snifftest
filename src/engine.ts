@@ -38,8 +38,15 @@ import {
   isNoJudgment,
   questionsFromRules,
 } from "./jev.ts";
-import { checkRegexRule } from "./rules.ts";
-import { type Chunk, type Flag, type Ruleset, isJudgmentRule, isRegexRule } from "./types.ts";
+import { appliesToChunk, checkRegexRule } from "./rules.ts";
+import {
+  type Chunk,
+  type ChunkKind,
+  type Flag,
+  type Ruleset,
+  isJudgmentRule,
+  isRegexRule,
+} from "./types.ts";
 
 export interface ChunkOptions {
   /** Cap on a chunk's length; an over-long paragraph is split on sentence boundaries. */
@@ -58,7 +65,8 @@ export function chunkDocument(text: string, file: string, options: ChunkOptions 
 
   const flush = (): void => {
     if (buffer.length === 0) return;
-    paragraphs.push({ file, line: startLine, text: buffer.join("\n") });
+    const body = buffer.join("\n");
+    paragraphs.push({ file, line: startLine, text: body, kind: classifyChunk(body, startLine) });
     buffer = [];
   };
 
@@ -112,6 +120,7 @@ export function runRegexArm(chunks: readonly Chunk[], ruleset: Ruleset): Flag[] 
 
     for (const rule of ruleset.rules) {
       if (!isRegexRule(rule)) continue;
+      if (!appliesToChunk(rule, chunk.kind)) continue;
       for (const match of checkRegexRule(rule, prose)) {
         flags.push({
           file: chunk.file,
@@ -126,6 +135,77 @@ export function runRegexArm(chunks: readonly Chunk[], ruleset: Ruleset): Flag[] 
   }
 
   return mergeFlags(flags);
+}
+
+// --- what a block is ------------------------------------------------------
+
+/**
+ * How many words a list block needs before it is asked a judgment question.
+ *
+ * A list of two-word items is a menu, and asking a model whether its final
+ * sentence restates the paragraph is a question about nothing, paid for at the
+ * same rate as a real one. Twelve words is about the length at which a bullet
+ * stops being a label and starts being a sentence, and it is deliberately a
+ * round number rather than a tuned one: nothing was measured to pick it.
+ */
+export const LIST_PROSE_WORDS = 12;
+
+/** A block quote's markers, so what is inside can be looked at. */
+const QUOTE_PREFIX = /^ {0,3}(> ?)+/;
+
+/** Every non-blank line is an ATX heading. */
+const HEADING_LINE = /^ {0,3}#{1,6}(\s|$)/;
+
+/** `[label]: https://example.com "title"`, the shape a link definition takes. */
+const LINK_DEFINITION_LINE = /^ {0,3}\[[^\]]+\]:\s*\S+/;
+
+/** A table's alignment row: pipes, dashes, colons and spaces, with at least one dash. */
+const TABLE_DELIMITER_LINE = /^ {0,3}\|?[\s:|-]*-[\s:|-]*\|[\s:|-]*$/;
+
+/**
+ * What kind of block this is.
+ *
+ * The order is the order a reader resolves it in: the shapes that can only be
+ * one thing first, then the containers, then prose as what is left. Front
+ * matter is only front matter at the top of a file, because three dashes in the
+ * middle of a document are a thematic break.
+ */
+export function classifyChunk(text: string, startLine: number): ChunkKind {
+  const lines = text.split("\n").filter((line) => line.trim() !== "");
+  const first = lines[0] ?? "";
+  if (lines.length === 0) return "prose";
+
+  if (startLine === 1 && /^(---|\+\+\+)\s*$/.test(first) && lines.length > 2) {
+    const closes = lines.slice(1).some((line) => /^(---|\+\+\+)\s*$/.test(line));
+    if (closes) return "front_matter";
+  }
+  if (first.trimStart().startsWith("<!--")) return "html_comment";
+  if (lines.some((line) => TABLE_DELIMITER_LINE.test(line)) && lines.some((l) => l.includes("|"))) {
+    return "table";
+  }
+  if (lines.every((line) => LINK_DEFINITION_LINE.test(line))) return "link_definition";
+  if (lines.every((line) => HEADING_LINE.test(line))) return "heading";
+  if (QUOTE_PREFIX.test(first)) return "block_quote";
+  if (LIST_MARKER.test(first)) return "list";
+  return "prose";
+}
+
+/**
+ * Whether a chunk is worth a paid judgment question.
+ *
+ * Prose and block quotes always are. A list is, once it is long enough to hold
+ * sentences. Nothing else is: a heading, a table, front matter, a link
+ * definition and an HTML comment are structure, and the judgment rules are
+ * written about writing.
+ */
+export function isProseLike(chunk: Chunk): boolean {
+  if (chunk.kind === "prose" || chunk.kind === "block_quote") return true;
+  if (chunk.kind !== "list") return false;
+  return wordCount(chunk.text.replace(/^[ \t]*([-*+]|\d{1,9}[.)])[ \t]+/gm, "")) >= LIST_PROSE_WORDS;
+}
+
+function wordCount(text: string): number {
+  return text.trim() === "" ? 0 : text.trim().split(/\s+/).length;
 }
 
 // --- the judgment arm -----------------------------------------------------
@@ -179,6 +259,8 @@ export interface SkippedChunk {
  */
 export interface JudgmentTally {
   readonly asked: number;
+  /** Blocks that were never asked about because they are structure, not writing. */
+  readonly structure: number;
   /** Came back as a usable probability that sits outside the no-judgment band. */
   readonly answered: number;
   /** Came back inside the no-judgment band, which is an answer that decides nothing. */
@@ -215,6 +297,14 @@ const NO_USAGE: JudgmentUsage = {
  * A ruleset with no judgment rules makes no request at all, which is what keeps
  * an ordinary regex-only run free and offline.
  *
+ * ## Structure is not writing, and is not paid for
+ *
+ * Only prose-like blocks are asked about. Over this repo's own docs that is
+ * about half the blocks, and the other half were headings, tables, front matter
+ * and link definitions, each costing a full ten-question request to be told
+ * nothing. The blocks that were passed over are counted, so a short bill is
+ * explained rather than mysterious.
+ *
  * ## One bad paragraph costs one paragraph
  *
  * The local text guard refuses a paragraph carrying a key, a data URI or a
@@ -235,11 +325,13 @@ export async function runJudgmentArm(
   client: JevClient,
 ): Promise<JudgmentArmResult> {
   const rules = ruleset.rules.filter(isJudgmentRule);
-  if (rules.length === 0 || chunks.length === 0) {
+  const prose = chunks.filter(isProseLike);
+  const structure = chunks.length - prose.length;
+  if (rules.length === 0 || prose.length === 0) {
     return {
       readings: [],
       usage: NO_USAGE,
-      tally: { asked: 0, answered: 0, noJudgment: 0, unanswered: 0 },
+      tally: { asked: 0, structure, answered: 0, noJudgment: 0, unanswered: 0 },
       skipped: [],
     };
   }
@@ -259,7 +351,7 @@ export async function runJudgmentArm(
   let noJudgment = 0;
   let halted = false;
 
-  for (const [index, chunk] of chunks.entries()) {
+  for (const [index, chunk] of prose.entries()) {
     if (halted) {
       skipped.push({
         file: chunk.file,
@@ -278,7 +370,7 @@ export async function runJudgmentArm(
       // A local refusal is about this paragraph. Anything else is about the
       // service, and asking the next paragraph would only buy the same answer
       // at the price of another retry ladder.
-      if (!(error instanceof JevStateRefusedError)) halted = index < chunks.length - 1;
+      if (!(error instanceof JevStateRefusedError)) halted = index < prose.length - 1;
       continue;
     }
 
@@ -312,11 +404,11 @@ export async function runJudgmentArm(
     }
   }
 
-  const asked = chunks.length * rules.length;
+  const asked = prose.length * rules.length;
   return {
     readings,
     usage: { requests, inputTokens, outputTokens, estimatedCostUsd, latencyMs, retries },
-    tally: { asked, answered, noJudgment, unanswered: asked - answered - noJudgment },
+    tally: { asked, structure, answered, noJudgment, unanswered: asked - answered - noJudgment },
     skipped,
   };
 }
@@ -599,6 +691,8 @@ function subChunk(chunk: Chunk, start: number, end: number): Chunk | null {
     file: chunk.file,
     line: chunk.line + countNewlines(chunk.text.slice(0, start)),
     text,
+    // A piece of an over-long block is the same kind of thing the block was.
+    kind: chunk.kind,
   };
 }
 

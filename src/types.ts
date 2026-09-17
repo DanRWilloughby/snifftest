@@ -8,6 +8,43 @@
 
 export type RuleKind = "regex" | "judgment";
 
+/**
+ * What a chunk of a document is, as a reader would say it.
+ *
+ * A paragraph is the unit this tool checks, and for most of a Markdown file
+ * that unit is not a paragraph at all. Half the blocks in this repo's own docs
+ * are headings, table rows, front matter or link definitions, and a rule about
+ * prose has no business firing on any of them. So every chunk carries what it
+ * is, countable rules say which kinds they apply to, and the judgment arm pays
+ * for questions about prose only.
+ */
+export type ChunkKind =
+  | "front_matter"
+  | "heading"
+  | "table"
+  | "link_definition"
+  | "html_comment"
+  | "list"
+  | "block_quote"
+  | "prose";
+
+export const CHUNK_KINDS: readonly ChunkKind[] = [
+  "front_matter",
+  "heading",
+  "table",
+  "link_definition",
+  "html_comment",
+  "list",
+  "block_quote",
+  "prose",
+];
+
+export function isChunkKind(value: unknown): value is ChunkKind {
+  // SAFETY: `includes` on a `readonly ChunkKind[]` will not take an arbitrary
+  // string, so the list is widened to its own supertype to ask the question.
+  return typeof value === "string" && (CHUNK_KINDS as readonly string[]).includes(value);
+}
+
 /** How `eval` manufactures a defect for a rule (the seeding recipe). */
 export interface TransformSeed {
   readonly transform: string;
@@ -43,6 +80,13 @@ interface RuleCommon {
 
 /** Knobs a countable rule may carry. Which ones apply depends on the check. */
 interface RegexTuning {
+  /**
+   * The chunk kinds this rule applies to. Absent means the check's own default,
+   * which for every built-in is the kinds a person would call writing.
+   */
+  readonly chunks?: readonly ChunkKind[];
+  /** `sentence_rhythm`: how many words a paragraph needs before rhythm is judged. */
+  readonly min_words?: number;
   /** `colon_count`: the number of colons that trips the rule. */
   readonly min?: number;
   /** `sentence_rhythm`: the coefficient of variation below which lengths are too uniform. */
@@ -105,6 +149,8 @@ export interface Chunk {
   /** 1-based line of the chunk's first line within its file. */
   readonly line: number;
   readonly text: string;
+  /** What this block is. Prose is the only kind every rule applies to. */
+  readonly kind: ChunkKind;
 }
 
 /** Where inside a chunk's text a check fired. */

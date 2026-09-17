@@ -181,8 +181,8 @@ describe("consent", () => {
     });
 
     expect(result.code).toBe(EXIT.flags);
-    // A heading and a paragraph: one request each, never one for the file.
-    expect(seen).toHaveLength(2);
+    // One paragraph, one request. The heading above it is structure, not writing.
+    expect(seen).toHaveLength(1);
     expect(existsSync(consentPath({ HOME: home }, home))).toBe(true);
     expect(existsSync(join(repoRoot, "consent.json"))).toBe(false);
   });
@@ -198,7 +198,7 @@ describe("consent", () => {
     });
 
     expect(result.code).toBe(EXIT.flags);
-    expect(seen).toHaveLength(2);
+    expect(seen).toHaveLength(1);
     expect(existsSync(consentPath({ HOME: home }, home))).toBe(false);
   });
 
@@ -224,7 +224,7 @@ describe("the judgment arm", () => {
       "tests/fixtures/texts/closer.md:3 dash_present 1.00 An em dash. Say it in two sentences.",
       "tests/fixtures/texts/closer.md:3 restating_closer 0.93 A closer that only restates. Cut it.",
     ]);
-    expect(seen[1]?.state).toContain("In short, everything above is what we said.");
+    expect(seen[0]?.state).toContain("In short, everything above is what we said.");
     expect(Object.keys(seen[0]?.questions ?? {})).toEqual(["restating_closer"]);
   });
 

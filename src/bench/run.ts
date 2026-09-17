@@ -40,7 +40,7 @@
  * reply, because the first is the run's doing and the second is the model's.
  */
 
-import { runRegexArm } from "../engine.ts";
+import { classifyChunk, runRegexArm } from "../engine.ts";
 import type { ArmObservation, ArmScore, Cell, JudgedDocument } from "../eval/score.ts";
 import { scoreArm, thresholdsWith } from "../eval/score.ts";
 import { type Chunk, type Ruleset, isJudgmentRule, isRegexRule } from "../types.ts";
@@ -594,7 +594,7 @@ function rotate(models: readonly ResolvedModel[], by: number): readonly Resolved
 }
 
 function chunkOf(doc: BenchDocument): Chunk {
-  return { file: doc.id, line: 1, text: doc.text };
+  return { file: doc.id, line: 1, text: doc.text, kind: classifyChunk(doc.text, 1) };
 }
 
 function costOf(
