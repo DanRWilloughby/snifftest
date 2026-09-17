@@ -45,6 +45,12 @@ re-opened by new evidence, never by being raised again.
   workflow that has a perfectly good reason to run the free rules on an event
   nobody here thought of, and the free rules send nothing, so the guard's
   promise holds without the breakage.
+- **Keeping the entry guard in `src/cli.ts` alongside a dedicated bin file.**
+  Rejected, after trying it: inside a bundle the guard is true, because the
+  bundled module and `argv[1]` are the same file, so the program ran twice and
+  printed its report twice. One file is the program and the other is a library,
+  decided by which file it is rather than at run time, and `bun src/bin.ts` is
+  now the way the repository runs the tool on itself.
 - **Bumping `package.json` off `0.0.0` now.** Rejected: it is deliberately
   behind the pins until a release, because the release workflow compares it with
   the tag, and step one of the checklist in `docs/releasing.md` is to bump it.
