@@ -188,6 +188,9 @@ rules:
   - id: tricolon
     kind: judgment
     what: |
+      Judge sentence by sentence. One sentence is enough to trip this rule,
+      wherever it sits in the paragraph and however informative the rest of
+      the paragraph is.
       A decorative rule of three. Three short parallel words or phrases in a
       row whose job is the beat rather than the information, such as three
       adjectives, three verbs, or a three-word fragment used as a flourish.
@@ -202,8 +205,8 @@ rules:
       - "Plan, build, repeat."
       - "It was slow, it was loud, it was late."
     criteria:
-      true: "At least one three-item run appears whose purpose is rhythm rather than information."
-      false: "Any three-item runs present are informative lists, or there are none."
+      true: "At least one sentence, anywhere in the paragraph, carries a three-item run whose purpose is rhythm rather than information. One such sentence is enough, and the informative lists around it do not excuse it."
+      false: "Every three-item run in the paragraph is an informative list, or there are none."
     message: "Three items for the cadence. Keep the one that carries the weight."
     seed:
       splice:
@@ -396,6 +399,9 @@ rules:
     # A positioning rule for pages that sell. A report about employment
     # says what it measures and is not covered by this.
     what: |
+      Judge sentence by sentence. One sentence is enough to trip this rule,
+      wherever it sits in the paragraph and however carefully the rest of the
+      paragraph describes the division of work.
       A claim about employment. That the thing creates jobs, that it
       replaces the people who used to do the work, or that it would never
       replace a person.
@@ -411,8 +417,8 @@ rules:
       - "This replaces the people who used to do the checking by hand."
       - "Four seats means we create jobs rather than removing them."
     criteria:
-      true: "The paragraph makes an employment claim of one of those kinds."
-      false: "It describes the division of work without any employment claim."
+      true: "At least one sentence, anywhere in the paragraph, makes an employment claim of one of those kinds. One such sentence is enough, whatever the surrounding sentences say about what people still do."
+      false: "No sentence makes an employment claim; the paragraph describes the division of work and stops there."
     message: "A claim about jobs. Say what the tool does and what people keep, then stop."
     seed:
       splice:
@@ -426,6 +432,9 @@ rules:
     tags: [marketing]
     # A typographic convention of published copy, not of ordinary prose.
     what: |
+      Judge line by line. One display line is enough to trip this rule,
+      wherever it sits in the paragraph and however complete the other lines
+      around it are.
       A pull quote, meaning a short line set apart in quotation marks or
       italics as a display line, whose text is a fragment with no subject and
       verb of its own.
@@ -439,8 +448,8 @@ rules:
       - "*\"Built to be argued with.\"*"
       - "*\"The part nobody reads twice.\"*"
     criteria:
-      true: "A display pull quote appears and it is a fragment rather than a complete sentence."
-      false: "There is no pull quote, or the pull quote is a complete sentence."
+      true: "At least one display line, anywhere in the paragraph, is set apart as a pull quote and is a fragment rather than a complete sentence. One such line is enough, and the complete ones beside it do not excuse it."
+      false: "There is no pull quote, or every pull quote in the paragraph is a complete sentence."
     message: "A pull quote with no verb. Quote a whole sentence."
     seed:
       splice:
