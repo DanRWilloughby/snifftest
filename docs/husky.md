@@ -203,3 +203,16 @@ token passed in as `github-token`.
 | 1 | At least one flag at or above the threshold. |
 | 2 | The checker could not do its job. |
 | 3 | The judgment rules needed a yes before sending, and did not get one. |
+
+Codes 2 and 3 are the tool reporting on itself, so neither is ever read as a
+verdict on your prose. The hook says which part failed and then does two
+things. If the countable rules had already flagged something, it blocks on
+that, because those rules ran here, on the staged text, and their result does
+not depend on the part that failed. If nothing was flagged, it steps aside and
+lets the commit through, unless `SNIFFTEST_STRICT=1` says to treat a failure as
+a failure.
+
+The Action does the same in its own way. Its job summary and its pull request
+comment carry a different heading for findings, for a checker that could not
+finish, and for a run that was never answered, so nothing that went wrong with
+the tool is posted under a sentence about the writing.

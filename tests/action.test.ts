@@ -205,6 +205,38 @@ describe("action.yml, as a document", () => {
     expect(comment).not.toMatch(/\bcat\b[^\n]*\$SNIFFTEST_PATHS/);
   });
 
+  test("says in one word what happened, and only findings mean the prose", () => {
+    // Three of the four exit codes are about the tool rather than the writing.
+    // A 401, a timeout or an unanswered sending question posted under "flagged
+    // the prose" is an accusation the author cannot argue with.
+    const run = stepById("run").run ?? "";
+    expect(run).toContain("1) verdict=findings ;;");
+    expect(run).toContain("3) verdict=consent ;;");
+    expect(run).toContain("*) verdict=failure ;;");
+    expect(action.outputs.verdict.value).toContain("steps.run.outputs.verdict");
+  });
+
+  test("the job summary heads a tool failure and a missing answer differently", () => {
+    const run = stepById("run").run ?? "";
+    const summary = run.slice(run.indexOf('case "$verdict" in'));
+    expect(summary).toContain("nothing tripped");
+    expect(summary).toContain("trips the rules below");
+    expect(summary).toContain("the judgment rules were not run");
+    expect(summary).toContain("could not finish");
+  });
+
+  test("the comment opens on what happened, not on a fixed verdict", () => {
+    const comment = stepById("comment").run ?? "";
+    const openings = comment.slice(comment.indexOf('case "${SNIFFTEST_VERDICT:-failure}" in'));
+    // The prose sentence is reachable only through the findings branch.
+    const findings = openings.slice(openings.indexOf("findings)"), openings.indexOf("consent)"));
+    expect(findings).toContain("flagged the prose");
+    expect(openings.slice(openings.indexOf("consent)"))).not.toContain("flagged the prose");
+    expect(openings).toContain("nothing was sent");
+    expect(openings).toContain("not a finding about the prose");
+    expect(stepById("comment").env?.SNIFFTEST_VERDICT).toContain("steps.run.outputs.verdict");
+  });
+
   test("ends on the exit code the check produced", () => {
     expect(stepById("verdict").run).toContain('exit "$SNIFFTEST_STATUS"');
     expect(action.outputs["exit-code"].value).toContain("steps.run.outputs.exit-code");
