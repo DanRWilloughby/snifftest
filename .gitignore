@@ -13,3 +13,11 @@ implementation-notes.md
 
 # Entire CLI checkpoints (local tooling, never published)
 .entire/
+
+# Rendered video and stills. They live with the video tooling, not here.
+renders/
+
+# The secret scanner, when it is fetched into the working tree rather than
+# installed. CI does exactly this.
+/gitleaks
+
