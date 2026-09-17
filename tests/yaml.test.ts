@@ -152,6 +152,40 @@ describe("parseYaml: out of subset, loudly and with a line number", () => {
     );
   });
 
+  test("refuses the key that would set the document's prototype", () => {
+    // `result[key] = value` on a plain object invokes the prototype setter for
+    // this one key, so the value arrives as configuration that no own-key walk
+    // can see and no unknown-key warning mentions. Refused by name, the way a
+    // merge key is, rather than arriving silently.
+    const error = expectYamlError(() => parseYaml("__proto__:\n  rules: injected\nversion: 1\n"));
+    expect(error.line).toBe(1);
+    expect(error.message).toContain("__proto__");
+
+    // The same key inside a flow mapping, which is a separate reader.
+    expect(expectYamlError(() => parseYaml("a: {__proto__: 1}\n")).message).toContain("__proto__");
+  });
+
+  test("a document that parses keeps an ordinary prototype", () => {
+    const doc = parseYaml("version: 1\nrules: []\n") as object;
+    expect(Object.getPrototypeOf(doc)).toBe(Object.prototype);
+  });
+
+  test("refuses flow collections nested deeper than a person would write", () => {
+    // Fifty thousand open brackets on one line used to recurse until the stack
+    // gave out, which reaches the caller as "could not finish" rather than as a
+    // named line of a named file. A ruleset in a repository somebody else wrote
+    // should not be able to choose which of those two a run gets.
+    const deep = `a: ${"[".repeat(50_000)}`;
+    const error = expectYamlError(() => parseYaml(deep));
+    expect(error.line).toBe(1);
+    expect(error.message).toContain("nested");
+  });
+
+  test("a flow collection nested as deep as the limit still parses", () => {
+    const nested = parseYaml(`a: ${"[".repeat(16)}${"]".repeat(16)}`) as { a: unknown };
+    expect(Array.isArray(nested.a)).toBe(true);
+  });
+
   test("rejects inconsistent indentation under a mapping", () => {
     const error = expectYamlError(() => parseYaml("a:\n  b: 1\n   c: 2\n"));
     expect(error.line).toBe(3);
