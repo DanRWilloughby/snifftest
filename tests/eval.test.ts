@@ -5,6 +5,8 @@ import { join, resolve } from "node:path";
 
 import { EXIT, runCli } from "../src/cli.ts";
 import { type BaseDocument, SeedError, applyKeyedEdit, seedCorpus } from "../src/eval/seed.ts";
+import { faultsFor, parseBank, readBank } from "../src/eval/bank.ts";
+import { chunkDocument, isProseLike, runRegexArm } from "../src/engine.ts";
 import { buildReport, renderMarkdown } from "../src/eval/report.ts";
 import { runEval } from "../src/eval/run.ts";
 import { INJECTION_BAR, compareTwins, readManifest } from "../src/eval/twins.ts";
@@ -971,6 +973,162 @@ describe("what an injected sentence moves", () => {
       const line = notes.split("\n").find((row) => row.includes(pair.adversarial));
       expect(line, `CORPUS.md has no row for ${pair.adversarial}`).toBeDefined();
       expect(line).toContain(original);
+    }
+  });
+});
+
+// --- the seed bank --------------------------------------------------------
+
+describe("the seed bank", () => {
+  const bank = readBank("examples/seeds/bank.json", repoRoot);
+
+  test("carries at least eight faults and some hard negatives for every judgment rule", () => {
+    const defaults = parseRuleset(
+      readFileSync(join(repoRoot, "rules", "default.yaml"), "utf8"),
+      "rules/default.yaml",
+    );
+
+    for (const rule of defaults.rules.filter((row) => row.kind === "judgment")) {
+      const entry = bank.rules[rule.id];
+      expect(entry, `the bank has nothing for ${rule.id}`).toBeDefined();
+      expect(entry?.faults.length, `${rule.id} faults`).toBeGreaterThanOrEqual(8);
+      expect(entry?.hard_negatives.length, `${rule.id} hard negatives`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  test("no fault is a rule example, a near-copy of one, or a phrase from an instruction", () => {
+    const defaults = parseRuleset(
+      readFileSync(join(repoRoot, "rules", "default.yaml"), "utf8"),
+      "rules/default.yaml",
+    );
+    const judgment = defaults.rules.filter((row) => row.kind === "judgment");
+    const shown = judgment.flatMap((rule) =>
+      rule.kind === "judgment"
+        ? [rule.what, rule.not_for ?? "", rule.criteria.true, rule.criteria.false, ...(rule.examples ?? [])]
+        : [],
+    );
+
+    const runs = (text: string): Set<string> => {
+      const words = text
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, " ")
+        .split(/\s+/)
+        .filter((word) => word !== "");
+      const found = new Set<string>();
+      for (let i = 0; i + 4 <= words.length; i += 1) found.add(words.slice(i, i + 4).join(" "));
+      return found;
+    };
+
+    const instruction = new Set<string>();
+    for (const text of shown) for (const run of runs(text)) instruction.add(run);
+
+    for (const [id, entry] of Object.entries(bank.rules)) {
+      for (const fault of entry.faults) {
+        for (const run of runs(fault.text)) {
+          expect(instruction.has(run), `${id}: "${run}" comes from a rule's own wording`).toBe(false);
+        }
+      }
+    }
+  });
+
+  test("faults that name something the host is about come first", () => {
+    const entry = bank.rules["tricolon"];
+    if (entry === undefined) throw new Error("the bank carries tricolon");
+    const ordered = faultsFor(entry, "A note about the draft and the sentence that opens it.");
+    const matching = entry.faults.filter((fault) =>
+      fault.hosts.some((word) => "a note about the draft and the sentence that opens it.".includes(word)),
+    );
+
+    expect(matching.length).toBeGreaterThan(0);
+    expect(ordered[0]).toBe(matching[0]?.text);
+    expect(ordered).toHaveLength(entry.faults.length);
+  });
+
+  test("a rule's seeds are drawn without repeating while the bank has faults left", () => {
+    const set = ruleset(judgmentRule("closer", "end"));
+    const withBank = seedCorpus(BASES, set, {
+      perRule: 3,
+      bank: parseBank(
+        {
+          version: 2,
+          rules: {
+            closer: {
+              faults: [
+                { text: "In short, that is the paragraph again.", hosts: [] },
+                { text: "To put it another way, the above is the point.", hosts: [] },
+                { text: "Summing up, that is what was just said.", hosts: [] },
+              ],
+              hard_negatives: [{ text: "The upshot is four pounds more.", why: "a closer with a number" }],
+            },
+          },
+        },
+        "test bank",
+      ),
+    });
+
+    const sentences = withBank.seeded
+      .filter((doc) => doc.rule === "closer" && doc.edit.kind === "splice")
+      .map((doc) => (doc.edit.kind === "splice" ? doc.edit.sentence : ""));
+
+    expect(sentences.length).toBeGreaterThan(1);
+    expect(new Set(sentences).size).toBe(sentences.length);
+    expect(withBank.seedVersion).toBe(2);
+    expect(withBank.negatives.length).toBe(1);
+    expect(withBank.negatives[0]).toMatchObject({ rule: "closer" });
+  });
+
+  test("seed version 1 ignores the bank, so an older corpus is reproducible", () => {
+    const set = ruleset(judgmentRule("closer", "end"));
+    const bankOnly = parseBank(
+      {
+        version: 2,
+        rules: { closer: { faults: [{ text: "A sentence only the bank knows.", hosts: [] }], hard_negatives: [] } },
+      },
+      "test bank",
+    );
+
+    const old = seedCorpus(BASES, set, { perRule: 1, seedVersion: 1, bank: bankOnly });
+    const now = seedCorpus(BASES, set, { perRule: 1, seedVersion: 2, bank: bankOnly });
+
+    expect(old.seedVersion).toBe(1);
+    expect(old.negatives).toEqual([]);
+    for (const doc of old.seeded) {
+      if (doc.edit.kind === "splice") expect(doc.edit.sentence).not.toBe("A sentence only the bank knows.");
+    }
+    expect(now.seeded.some((doc) => doc.edit.kind === "splice" && doc.edit.sentence === "A sentence only the bank knows.")).toBe(true);
+  });
+});
+
+describe("the structure set", () => {
+  test("the countable rules stay quiet on every shape in it", () => {
+    const defaults = parseRuleset(
+      readFileSync(join(repoRoot, "rules", "default.yaml"), "utf8"),
+      "rules/default.yaml",
+    );
+    const dir = join(repoRoot, "examples", "structure");
+
+    for (const name of readdirSync(dir).filter((file) => file.endsWith(".md"))) {
+      const text = readFileSync(join(dir, name), "utf8");
+      const flags = runRegexArm(chunkDocument(text, `examples/structure/${name}`), defaults);
+      expect(flags.map((flag) => `${flag.rule} at line ${flag.line}`), name).toEqual([]);
+    }
+  });
+
+  test("the judgment arm is never asked about a heading, a table or front matter", () => {
+    const dir = join(repoRoot, "examples", "structure");
+    const kinds = new Set<string>();
+
+    for (const name of readdirSync(dir).filter((file) => file.endsWith(".md"))) {
+      const text = readFileSync(join(dir, name), "utf8");
+      for (const chunk of chunkDocument(text, name)) {
+        kinds.add(chunk.kind);
+        if (isProseLike(chunk)) expect(["prose", "block_quote", "list"]).toContain(chunk.kind);
+      }
+    }
+
+    // The set is only worth having if it actually holds the awkward shapes.
+    for (const kind of ["front_matter", "heading", "table", "link_definition", "html_comment", "list", "block_quote"]) {
+      expect(kinds.has(kind), `no ${kind} anywhere in the structure set`).toBe(true);
     }
   });
 });

@@ -67,6 +67,7 @@ import {
   runRegexArm,
 } from "./engine.ts";
 import { buildReport, writeReport } from "./eval/report.ts";
+import { BankError, type SeedBank, packagedBankPath, readBank } from "./eval/bank.ts";
 import { type RunEvalOptions, runEval } from "./eval/run.ts";
 import { TwinError, compareTwins, readManifest } from "./eval/twins.ts";
 import { DEFAULT_PER_RULE, DEFAULT_SEED, SeedError, type BaseDocument, seedCorpus } from "./eval/seed.ts";
@@ -163,6 +164,10 @@ interface Options {
   readonly outDir?: string;
   /** `--twins <dir>`: measure what an injected sentence moves, instead of seeding. */
   readonly twins?: string;
+  /** `--seed-version 1` reproduces a corpus made before the seed bank existed. */
+  readonly seedVersion?: 1 | 2;
+  /** `--seed-bank <path>`: faults to draw from. Absent means the packaged bank. */
+  readonly bankPath?: string;
   /** `bench` only. */
   readonly panelPath?: string;
   readonly repeats?: number;
@@ -490,10 +495,32 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
     client = (deps.createClient ?? createJevClient)({ apiKey: key });
   }
 
+  let bank: SeedBank | undefined;
+  const wantsBank = (options.seedVersion ?? 2) === 2;
+  if (wantsBank) {
+    const path = options.bankPath ?? packagedBankPath();
+    try {
+      bank = readBank(path, deps.cwd);
+    } catch (error) {
+      if (!(error instanceof BankError)) throw error;
+      // A named bank that will not read is an error; a missing packaged one is
+      // a fact about the installation, and the run says which faults it used.
+      if (options.bankPath !== undefined) {
+        deps.writeError(messageOf(error));
+        return EXIT.failure;
+      }
+      deps.writeError(
+        "no seed bank ships with this install, so the faults come from the ruleset's own lists.",
+      );
+    }
+  }
+
   const runOptions: RunEvalOptions = {
     ruleset,
     candidates,
     threshold,
+    ...(options.seedVersion === undefined ? {} : { seedVersion: options.seedVersion }),
+    ...(bank === undefined ? {} : { bank }),
     ...(options.seed === undefined ? {} : { seed: options.seed }),
     ...(options.perRule === undefined ? {} : { perRule: options.perRule }),
     ...(client === undefined ? {} : { client }),
@@ -1122,6 +1149,8 @@ function parseArgs(argv: readonly string[]): Options {
   let seed: number | undefined;
   let perRule: number | undefined;
   let twins: string | undefined;
+  let seedVersion: 1 | 2 | undefined;
+  let bankPath: string | undefined;
   let outDir: string | undefined;
   let panelPath: string | undefined;
   let modelsPath: string | undefined;
@@ -1160,6 +1189,17 @@ function parseArgs(argv: readonly string[]): Options {
         break;
       case "--seed":
         seed = wholeNumber(valueFor(argv, ++i, "--seed"), "--seed", 0);
+        break;
+      case "--seed-version": {
+        const asked = wholeNumber(valueFor(argv, ++i, "--seed-version"), "--seed-version", 1);
+        if (asked !== 1 && asked !== 2) {
+          throw new UsageError("--seed-version is 1 (the ruleset's own faults) or 2 (the seed bank).");
+        }
+        seedVersion = asked;
+        break;
+      }
+      case "--seed-bank":
+        bankPath = valueFor(argv, ++i, "--seed-bank");
         break;
       case "--twins":
         twins = valueFor(argv, ++i, "--twins");
@@ -1208,6 +1248,8 @@ function parseArgs(argv: readonly string[]): Options {
     ...(seed === undefined ? {} : { seed }),
     ...(perRule === undefined ? {} : { perRule }),
     ...(twins === undefined ? {} : { twins }),
+    ...(seedVersion === undefined ? {} : { seedVersion }),
+    ...(bankPath === undefined ? {} : { bankPath }),
     ...(outDir === undefined ? {} : { outDir }),
     ...(panelPath === undefined ? {} : { panelPath }),
     ...(modelsPath === undefined ? {} : { modelsPath }),
@@ -1430,6 +1472,8 @@ function helpLines(): string[] {
     `  --seed <n>          the value every choice is derived from (default ${DEFAULT_SEED})`,
     `  --per-rule <n>      seeded paragraphs per rule (default ${DEFAULT_PER_RULE})`,
     "  --twins <dir>       compare each adversarial file with its clean original instead",
+    "  --seed-bank <path>  the faults to seed from (default: the bank in the package)",
+    "  --seed-version <n>  1 seeds from the ruleset's own faults, 2 from the bank (default 2)",
     "  --out <dir>         where the report is written (default bench/results/<today>)",
     "",
     "Options for bench",

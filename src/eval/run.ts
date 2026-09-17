@@ -102,6 +102,8 @@ export async function runEval(options: RunEvalOptions): Promise<EvalOutcome> {
   const seeding = seedCorpus(options.candidates, ruleset, {
     ...(options.seed === undefined ? {} : { seed: options.seed }),
     ...(options.perRule === undefined ? {} : { perRule: options.perRule }),
+    ...(options.seedVersion === undefined ? {} : { seedVersion: options.seedVersion }),
+    ...(options.bank === undefined ? {} : { bank: options.bank }),
   });
 
   const documents: EvalDocument[] = [
@@ -110,6 +112,15 @@ export async function runEval(options: RunEvalOptions): Promise<EvalOutcome> {
       kind: "clean" as const,
       text: doc.text,
       source: `${doc.file}:${doc.line}`,
+    })),
+    // A hard negative is a clean paragraph with a near miss in it. It is
+    // positive for nothing, so any flag on it is a false positive, which is
+    // exactly the question it was written to ask.
+    ...seeding.negatives.map((doc) => ({
+      id: doc.id,
+      kind: "clean" as const,
+      text: doc.text,
+      source: `${doc.base_file} near miss for ${doc.rule}`,
     })),
     ...seeding.seeded.map((doc) => ({
       id: doc.id,
