@@ -254,6 +254,9 @@ rules:
     criteria:
       true: "The first sentence is a question asked for rhetorical effect."
       false: "The first sentence is a statement, or the only questions come later, or the opening question is one someone actually asked."
+    # About the paragraph's opening, so it is not asked of the later pieces of a
+    # paragraph that was too long to send in one request.
+    sentence: first
     message: "Opens on a question nobody asked. Start with the answer."
     seed:
       splice:
@@ -278,6 +281,9 @@ rules:
     criteria:
       true: "The last sentence is a summary of the paragraph and adds nothing."
       false: "The last sentence advances the argument or adds information, or the paragraph is a single sentence."
+    # About the paragraph's ending, so it is not asked of the earlier pieces of
+    # a paragraph that was too long to send in one request.
+    sentence: last
     message: "The last sentence says the paragraph again. End one sentence earlier."
     seed:
       splice:

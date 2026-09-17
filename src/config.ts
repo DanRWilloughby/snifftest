@@ -80,6 +80,18 @@ export function packagedRulesPath(): string {
   return fileURLToPath(new URL("../rules/default.yaml", import.meta.url));
 }
 
+/**
+ * A file that ships inside the package, named from the package root.
+ *
+ * `rules/default.yaml` is the anchor because it is the one packaged file whose
+ * location is already load-bearing, and it sits one directory below the root in
+ * both layouts: `src/config.ts` beside `rules/` in the repo, and
+ * `dist/snifftest.js` beside `rules/` in the published tarball.
+ */
+export function packagedPath(...parts: readonly string[]): string {
+  return join(dirname(packagedRulesPath()), "..", ...parts);
+}
+
 export function resolveRuleset(options: ResolveRulesetOptions): ResolvedRuleset {
   const defaultPath = options.defaultRulesPath ?? packagedRulesPath();
   const start = startingFile(options, defaultPath);

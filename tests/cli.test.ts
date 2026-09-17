@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -632,5 +632,49 @@ describe("choosing rules by tag", () => {
     expect(result.out).toContain("off by default, unless --only names one: marketing");
     expect(result.out).toContain("[marketing]");
     expect(result.out).toContain("(off by default)");
+  });
+});
+
+// --- what a stranger gets from an install ---------------------------------
+
+describe("running outside a clone of this repo", () => {
+  test("the tarball carries the rules, the corpus and the panel it needs", () => {
+    const manifest = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8")) as {
+      files: readonly string[];
+    };
+
+    // Without these the eval and the bench are commands that only work from a
+    // clone, which is not what the README says they are.
+    expect(manifest.files).toContain("rules");
+    expect(manifest.files).toContain("examples");
+    expect(manifest.files).toContain("bench/panel.yaml");
+    expect(manifest.files).toContain("bench/prices");
+    // The corpus, the fault bank and the panel are where the code looks.
+    expect(existsSync(join(repoRoot, "examples", "corpus"))).toBe(true);
+    expect(existsSync(join(repoRoot, "examples", "seeds", "bank.json"))).toBe(true);
+    expect(existsSync(join(repoRoot, "bench", "panel.yaml"))).toBe(true);
+  });
+
+  test("bench finds the panel that ships with the install, from any directory", async () => {
+    const result = await run({
+      argv: ["bench", "--dry-run", "--models", join(repoRoot, "tests/fixtures/bench/openrouter-models.json")],
+      cwd: sandbox(),
+      env: { OPENROUTER_API_KEY: "not-a-real-key" },
+    });
+
+    expect(result.code).toBe(EXIT.ok);
+    expect(result.out).toContain("panel");
+    expect(result.out).toContain("--dry-run: the panel above is resolved and no model was called.");
+  });
+
+  test("eval with no paths seeds the corpus that ships, and says which one", async () => {
+    const result = await run({
+      argv: ["eval", "--dry-run", "--out", join(sandbox(), "results")],
+      cwd: sandbox(),
+    });
+
+    expect(result.code).toBe(EXIT.ok);
+    expect(result.err).toContain("the corpus that ships with this install was used");
+    expect(result.err).toContain(join("examples", "corpus"));
   });
 });

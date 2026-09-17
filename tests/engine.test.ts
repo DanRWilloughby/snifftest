@@ -674,3 +674,87 @@ describe("inline code spans", () => {
     ]);
   });
 });
+
+// --- a piece of a paragraph is not a paragraph -----------------------------
+
+describe("a paragraph too long to send in one request", () => {
+  const positional = parseRuleset(
+    `version: 1
+threshold: 0.7
+rules:
+  - id: rhetorical_opener
+    kind: judgment
+    sentence: first
+    what: The first sentence is a question asked for effect.
+    criteria:
+      true: "The first sentence is a rhetorical question."
+      false: "The first sentence is a statement."
+    message: "Opens on a question nobody asked."
+  - id: restating_closer
+    kind: judgment
+    sentence: last
+    what: The final sentence only restates the paragraph.
+    criteria:
+      true: "The last sentence adds nothing."
+      false: "The last sentence adds something."
+    message: "The last sentence says it again."
+  - id: stacked_hedging
+    kind: judgment
+    what: Two hedges stacked in one clause.
+    criteria:
+      true: "There are two hedges."
+      false: "There are not."
+    message: "Pick one hedge."
+`,
+    "rules/positional.yaml",
+  );
+
+  const sentence = "This sentence is exactly long enough to matter here. ";
+  const pieces = chunkDocument(sentence.repeat(6).trim(), "d.md", { maxChars: 120 });
+
+  test("its pieces know which one holds the opening and which the ending", () => {
+    expect(pieces.length).toBeGreaterThan(2);
+    expect(pieces[0]?.part).toEqual({ index: 1, of: pieces.length });
+    expect(pieces.at(-1)?.part).toEqual({ index: pieces.length, of: pieces.length });
+    // A block that fits is not a piece of anything and carries no part at all.
+    expect(chunkDocument("One short line.\n", "d.md")[0]?.part).toBeUndefined();
+  });
+
+  test("a rule about the opening is asked of the first piece only", async () => {
+    const seen: JevRequest[] = [];
+    await runJudgmentArm(pieces, positional, client({ stacked_hedging: 0.1 }, seen));
+
+    expect(seen).toHaveLength(pieces.length);
+    expect(Object.keys(seen[0]?.questions ?? {})).toEqual(["rhetorical_opener", "stacked_hedging"]);
+    expect(Object.keys(seen[1]?.questions ?? {})).toEqual(["stacked_hedging"]);
+    expect(Object.keys(seen.at(-1)?.questions ?? {})).toEqual(["restating_closer", "stacked_hedging"]);
+  });
+
+  test("the tally counts the questions that were asked, not paragraphs times rules", async () => {
+    const seen: JevRequest[] = [];
+    const result = await runJudgmentArm(pieces, positional, client({ stacked_hedging: 0.1 }, seen));
+
+    const expected = pieces.length + 2;
+    expect(result.tally.asked).toBe(expected);
+    expect(result.tally.asked).toBeLessThan(pieces.length * 3);
+    expect(result.tally.answered + result.tally.noJudgment + result.tally.unanswered).toBe(expected);
+  });
+
+  function client(nouls: Readonly<Record<string, number>>, seen: JevRequest[]): JevClient {
+    return {
+      async ask(request: JevRequest): Promise<JevResult> {
+        seen.push(request);
+        return {
+          model: "jev-test",
+          nouls,
+          inputTokens: 10,
+          outputTokens: 0,
+          estimatedCostUsd: 0,
+          usageReported: true,
+          latencyMs: 3,
+          attempts: 1,
+        };
+      },
+    };
+  }
+});

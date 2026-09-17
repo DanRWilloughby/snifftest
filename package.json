@@ -21,6 +21,9 @@
   "files": [
     "dist",
     "rules",
+    "examples",
+    "bench/panel.yaml",
+    "bench/prices",
     "README.md",
     "LICENSE"
   ],

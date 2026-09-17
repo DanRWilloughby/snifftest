@@ -19,9 +19,9 @@
  */
 
 import { readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 
-import { packagedRulesPath } from "../config.ts";
+import { packagedPath } from "../config.ts";
 import { asRecord } from "../types.ts";
 
 export class BankError extends Error {
@@ -62,7 +62,7 @@ export interface SeedBank {
  * other.
  */
 export function packagedBankPath(): string {
-  return join(dirname(packagedRulesPath()), "..", "examples", "seeds", "bank.json");
+  return packagedPath("examples", "seeds", "bank.json");
 }
 
 export function readBank(path: string, cwd: string): SeedBank {

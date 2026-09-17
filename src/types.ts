@@ -134,9 +134,30 @@ export interface PatternRule extends RuleCommon, RegexTuning {
 export type RegexRule = BuiltinRule | PatternRule;
 
 /** A rule that needs reading. It is answered by a model, never by a regex. */
+/** Which sentence of a paragraph a rule is about, when it is about one. */
+export type SentenceOfInterest = "first" | "last";
+
+export const SENTENCES_OF_INTEREST: readonly SentenceOfInterest[] = ["first", "last"];
+
+export function isSentenceOfInterest(value: unknown): value is SentenceOfInterest {
+  // SAFETY: `includes` on a `readonly SentenceOfInterest[]` will not take an
+  // arbitrary string, so the list is widened to its own supertype to ask.
+  return typeof value === "string" && (SENTENCES_OF_INTEREST as readonly string[]).includes(value);
+}
+
 export interface JudgmentRule extends RuleCommon {
   readonly kind: "judgment";
   readonly what: string;
+  /**
+   * The sentence this rule is about, when the rule is about a position.
+   *
+   * A rule about how a paragraph opens has nothing to say about the second
+   * half of a paragraph that had to be cut in two to be sent at all: the piece
+   * after the cut has a first sentence, but it is not the paragraph's. Rules
+   * that declare a sentence here are asked only of the piece that really holds
+   * it, and are not asked at all of the pieces that do not.
+   */
+  readonly sentence?: SentenceOfInterest;
   readonly not_for?: string;
   readonly examples?: readonly string[];
   readonly criteria: {
@@ -163,6 +184,20 @@ export interface Ruleset {
   readonly rules: readonly Rule[];
 }
 
+/**
+ * Where a piece sits in the block it was cut out of.
+ *
+ * Present only on the pieces of a block that was too long to send whole. It is
+ * what lets a rule about a paragraph's opening be asked of the piece that holds
+ * the opening and of no other.
+ */
+export interface ChunkPart {
+  /** 1-based. */
+  readonly index: number;
+  /** How many pieces the block became. */
+  readonly of: number;
+}
+
 /** A paragraph of a document, carrying where it started so flags can be placed. */
 export interface Chunk {
   readonly file: string;
@@ -171,6 +206,31 @@ export interface Chunk {
   readonly text: string;
   /** What this block is. Prose is the only kind every rule applies to. */
   readonly kind: ChunkKind;
+  /** Absent unless this chunk is one piece of a block that had to be cut. */
+  readonly part?: ChunkPart;
+}
+
+/** A whole block, or the piece of one that holds the block's first sentence. */
+export function opensItsBlock(chunk: Chunk): boolean {
+  return chunk.part === undefined || chunk.part.index === 1;
+}
+
+/** A whole block, or the piece of one that holds the block's last sentence. */
+export function closesItsBlock(chunk: Chunk): boolean {
+  return chunk.part === undefined || chunk.part.index === chunk.part.of;
+}
+
+/** The rules worth asking about this chunk, given where it sits in its block. */
+export function rulesForChunk(
+  rules: readonly JudgmentRule[],
+  chunk: Chunk,
+): readonly JudgmentRule[] {
+  if (chunk.part === undefined) return rules;
+  return rules.filter((rule) => {
+    if (rule.sentence === "first") return opensItsBlock(chunk);
+    if (rule.sentence === "last") return closesItsBlock(chunk);
+    return true;
+  });
 }
 
 /** Where inside a chunk's text a check fired. */
