@@ -20,7 +20,7 @@
  * someone into agreeing to a request it was never going to make.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -227,7 +227,7 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
   warnAbout(deps, resolved);
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
 
-  const files = collectFiles(options.paths, deps.cwd);
+  const files = collectFiles(deps, options.paths);
   const chunks = readDrafts(deps, files).flatMap((draft) =>
     // The cap is applied on every run, dry or not, so a chunk boundary (and so
     // a reported line number) never depends on whether the network was used.
@@ -327,7 +327,7 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
   warnAbout(deps, resolved);
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
 
-  const files = collectFiles(options.paths, deps.cwd);
+  const files = collectFiles(deps, options.paths);
   const candidates: BaseDocument[] = [];
   for (const draft of readDrafts(deps, files)) {
     for (const chunk of chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS })) {
@@ -706,7 +706,7 @@ function benchCorpus(deps: CliDeps, options: Options, ruleset: Ruleset): BenchCo
     );
   }
 
-  const files = collectFiles(options.paths, deps.cwd);
+  const files = collectFiles(deps, options.paths);
   const candidates: BaseDocument[] = [];
   for (const draft of readDrafts(deps, files)) {
     for (const chunk of chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS })) {
@@ -1052,20 +1052,51 @@ function thresholdValue(value: string): number {
 
 // --- files ----------------------------------------------------------------
 
-function collectFiles(paths: readonly string[], cwd: string): string[] {
+/**
+ * The files to read, and the links that are refused instead.
+ *
+ * A symbolic link is a path to somewhere else, and reading one reads what it
+ * points at. That is fine in your own directory and a hole in a repository
+ * somebody else wrote: `docs/notes.md` can be a link to any file the person
+ * running the check can read, and with the judgment pass on its contents go
+ * into the request body. `readdirSync` reports a link as not-a-directory, so
+ * one named `.md` used to fall straight through the extension test.
+ *
+ * The rule is therefore the short one: a link is never read. Not contained,
+ * not resolved, not followed once. Containment would need a root, and an
+ * explicitly named file has no root to be contained by; it would also have to
+ * be explained, while "a link is never read" can be checked by a reader in one
+ * sentence. The way to check what a link points at is to name what it points
+ * at, which costs the one person who wanted that nothing.
+ *
+ * Each skipped link is named once, on stderr, and the run carries on. A link is
+ * not a finding about anybody's prose.
+ */
+function collectFiles(deps: CliDeps, paths: readonly string[]): string[] {
   const found = new Set<string>();
+  const skipped = new Set<string>();
+
+  const skip = (path: string): void => {
+    if (skipped.has(path)) return;
+    skipped.add(path);
+    deps.writeError(`${display(path, deps.cwd)} skipped, a symbolic link.`);
+  };
 
   for (const given of paths) {
-    const path = isAbsolute(given) ? given : resolve(cwd, given);
+    const path = isAbsolute(given) ? given : resolve(deps.cwd, given);
     let stats;
     try {
-      stats = statSync(path);
+      stats = lstatSync(path);
     } catch {
       throw new UsageError(`no file or directory at ${given}`);
     }
 
+    if (stats.isSymbolicLink()) {
+      skip(path);
+      continue;
+    }
     if (stats.isDirectory()) {
-      for (const file of walk(path)) found.add(file);
+      for (const file of walk(path, skip)) found.add(file);
     } else {
       found.add(path);
     }
@@ -1075,14 +1106,20 @@ function collectFiles(paths: readonly string[], cwd: string): string[] {
   return [...found].sort();
 }
 
-function walk(directory: string): string[] {
+function walk(directory: string, skip: (path: string) => void): string[] {
   const out: string[] = [];
 
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
     // A dot directory or a dependency tree is somebody else's prose.
     if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
     const path = join(directory, entry.name);
-    if (entry.isDirectory()) out.push(...walk(path));
+    if (entry.isSymbolicLink()) {
+      // Only worth a line when it looks like something that would have been
+      // read; a link to a directory or a binary was never a draft anyway.
+      if (DRAFT_EXTENSIONS.has(extname(entry.name).toLowerCase())) skip(path);
+      continue;
+    }
+    if (entry.isDirectory()) out.push(...walk(path, skip));
     else if (DRAFT_EXTENSIONS.has(extname(entry.name).toLowerCase())) out.push(path);
   }
 
