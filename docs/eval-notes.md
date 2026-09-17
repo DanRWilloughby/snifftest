@@ -42,3 +42,19 @@ the reason. A line is reopened by new evidence, not by asking again.
   paragraph is probably fine. A rejected key or a dead socket will answer every
   remaining paragraph the same way, so the arm stops asking, keeps every answer
   already paid for, and names each paragraph it did not send.
+
+- **The judgment service's price prints as unknown in the bench and as a
+  disclosed constant in the eval.** No dated published price has been recorded
+  for that endpoint. The bench table compares it against rows whose prices come
+  from a provider's own list or a dated file, and an unsourced number in that
+  column would read as one of them, so the row prints unknown. The eval's own
+  report has one arm and prints the constant with its basis beside it: the
+  usage is provider-reported, the price is not sourced, and it says so. When a
+  dated price exists it goes in `bench/prices/` beside the Anthropic file and
+  both surfaces read it.
+- **Arm C's accuracy is still joined from the eval, not measured in the bench.**
+  Jev is in the bench rotation for latency and cost, on the same interleaving
+  and the same repeats as every other row. Its accuracy stays where it is
+  scored against arms A and B over the same corpus, because moving it would
+  give the project two recall figures for one arm measured two ways, which is
+  the fault this change exists to remove.

@@ -29,9 +29,9 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-import type { ArmScore } from "../eval/score.ts";
+import type { ArmScore, OverallAtThreshold } from "../eval/score.ts";
 import type { ReasoningSetting } from "./panel.ts";
-import type { BenchModelResult, BenchOutcome } from "./run.ts";
+import type { BenchModelResult, BenchOutcome, BenchSpread } from "./run.ts";
 
 /** One arm carried over from `snifftest eval`, so both halves share a corpus. */
 export interface JoinedArm {
@@ -39,8 +39,10 @@ export interface JoinedArm {
   readonly label: string;
   readonly recall: number | null;
   readonly fpPerCleanCell: number | null;
+  readonly fpCleanParagraphs?: number | null;
+  readonly cleanParagraphs?: number | null;
   readonly medianMs: number;
-  readonly usdPer100Documents: number | null;
+  readonly usdPer100Paragraphs: number | null;
   /** What the eval run was served by, when that arm made a call at all. */
   readonly servedModel?: string | null;
 }
@@ -86,15 +88,22 @@ export interface BenchModelRow {
   readonly parse_failures: number;
   readonly truncated: number;
   readonly unanswered_cells: number;
+  /** The same count split by rule, so a per-rule table prints its own number. */
+  readonly unanswered_by_rule: Readonly<Record<string, number>>;
   readonly latency: { readonly median_ms: number; readonly p95_ms: number; readonly samples: number };
   readonly cost: {
     readonly total_usd: number | null;
-    readonly usd_per_document: number | null;
-    readonly usd_per_100_documents: number | null;
+    readonly usd_per_paragraph: number | null;
+    readonly usd_per_100_paragraphs: number | null;
     readonly input_tokens: number;
     readonly output_tokens: number;
   };
+  /** The first repeat, scored on the boolean the model was asked for. */
   readonly accuracy: ArmScore | null;
+  /** The same repeat, scored on the probability the model verbalised. */
+  readonly accuracy_verbalised: ArmScore | null;
+  /** Every repeat, so the headline can print how far the row moved. */
+  readonly spread: BenchSpread;
   readonly failure_detail: readonly { doc: string; repeat: number; reason: string }[];
 }
 
@@ -190,6 +199,7 @@ function toRow(model: BenchModelResult): BenchModelRow {
     parse_failures: model.parseFailures,
     truncated: model.truncated,
     unanswered_cells: model.unansweredCells,
+    unanswered_by_rule: model.unansweredByRule,
     latency: {
       median_ms: model.latency.medianMs,
       p95_ms: model.latency.p95Ms,
@@ -197,12 +207,14 @@ function toRow(model: BenchModelResult): BenchModelRow {
     },
     cost: {
       total_usd: model.cost.totalUsd,
-      usd_per_document: model.cost.usdPerDocument,
-      usd_per_100_documents: model.cost.usdPer100Documents,
+      usd_per_paragraph: model.cost.usdPerParagraph,
+      usd_per_100_paragraphs: model.cost.usdPer100Paragraphs,
       input_tokens: model.cost.inputTokens,
       output_tokens: model.cost.outputTokens,
     },
     accuracy: model.score,
+    accuracy_verbalised: model.scoreVerbalised,
+    spread: model.spread,
     failure_detail: model.failureDetail.map((failure) => ({ ...failure })),
   };
 }
@@ -221,7 +233,10 @@ export function renderBenchMarkdown(report: BenchReport): string {
       `rule wording and the same paragraph, one call per paragraph, temperature 0. The rows ` +
       `differ in one respect, the completion budget and reasoning each was given, and that is ` +
       `printed in full under "The run". ` +
-      `Accuracy is from the first repeat; latency is the median and p95 over ${report.repeats} ` +
+      `A paragraph is one corpus entry of roughly 150 to 400 words, and one call: every ` +
+      `per-paragraph figure below is per call, never per file. ` +
+      `The detailed tables are from the first repeat; every repeat is scored and the spread ` +
+      `sits beside the headline; latency is the median and p95 over ${report.repeats} ` +
       `repeat${report.repeats === 1 ? "" : "s"}; cost is from returned token usage.`,
   );
   lines.push("");
@@ -232,37 +247,76 @@ export function renderBenchMarkdown(report: BenchReport): string {
   // The served model rides in the headline rather than only in the run table
   // below: a row of numbers read on its own has to say which model produced it.
   lines.push(
-    `| Model | Tier | Model served | Recall @${at} | FP per clean cell | Median ms | $ per 100 documents |`,
+    `| Model | Tier | Model served | Recall, own flag | Spread over repeats | Recall, p >= ${at} | ` +
+      `Median ms | $ per 100 paragraphs |`,
   );
-  lines.push("|---|---|---|---|---|---|---|");
+  lines.push("|---|---|---|---|---|---|---|---|");
 
   for (const arm of report.joined) {
     lines.push(
-      `| ${arm.label} | eval arm | ${arm.servedModel ?? "-"} | ${num(arm.recall)} | ` +
-        `${num(arm.fpPerCleanCell)} | ${Math.round(arm.medianMs)} | ${money(arm.usdPer100Documents)} |`,
+      `| ${arm.label} | eval arm | ${arm.servedModel ?? "-"} | - | - | ${num(arm.recall)} | ` +
+        `${Math.round(arm.medianMs)} (eval run) | ${money(arm.usdPer100Paragraphs)} |`,
     );
   }
 
   for (const model of report.models) {
     if (!model.available) {
       lines.push(
-        `| ${model.label} | ${model.tier} | - | ${model.note ?? "not available"} | - | - | - |`,
+        `| ${model.label} | ${model.tier} | ${model.note ?? "not available"} | - | - | - | - | - |`,
       );
       continue;
     }
-    const overall = model.accuracy?.overall[at];
     lines.push(
       `| ${model.label} | ${model.tier} | ${model.served_model ?? model.slug ?? "-"} | ` +
-        `${num(overall?.recall)} | ${num(overall?.fp_rate_per_clean_cell)} | ` +
-        `${Math.round(model.latency.median_ms)} | ${money(model.cost.usd_per_100_documents)} |`,
+        `${num(model.accuracy?.overall[at]?.recall)} | ${spreadWords(model.spread)} | ` +
+        `${num(model.accuracy_verbalised?.overall[at]?.recall)} | ` +
+        `${Math.round(model.latency.median_ms)} | ${money(model.cost.usd_per_100_paragraphs)} |`,
     );
   }
   lines.push("");
 
   lines.push(
+    "Each model was asked for a boolean and a probability. The first recall column is the " +
+      "boolean, which is the decision the model made. The second applies this tool's own " +
+      `operating point of ${at} to the probability it wrote, which a general model was never ` +
+      "asked to calibrate, so read that column as a comparison of one number against another " +
+      "tool's line and no more than that.",
+  );
+  lines.push("");
+  lines.push(
+    "The eval arms are joined from a separate run. Their latency was measured there, one pass " +
+      "and in order, so it is marked and is not comparable with the interleaved rows above it.",
+  );
+  lines.push("");
+  lines.push(
     "`unknown` in a cost column means the provider published no price for that model on the run " +
       "date. It is not zero, and it is not an estimate.",
   );
+  lines.push("");
+
+  // --- every denominator a false alarm can be counted against
+  lines.push("## False alarms, every way they were counted");
+  lines.push("");
+  lines.push(
+    "A false-alarm rate is only as strong as its denominator, so all of them are printed and " +
+      "the headline is the strictest. A clean paragraph counts once however many rules fired " +
+      "on it. A cell is one rule against one paragraph, which is the flattering denominator " +
+      "because most cells cannot fire. A fireable cell leaves out the rules this arm never " +
+      "answered and the rules the clean set was pre-filtered to pass.",
+  );
+  lines.push("");
+  lines.push(
+    `| Model | Clean paragraphs flagged | Per clean cell | Per fireable clean cell | ` +
+      `Per negative cell | Off-rule flags |`,
+  );
+  lines.push("|---|---|---|---|---|---|");
+  for (const model of report.models) {
+    if (!model.available) {
+      lines.push(`| ${model.label} | ${model.note ?? "not available"} | - | - | - | - |`);
+      continue;
+    }
+    lines.push(`| ${model.label} | ${falseAlarmCells(model.accuracy?.overall[at])} |`);
+  }
   lines.push("");
 
   // --- one table per rule
@@ -271,7 +325,7 @@ export function renderBenchMarkdown(report: BenchReport): string {
   for (const rule of report.classes) {
     lines.push(`### ${rule}`);
     lines.push("");
-    lines.push(`| Model | n seeded | Recall @${at} | FP rate on clean | Unanswered |`);
+    lines.push(`| Model | n seeded | Recall @${at} | FP rate on clean | Unanswered, this rule |`);
     lines.push("|---|---|---|---|---|");
     for (const model of report.models) {
       if (!model.available) {
@@ -282,7 +336,7 @@ export function renderBenchMarkdown(report: BenchReport): string {
       const cell = row?.at[at];
       lines.push(
         `| ${model.label} | ${row?.n_positive ?? 0} | ${num(cell?.recall)} | ${num(cell?.fp_rate_clean)} | ` +
-          `${model.unanswered_cells} |`,
+          `${model.unanswered_by_rule[rule] ?? 0} |`,
       );
     }
     lines.push("");
@@ -368,8 +422,16 @@ function requestSettings(report: BenchReport): string[] {
   return lines;
 }
 
+/**
+ * What a row asked for, without claiming anything about what it then did.
+ *
+ * "not requested" was printed for every row that declared no setting, which
+ * read as "this row did not reason". Several of the models in the panel reason
+ * unless they are told not to, so the honest words for an undeclared row are
+ * the provider's default, whatever that turns out to be.
+ */
 function reasoningWords(setting: ReasoningSetting | null): string {
-  if (setting === null) return "not requested";
+  if (setting === null) return "the provider's default, whatever that is for this model";
   const parts: string[] = [];
   if (setting.effort !== undefined) parts.push(`effort ${setting.effort}`);
   if (setting.maxTokens !== undefined) parts.push(`up to ${setting.maxTokens} tokens`);
@@ -415,6 +477,34 @@ function write(path: string, body: string): void {
 
 function num(value: number | null | undefined): string {
   return value === null || value === undefined ? "n/a" : value.toFixed(3);
+}
+
+/** How far a row moved between repeats, or why there is no spread to print. */
+function spreadWords(spread: BenchSpread): string {
+  if (spread.repeats <= 1) return "one repeat";
+  if (spread.minRecall === null || spread.maxRecall === null) return "n/a";
+  return `${num(spread.minRecall)} to ${num(spread.maxRecall)} over ${spread.repeats}`;
+}
+
+/** Every false-alarm denominator the scorer computed, each with its own k of n. */
+function falseAlarmCells(overall: OverallAtThreshold | undefined): string {
+  if (overall === undefined) return "n/a | n/a | n/a | n/a | n/a";
+  return [
+    ofWith(overall.fp_clean_paragraphs, overall.clean_paragraphs),
+    ofWith(overall.fp_cells, overall.clean_cells, overall.fp_rate_per_clean_cell),
+    ofWith(overall.fp_cells, overall.fireable_clean_cells, overall.fp_rate_per_fireable_clean_cell),
+    num(overall.fp_rate_per_negative_cell),
+    overall.off_rule_flags_on_seeded_cells === null
+      ? String(overall.off_rule_flags)
+      : `${overall.off_rule_flags} (${overall.off_rule_flags_on_seeded_cells} on seeded cells)`,
+  ].join(" | ");
+}
+
+/** `k of n` always, and the rate beside it only where n is worth a rate. */
+function ofWith(k: number, n: number, rate?: number | null): string {
+  if (n === 0) return `${k} of 0`;
+  const computed = rate === undefined ? k / n : rate;
+  return computed === null ? `${k} of ${n}` : `${k} of ${n} (${computed.toFixed(3)})`;
 }
 
 /** `unknown` where there is no price. Never a zero standing in for one. */
