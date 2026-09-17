@@ -209,3 +209,49 @@ Eight seeds per rule is a small sample and every figure here carries an interval
 wider than the differences in the table. The honest summary is that three rules
 were reworded, two of them look better on unseen faults, and the third looks the
 same.
+
+## Recording a replay, so the demo plays back a real run
+
+`examples/replays/example.json` was written by hand. Its probabilities are made
+up, the page says so in its mode line, and that is honest enough for trying the
+page without a key. It is not honest enough for a launch capture. A video of
+numbers nobody measured is a claim, and the argument this repository makes is
+that a claim needs a run behind it.
+
+So there is a recorder:
+
+```
+snifftest serve --record demo.json --yes draft.md
+```
+
+It never starts the page. It reads each draft, walks it the way a writer does,
+and at every sentence boundary takes the draft so far as a state the page would
+score on its next pause. Each of those prefixes goes through the same chunker
+the page's scorer uses, `chunkDocument` with the page's own character guard, and
+each prose chunk is asked about with the same questions, built from the same
+judgment rules. Structure blocks are skipped, because the page's arm does not
+ask about them either. A paragraph state already asked about is not asked again,
+so a four sentence draft costs four requests, not ten.
+
+What comes back is written down as it came back: the probability for every rule
+the reply carried a usable reading for, the input tokens, the latency and the
+cost, all in the gateway's own field names. Nothing is rounded or filled in.
+The file carries `measured: true` and a `runDate`, which is the newest run under
+`bench/results/` that is committed, not merely present on disk. An eval writes
+into today's directory by default, so the newest directory is often a run from
+five minutes ago that no reader can open. `--run-date` names one instead.
+
+Two refusals keep the recording honest.
+
+A failed answer stops the whole run and nothing is written. A recording with one
+hole in it plays back as a paragraph the nose ignores, which on a capture reads
+as a clean paragraph rather than as a request that failed. The file is written
+whole or not at all.
+
+And a paragraph the recording does not hold falls through to the file's default,
+which carries no readings, no tokens, no time and no cost, because nothing was
+measured for it. Filling that gap with a plausible number would be the
+hand-written file again.
+
+No test makes a live call. The writer takes a client, and the tests hand it one
+that answers from a table.
