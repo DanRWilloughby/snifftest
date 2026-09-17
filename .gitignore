@@ -1,0 +1,12 @@
+node_modules
+dist
+.DS_Store
+*.log
+
+# Never commit secrets. Keys are read from the environment only.
+.env
+.env.*
+!.env.example
+
+# Builder working notes, deliberately untracked.
+implementation-notes.md
