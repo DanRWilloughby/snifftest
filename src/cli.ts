@@ -1310,18 +1310,23 @@ export function processDeps(argv: readonly string[]): CliDeps {
   };
 }
 
-async function main(): Promise<void> {
+/**
+ * Run the tool against this process, and leave the exit code behind.
+ *
+ * This file is a library and never runs itself. `src/bin.ts` is the only entry
+ * point, in development and in the published package alike, and it calls this
+ * without asking any question first.
+ *
+ * The question it used to ask was whether `import.meta.url` matched `argv[1]`.
+ * A package manager installs `node_modules/.bin/snifftest` as a symbolic link,
+ * Node resolves that link for one of those and not for the other, and the
+ * answer through the link was therefore no: the program ended having done
+ * nothing, and exit 0 with no output is this tool's word for "nothing tripped".
+ * Every install path goes through that link, so the failure arrived everywhere
+ * as a clean bill of health. A file that is either a library or the program,
+ * decided by which file it is rather than at run time, cannot fail that way.
+ */
+export async function main(): Promise<void> {
   process.exitCode = await runCli(processDeps(process.argv.slice(2)));
 }
 
-const invokedDirectly = (): boolean => {
-  const entry = process.argv[1];
-  if (entry === undefined) return false;
-  try {
-    return import.meta.url === new URL(`file://${resolve(entry)}`).href;
-  } catch {
-    return false;
-  }
-};
-
-if (invokedDirectly()) await main();
