@@ -83,3 +83,49 @@ describe("rules/default.yaml", () => {
     }
   });
 });
+
+// --- seed.position --------------------------------------------------------
+
+function spliceRule(seedBody: string): ReturnType<typeof parseRuleset> {
+  return parseRuleset(
+    `version: 1
+rules:
+  - id: closer
+    kind: judgment
+    what: "A restating closer."
+    not_for: "A closing line that adds something."
+    examples: ["In conclusion, that is the whole of it."]
+    criteria:
+      true: "The last line only restates."
+      false: "The last line adds."
+    message: "Restating closer."
+    seed:
+${seedBody}`,
+    "position.yaml",
+  );
+}
+
+function positionOf(ruleset: ReturnType<typeof parseRuleset>): string | undefined {
+  const seed = ruleset.rules[0]?.seed;
+  return seed !== undefined && "splice" in seed ? seed.position : undefined;
+}
+
+describe("seed.position", () => {
+  test("is carried through the reader when it is given", () => {
+    for (const position of ["any", "start", "end"]) {
+      const parsed = spliceRule(`      splice: ["A spliced line."]\n      position: ${position}`);
+      expect(positionOf(parsed)).toBe(position);
+    }
+  });
+
+  test("is optional, and absent means the field is absent rather than guessed", () => {
+    const parsed = spliceRule(`      splice: ["A spliced line."]`);
+    expect(positionOf(parsed)).toBeUndefined();
+  });
+
+  test("is refused when it is not one of the three, naming the rule", () => {
+    expect(() =>
+      spliceRule(`      splice: ["A spliced line."]\n      position: middle`),
+    ).toThrow(/position must be one of any, start, end/);
+  });
+});

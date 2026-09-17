@@ -14,8 +14,15 @@ export interface TransformSeed {
   readonly count?: number;
 }
 
+/** Where a spliced sentence lands in the paragraph it is planted in. */
+export type SeedPosition = "any" | "start" | "end";
+
+export const SEED_POSITIONS: readonly SeedPosition[] = ["any", "start", "end"];
+
 export interface SpliceSeed {
   readonly splice: readonly string[];
+  /** Absent means `any`; a rule about openers or closers needs the other two. */
+  readonly position?: SeedPosition;
 }
 
 export type Seed = TransformSeed | SpliceSeed;

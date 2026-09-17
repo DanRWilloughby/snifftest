@@ -5,7 +5,16 @@
  * validated here and answered elsewhere; nothing in this file calls out.
  */
 
-import type { BuiltinRule, Match, RegexRule, Rule, Ruleset, Seed } from "./types.ts";
+import {
+  type BuiltinRule,
+  type Match,
+  type RegexRule,
+  type Rule,
+  type Ruleset,
+  type Seed,
+  type SeedPosition,
+  SEED_POSITIONS,
+} from "./types.ts";
 import { type YamlValue, parseYaml } from "./yaml.ts";
 
 export class RulesetError extends Error {
@@ -248,7 +257,10 @@ function validateSeed(value: YamlValue | undefined, where: string): Seed | undef
   }
 
   if (value.splice !== undefined && value.splice !== null) {
-    return { splice: stringList(value.splice, "seed.splice", where) };
+    return {
+      splice: stringList(value.splice, "seed.splice", where),
+      ...positionField(value.position, where),
+    };
   }
 
   throw new RulesetError(`${where}: seed needs either a transform or a splice list`);
@@ -338,6 +350,28 @@ function numberField(
   if (value === undefined || value === null) return {};
   if (typeof value !== "number") throw new RulesetError(`${where}: ${name} must be a number`);
   return { [name]: value };
+}
+
+/**
+ * `seed.position` on a splice seed.
+ *
+ * It is one optional field rather than three, because "where the sentence
+ * lands" is one decision and the rules that care about it — an opener, a
+ * closer — care about exactly one value of it.
+ */
+function positionField(
+  value: YamlValue | undefined,
+  where: string,
+): { position?: SeedPosition } {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "string" || !(SEED_POSITIONS as readonly string[]).includes(value)) {
+    throw new RulesetError(
+      `${where}: seed.position must be one of ${SEED_POSITIONS.join(", ")}, not "${String(value)}"`,
+    );
+  }
+  // SAFETY: the membership check on the line above proves the narrowing that
+  // `includes` on a readonly string[] does not carry across.
+  return { position: value as SeedPosition };
 }
 
 function stringList(value: YamlValue | undefined, name: string, where: string): readonly string[] {
