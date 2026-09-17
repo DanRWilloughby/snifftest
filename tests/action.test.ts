@@ -160,6 +160,19 @@ describe("action.yml, as a document", () => {
     expect(guard.run).toContain("send=false");
   });
 
+  test("forces the free rules on an event whose fork guard does not apply", () => {
+    // The fork test reads a pull-request-shaped field, so on any other event it
+    // is empty and decides nothing. An event nobody reasoned about is an event
+    // with no guard on it, and a comment event runs in the base repository's
+    // context with its secrets while not ending in _target.
+    const guard = stepById("guard").run ?? "";
+    const clause = guard.slice(guard.indexOf('case "${GITHUB_EVENT_NAME:-}" in'));
+    expect(clause).toContain("pull_request | push | workflow_dispatch");
+    const allowed = clause.slice(0, clause.indexOf("*)"));
+    expect(allowed).not.toContain("issue_comment");
+    expect(clause.slice(clause.indexOf("*)"))).toContain("send=false");
+  });
+
   test("fails loudly when send is on and no key was passed", () => {
     const guard = stepById("guard") as { run: string; env?: Record<string, string> };
     const clause = guard.run.slice(guard.run.indexOf('if [ "$send" = "true" ]'));
