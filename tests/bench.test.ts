@@ -714,7 +714,8 @@ describe("the Anthropic direct adapter, the overhead control", () => {
 
     const body = JSON.parse(String(seen[0]?.init.body)) as Record<string, unknown>;
     expect(body["system"]).toBe("s");
-    expect(body["temperature"]).toBe(0);
+    // The Claude 5 models refuse a temperature field, so no row sends one.
+    expect("temperature" in body).toBe(false);
     expect(answer.servedModel).toBe("claude-sonnet-5-20260101");
     expect(answer.inputTokens).toBe(200);
   });
