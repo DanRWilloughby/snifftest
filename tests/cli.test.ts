@@ -5,8 +5,25 @@ import { join, resolve } from "node:path";
 
 import { EXIT, runCli } from "../src/cli.ts";
 import { consentPath } from "../src/consent.ts";
-import type { JevClient, JevRequest, JevResult } from "../src/jev.ts";
+import { type JevClient, type JevClientOptions, type JevRequest, type JevResult, createJevClient } from "../src/jev.ts";
 import type { Flag } from "../src/types.ts";
+
+/** The shape `check --format json` prints, as a reader of the output sees it. */
+interface CheckJson {
+  readonly tool: string;
+  readonly threshold: number;
+  readonly verdict: string;
+  readonly judgment: {
+    readonly state: string;
+    readonly asked: number;
+    readonly answered: number;
+    readonly no_judgment: number;
+    readonly unanswered: number;
+    readonly skipped: readonly { readonly file: string; readonly line: number; readonly reason: string }[];
+    readonly readings: readonly { readonly rule: string; readonly probability: number }[];
+  };
+  readonly flags: readonly Flag[];
+}
 
 const repoRoot = resolve(import.meta.dir, "..");
 const MIXED = "tests/fixtures/rules/mixed.yaml";
@@ -75,6 +92,8 @@ interface RunOptions {
   readonly cwd?: string;
   readonly isTty?: boolean;
   readonly answer?: string;
+  /** Builds the real gateway over a stubbed fetch, so the local guard is exercised. */
+  readonly makeClient?: (options: JevClientOptions) => JevClient;
 }
 
 interface RunResult {
@@ -97,7 +116,10 @@ async function run(options: RunOptions): Promise<RunResult> {
     writeError: (line) => err.push(line),
     isTty: options.isTty ?? false,
     ...(options.answer === undefined ? {} : { prompt: async () => options.answer as string }),
-    createClient: () => options.client ?? forbiddenClient(),
+    createClient: (clientOptions) =>
+      options.makeClient === undefined
+        ? (options.client ?? forbiddenClient())
+        : options.makeClient(clientOptions),
   });
 
   return { code, out: out.join("\n"), err: err.join("\n") };
@@ -256,15 +278,18 @@ describe("the judgment arm", () => {
 });
 
 describe("output formats", () => {
-  test("--format json emits one array and nothing else", async () => {
+  test("--format json carries the flags, the threshold and what the judgment arm did", async () => {
     const result = await run({
       argv: ["check", "--dry-run", "--format", "json", "--rules", MIXED, `${TEXTS}/flagged.md`],
     });
 
-    const parsed = JSON.parse(result.out) as Flag[];
-    expect(Array.isArray(parsed)).toBe(true);
-    expect(parsed.map((flag) => flag.rule)).toEqual(["dash_present", "colon_heavy"]);
-    expect(parsed[0]).toEqual({
+    const parsed = JSON.parse(result.out) as CheckJson;
+    expect(parsed.tool).toBe("snifftest check");
+    expect(parsed.threshold).toBe(0.7);
+    expect(parsed.judgment.state).toBe("not run");
+    expect(parsed.verdict).toContain("--dry-run");
+    expect(parsed.flags.map((flag) => flag.rule)).toEqual(["dash_present", "colon_heavy"]);
+    expect(parsed.flags[0]).toEqual({
       file: "tests/fixtures/texts/flagged.md",
       line: 6,
       rule: "dash_present",
@@ -274,12 +299,12 @@ describe("output formats", () => {
     });
   });
 
-  test("a clean draft in json is an empty array, not an empty string", async () => {
+  test("a clean draft in json is an empty flag list, not an empty string", async () => {
     const result = await run({
       argv: ["check", "--dry-run", "--format", "json", "--rules", MIXED, `${TEXTS}/clean.md`],
     });
 
-    expect(JSON.parse(result.out)).toEqual([]);
+    expect((JSON.parse(result.out) as CheckJson).flags).toEqual([]);
     expect(result.code).toBe(EXIT.ok);
   });
 
@@ -290,6 +315,169 @@ describe("output formats", () => {
     expect(result.out).toContain("dash_present");
     expect(result.out).toContain("restating_closer");
     expect(result.out).toContain(MIXED);
+  });
+});
+
+describe("what the judgment arm says about itself", () => {
+  /** An answers object with nothing usable in it, which is an HTTP 200 saying nothing. */
+  const silent = always({});
+
+  test("an arm that answers nothing is a tool failure, never a clean run", async () => {
+    const seen: JevRequest[] = [];
+    const result = await run({
+      argv: ["check", "--yes", "--rules", MIXED, `${TEXTS}/clean.md`],
+      client: stubClient(silent, seen),
+    });
+
+    expect(seen.length).toBeGreaterThan(0);
+    expect(result.code).toBe(EXIT.failure);
+    expect(result.err).toContain("answered none");
+    expect(result.err).toContain("unanswered");
+  });
+
+  test("a flat middle answer is no judgment, and is counted as such", async () => {
+    const seen: JevRequest[] = [];
+    const result = await run({
+      argv: ["check", "--yes", "--format", "json", "--rules", MIXED, `${TEXTS}/clean.md`],
+      client: stubClient(always({ restating_closer: 0.5 }), seen),
+    });
+
+    const parsed = JSON.parse(result.out) as CheckJson;
+    expect(parsed.judgment.state).toBe("answered nothing");
+    expect(parsed.judgment.no_judgment).toBe(seen.length);
+    expect(parsed.judgment.answered).toBe(0);
+    expect(parsed.judgment.asked).toBe(seen.length);
+    expect(parsed.verdict).toContain("no-judgment band");
+    expect(result.code).toBe(EXIT.failure);
+  });
+
+  test("a reading inside the band is never a flag, however low the threshold is set", async () => {
+    const seen: JevRequest[] = [];
+    const result = await run({
+      argv: ["check", "--yes", "--threshold", "0.4", "--rules", MIXED, `${TEXTS}/clean.md`],
+      client: stubClient(always({ restating_closer: 0.45 }), seen),
+    });
+
+    expect(result.out).not.toContain("restating_closer");
+    expect(result.code).toBe(EXIT.failure);
+  });
+
+  test("an answer outside 0 to 1 is unanswered, not a catch", async () => {
+    const seen: JevRequest[] = [];
+    const result = await run({
+      argv: ["check", "--yes", "--format", "json", "--rules", MIXED, `${TEXTS}/clean.md`],
+      client: stubClient(always({ restating_closer: 7 }), seen),
+    });
+
+    const parsed = JSON.parse(result.out) as CheckJson;
+    expect(parsed.flags).toEqual([]);
+    expect(parsed.judgment.unanswered).toBe(parsed.judgment.asked);
+    expect(result.code).toBe(EXIT.failure);
+  });
+
+  test("json carries every reading, including the ones below the threshold", async () => {
+    const seen: JevRequest[] = [];
+    const result = await run({
+      argv: ["check", "--yes", "--format", "json", "--rules", MIXED, `${TEXTS}/clean.md`],
+      client: stubClient(always({ restating_closer: 0.12 }), seen),
+    });
+
+    const parsed = JSON.parse(result.out) as CheckJson;
+    expect(parsed.flags).toEqual([]);
+    expect(parsed.judgment.readings.map((r) => r.probability)).toEqual(
+      new Array(parsed.judgment.asked).fill(0.12),
+    );
+    expect(parsed.judgment.state).toBe("answered");
+    expect(result.code).toBe(EXIT.ok);
+  });
+
+  test("a paragraph the guard refuses is skipped by name, and the run finishes", async () => {
+    const dir = sandbox();
+    const draft = join(dir, "draft.md");
+    writeFileSync(
+      draft,
+      "The first paragraph is ordinary prose and says a thing plainly.\n" +
+        "\n" +
+        "Here is an avatar: data:image/png;base64,iVBORw0KGgoAAAANSUhEUg\n",
+      "utf8",
+    );
+
+    const asked: string[] = [];
+    const result = await run({
+      argv: ["check", "--yes", "--format", "json", "--rules", resolve(repoRoot, MIXED), draft],
+      cwd: dir,
+      makeClient: (clientOptions) =>
+        createJevClient({
+          ...clientOptions,
+          fetch: async (_url, init) => {
+            asked.push(String(init.body));
+            return new Response(
+              JSON.stringify({
+                model: "jev-test",
+                answers: { restating_closer: { type: "noul", noul: 0.91 } },
+                usage: { input_tokens: 40, output_tokens: 0 },
+              }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            );
+          },
+        }),
+    });
+
+    const parsed = JSON.parse(result.out) as CheckJson;
+    expect(asked).toHaveLength(1);
+    expect(parsed.judgment.skipped).toHaveLength(1);
+    expect(parsed.judgment.skipped[0]?.file).toBe("draft.md");
+    expect(parsed.judgment.skipped[0]?.line).toBe(3);
+    expect(parsed.judgment.answered).toBe(1);
+    expect(parsed.judgment.unanswered).toBe(1);
+    expect(parsed.flags.map((flag) => flag.rule)).toEqual(["restating_closer"]);
+    expect(result.err).toContain("skipped draft.md:3");
+    expect(result.code).toBe(EXIT.flags);
+  });
+
+  test("a mid-run service failure keeps what was paid for and names what was not sent", async () => {
+    const dir = sandbox();
+    const draft = join(dir, "draft.md");
+    writeFileSync(
+      draft,
+      "The first paragraph is ordinary prose and says a thing plainly.\n" +
+        "\n" +
+        "The second paragraph is also ordinary and also says a thing.\n" +
+        "\n" +
+        "The third paragraph closes the draft without any flourish.\n",
+      "utf8",
+    );
+
+    let call = 0;
+    const result = await run({
+      argv: ["check", "--yes", "--format", "json", "--rules", resolve(repoRoot, MIXED), draft],
+      cwd: dir,
+      makeClient: (clientOptions) =>
+        createJevClient({
+          ...clientOptions,
+          attempts: 1,
+          fetch: async () => {
+            call += 1;
+            if (call > 1) return new Response("no", { status: 401 });
+            return new Response(
+              JSON.stringify({
+                model: "jev-test",
+                answers: { restating_closer: { type: "noul", noul: 0.95 } },
+                usage: { input_tokens: 40, output_tokens: 0 },
+              }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            );
+          },
+        }),
+    });
+
+    const parsed = JSON.parse(result.out) as CheckJson;
+    expect(call).toBe(2);
+    expect(parsed.judgment.answered).toBe(1);
+    expect(parsed.judgment.skipped).toHaveLength(2);
+    expect(parsed.judgment.skipped[1]?.reason).toContain("stopped");
+    expect(parsed.flags.map((flag) => flag.rule)).toEqual(["restating_closer"]);
+    expect(result.code).toBe(EXIT.flags);
   });
 });
 

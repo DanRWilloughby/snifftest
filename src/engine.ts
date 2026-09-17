@@ -32,7 +32,12 @@
  * are only ever read as code when a fence is drawn there.
  */
 
-import { type JevClient, questionsFromRules } from "./jev.ts";
+import {
+  type JevClient,
+  JevStateRefusedError,
+  isNoJudgment,
+  questionsFromRules,
+} from "./jev.ts";
 import { checkRegexRule } from "./rules.ts";
 import { type Chunk, type Flag, type Ruleset, isJudgmentRule, isRegexRule } from "./types.ts";
 
@@ -138,6 +143,12 @@ export interface JudgmentReading {
   readonly rule: string;
   readonly probability: number;
   readonly message: string;
+  /**
+   * True when the probability landed in the no-judgment band, which means the
+   * service answered without deciding. Such a reading is neither a flag nor a
+   * pass, so it is carried rather than dropped and never becomes a flag.
+   */
+  readonly noJudgment: boolean;
 }
 
 /** What the run cost, so a caller can print it instead of guessing. */
@@ -151,9 +162,36 @@ export interface JudgmentUsage {
   readonly retries: number;
 }
 
+/** A paragraph the judgment arm never got an answer about, and why. */
+export interface SkippedChunk {
+  readonly file: string;
+  readonly line: number;
+  readonly reason: string;
+}
+
+/**
+ * What became of every question the arm set out to ask.
+ *
+ * One cell is one (paragraph, judgment rule) pair, and `asked` counts them all,
+ * including the cells of a paragraph that was never sent. So the four numbers
+ * always add up, and a run that quietly stopped asking cannot look like a run
+ * that asked and heard nothing worth flagging.
+ */
+export interface JudgmentTally {
+  readonly asked: number;
+  /** Came back as a usable probability that sits outside the no-judgment band. */
+  readonly answered: number;
+  /** Came back inside the no-judgment band, which is an answer that decides nothing. */
+  readonly noJudgment: number;
+  /** No usable answer: missing, not a number, outside 0 to 1, or never sent. */
+  readonly unanswered: number;
+}
+
 export interface JudgmentArmResult {
   readonly readings: readonly JudgmentReading[];
   readonly usage: JudgmentUsage;
+  readonly tally: JudgmentTally;
+  readonly skipped: readonly SkippedChunk[];
 }
 
 const NO_USAGE: JudgmentUsage = {
@@ -176,6 +214,20 @@ const NO_USAGE: JudgmentUsage = {
  *
  * A ruleset with no judgment rules makes no request at all, which is what keeps
  * an ordinary regex-only run free and offline.
+ *
+ * ## One bad paragraph costs one paragraph
+ *
+ * The local text guard refuses a paragraph carrying a key, a data URI or a
+ * base64 blob, and one such paragraph in a docs folder used to end the arm for
+ * the whole folder and throw away the answers already paid for. A refusal is
+ * now that paragraph's own: it is recorded with its file and line, and the run
+ * carries on.
+ *
+ * A failure from the service is different in kind. A 401 or a dead socket will
+ * greet the next paragraph the same way, so the arm stops asking rather than
+ * spending four backoff ladders per remaining paragraph to learn it again. What
+ * came back before the failure is kept, and every paragraph that was not sent
+ * is named.
  */
 export async function runJudgmentArm(
   chunks: readonly Chunk[],
@@ -184,7 +236,12 @@ export async function runJudgmentArm(
 ): Promise<JudgmentArmResult> {
   const rules = ruleset.rules.filter(isJudgmentRule);
   if (rules.length === 0 || chunks.length === 0) {
-    return { readings: [], usage: NO_USAGE };
+    return {
+      readings: [],
+      usage: NO_USAGE,
+      tally: { asked: 0, answered: 0, noJudgment: 0, unanswered: 0 },
+      skipped: [],
+    };
   }
 
   const questions = questionsFromRules(rules);
@@ -197,8 +254,33 @@ export async function runJudgmentArm(
   let latencyMs = 0;
   let retries = 0;
 
-  for (const chunk of chunks) {
-    const answer = await client.ask({ state: chunk.text, questions });
+  const skipped: SkippedChunk[] = [];
+  let answered = 0;
+  let noJudgment = 0;
+  let halted = false;
+
+  for (const [index, chunk] of chunks.entries()) {
+    if (halted) {
+      skipped.push({
+        file: chunk.file,
+        line: chunk.line,
+        reason: "not sent, because the judgment arm stopped after the failure above",
+      });
+      continue;
+    }
+
+    let answer;
+    try {
+      answer = await client.ask({ state: chunk.text, questions });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      skipped.push({ file: chunk.file, line: chunk.line, reason });
+      // A local refusal is about this paragraph. Anything else is about the
+      // service, and asking the next paragraph would only buy the same answer
+      // at the price of another retry ladder.
+      if (!(error instanceof JevStateRefusedError)) halted = index < chunks.length - 1;
+      continue;
+    }
 
     requests += 1;
     inputTokens += answer.inputTokens;
@@ -210,28 +292,46 @@ export async function runJudgmentArm(
     for (const rule of rules) {
       const probability = answer.nouls[rule.id];
       // A rule the service did not answer is left out rather than scored zero:
-      // "not answered" and "answered low" are different facts.
-      if (probability === undefined) continue;
+      // "not answered" and "answered low" are different facts. The range is
+      // checked here as well as in the gateway, because the arm takes any
+      // `JevClient` and a probability of 7 counted as a catch would be a
+      // measurement nobody made.
+      if (probability === undefined || !Number.isFinite(probability)) continue;
+      if (probability < 0 || probability > 1) continue;
+      const undecided = isNoJudgment(probability);
+      if (undecided) noJudgment += 1;
+      else answered += 1;
       readings.push({
         file: chunk.file,
         line: chunk.line,
         rule: rule.id,
         probability,
         message: messages.get(rule.id) ?? rule.message,
+        noJudgment: undecided,
       });
     }
   }
 
+  const asked = chunks.length * rules.length;
   return {
     readings,
     usage: { requests, inputTokens, outputTokens, estimatedCostUsd, latencyMs, retries },
+    tally: { asked, answered, noJudgment, unanswered: asked - answered - noJudgment },
+    skipped,
   };
 }
 
-/** The readings that clear the threshold, as flags. */
+/**
+ * The readings that clear the threshold, as flags.
+ *
+ * A reading inside the no-judgment band never becomes a flag, whatever the
+ * threshold is set to. The band means the service did not decide, and a number
+ * that means nothing must not be allowed to mean "flag" because someone lowered
+ * the bar to 0.5.
+ */
 export function flagsFrom(readings: readonly JudgmentReading[], threshold: number): Flag[] {
   return readings
-    .filter((reading) => reading.probability >= threshold)
+    .filter((reading) => !reading.noJudgment && reading.probability >= threshold)
     .map((reading) => ({
       file: reading.file,
       line: reading.line,

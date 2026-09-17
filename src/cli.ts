@@ -55,7 +55,11 @@ import { type JoinedArm, buildBenchReport, writeBenchReport } from "./bench/tabl
 import { ConfigError, type ResolvedRuleset, resolveRuleset } from "./config.ts";
 import { type Destination, type Env, requestConsent } from "./consent.ts";
 import {
+  type JudgmentArmResult,
+  type JudgmentReading,
+  type JudgmentTally,
   type JudgmentUsage,
+  type SkippedChunk,
   chunkDocument,
   flagsFrom,
   mergeFlags,
@@ -89,6 +93,28 @@ export const EXIT = {
   /** The judgment rules need an answer before anything is sent. */
   consent: 3,
 } as const;
+
+/**
+ * The exit-code contract, written once and printed by `--help`.
+ *
+ * It lives here rather than in prose in four files because every surface that
+ * reads an exit code reads this one: the Action writes a job summary from it,
+ * the hook decides whether to block a commit by it, and a person reads it at
+ * the end of `--help`. The rule that matters most is the last one: a judgment
+ * arm that was asked for and answered nothing is a tool failure and never a
+ * quiet fall back to the countable rules, because exit 0 is this tool's word
+ * for "nothing tripped" and a silent degrade would spend it on "nothing ran".
+ */
+export const EXIT_RULES: readonly string[] = [
+  "  0  nothing tripped a rule",
+  "  1  at least one flag at or above the threshold",
+  "  2  the tool could not do its job: arguments, rules, files, a failed request,",
+  "     or a judgment arm that was asked for and answered none of its questions",
+  "  3  the judgment rules need a yes before anything is sent, and did not get one",
+  "",
+  "  A judgment arm that answered some of its questions is a partial run: the exit",
+  "  code comes from the flags that exist, and what went unanswered is printed.",
+];
 
 /** Used when neither the command line nor the ruleset names one (T1 report). */
 export const DEFAULT_THRESHOLD = 0.7;
@@ -201,13 +227,22 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
   const judgmentRules = ruleset.rules.filter(isJudgmentRule);
 
   if (options.dryRun || judgmentRules.length === 0 || chunks.length === 0) {
-    report(deps, options, countable);
+    const why = options.dryRun
+      ? "--dry-run was asked for"
+      : judgmentRules.length === 0
+        ? "the ruleset carries no judgment rules"
+        : "those paths hold no paragraphs";
+    const verdict = `The countable rules produced this verdict on their own, because ${why}.`;
+    report(deps, options, threshold, countable, verdict, notRun(why));
+    deps.writeError(verdict);
     return exitFor(countable);
   }
 
   const key = deps.env[KEY_ENV];
   if (key === undefined || key.trim() === "") {
-    report(deps, options, countable);
+    const verdict =
+      `The countable rules ran and the judgment rules did not, so this is not a full verdict.`;
+    report(deps, options, threshold, countable, verdict, notRun(`${KEY_ENV} is not set`));
     deps.writeError(
       `${KEY_ENV} is not set, so the judgment rules cannot run. Export it, or use --dry-run for the countable rules only.`,
     );
@@ -226,25 +261,34 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
   });
 
   if (!consent.granted) {
-    report(deps, options, countable);
+    const verdict = "The countable rules ran; the judgment rules were not sent anything.";
+    report(deps, options, threshold, countable, verdict, notRun("consent was not given"));
     return EXIT.consent;
   }
 
   const client = (deps.createClient ?? createJevClient)({ apiKey: key });
-  let usage: JudgmentUsage;
-  let flags: Flag[];
+  let judged: JudgmentArmResult;
   try {
-    const judged = await runJudgmentArm(chunks, ruleset, client);
-    usage = judged.usage;
-    flags = mergeFlags(countable, flagsFrom(judged.readings, threshold));
+    judged = await runJudgmentArm(chunks, ruleset, client);
   } catch (error) {
-    report(deps, options, countable);
+    const verdict = "The countable rules ran and the judgment arm failed, so this is not a full verdict.";
+    report(deps, options, threshold, countable, verdict, notRun(messageOf(error)));
     deps.writeError(`the judgment rules could not run: ${messageOf(error)}`);
     return EXIT.failure;
   }
 
-  report(deps, options, flags);
-  deps.writeError(usageLine(usage));
+  const flags = mergeFlags(countable, flagsFrom(judged.readings, threshold));
+  const summary = judgmentSummary(judged);
+  const verdict = verdictLine(judged.tally);
+
+  report(deps, options, threshold, flags, verdict, summary);
+  deps.writeError(verdict);
+  for (const line of degradationLines(judged)) deps.writeError(line);
+  deps.writeError(usageLine(judged.usage));
+
+  // Asked, and heard nothing usable. Exit 0 is this tool's word for "nothing
+  // tripped a rule", and a run that got no judgment at all has not earned it.
+  if (judged.tally.asked > 0 && judged.tally.answered === 0) return EXIT.failure;
   return exitFor(flags);
 }
 
@@ -252,9 +296,99 @@ function exitFor(flags: readonly Flag[]): number {
   return flags.length > 0 ? EXIT.flags : EXIT.ok;
 }
 
-function report(deps: CliDeps, options: Options, flags: readonly Flag[]): void {
+// --- what the judgment arm did, in one shape both formats read ------------
+
+type JudgmentState = "not run" | "answered" | "degraded" | "answered nothing";
+
+/**
+ * The judgment arm's own account of itself, printed in text and in JSON.
+ *
+ * It is one record rather than a few loose numbers because the question a
+ * reader asks is a single one: how much of this verdict is judgment and how
+ * much of it is the countable rules alone. The answer is unreadable unless the
+ * counts, the skipped paragraphs and the state sit together.
+ */
+interface JudgmentSummary {
+  readonly state: JudgmentState;
+  readonly reason?: string;
+  readonly asked: number;
+  readonly answered: number;
+  readonly no_judgment: number;
+  readonly unanswered: number;
+  readonly skipped: readonly SkippedChunk[];
+  /**
+   * Every reading, including the ones below the threshold and the ones in the
+   * no-judgment band. A caller comparing two drafts needs the numbers that did
+   * not become flags, and printing only the flags hid them.
+   */
+  readonly readings: readonly JudgmentReading[];
+}
+
+function notRun(reason: string): JudgmentSummary {
+  return {
+    state: "not run",
+    reason,
+    asked: 0,
+    answered: 0,
+    no_judgment: 0,
+    unanswered: 0,
+    skipped: [],
+    readings: [],
+  };
+}
+
+function judgmentSummary(judged: JudgmentArmResult): JudgmentSummary {
+  const tally = judged.tally;
+  const state: JudgmentState =
+    tally.answered === 0
+      ? "answered nothing"
+      : tally.noJudgment + tally.unanswered > 0
+        ? "degraded"
+        : "answered";
+
+  return {
+    state,
+    asked: tally.asked,
+    answered: tally.answered,
+    no_judgment: tally.noJudgment,
+    unanswered: tally.unanswered,
+    skipped: judged.skipped,
+    readings: judged.readings,
+  };
+}
+
+/** One sentence naming which arm the exit code rests on. */
+function verdictLine(tally: JudgmentTally): string {
+  const cells = `${tally.answered} of ${tally.asked} judgment questions answered`;
+  const middle = tally.noJudgment === 0 ? "" : `, ${tally.noJudgment} answered inside the no-judgment band`;
+  const missing = tally.unanswered === 0 ? "" : `, ${tally.unanswered} unanswered`;
+
+  if (tally.answered === 0) {
+    return `The judgment arm answered none of its ${tally.asked} questions${middle}${missing}, so there is no judgment in this verdict.`;
+  }
+  if (tally.noJudgment + tally.unanswered > 0) {
+    return `The countable rules and a partial judgment arm produced this verdict: ${cells}${middle}${missing}.`;
+  }
+  return `The countable rules and the judgment rules both produced this verdict: ${cells}.`;
+}
+
+/** The paragraphs that went unjudged, each with its file and line. */
+function degradationLines(judged: JudgmentArmResult): string[] {
+  return judged.skipped.map((row) => `skipped ${row.file}:${row.line}, ${row.reason}`);
+}
+
+function report(
+  deps: CliDeps,
+  options: Options,
+  threshold: number,
+  flags: readonly Flag[],
+  verdict: string,
+  judgment: JudgmentSummary,
+): void {
   if (options.format === "json") {
-    deps.write(JSON.stringify(flags, null, 2));
+    deps.write(
+      JSON.stringify({ tool: "snifftest check", threshold, verdict, judgment, flags }, null, 2),
+    );
     return;
   }
   for (const flag of flags) {
@@ -1157,10 +1291,7 @@ function helpLines(): string[] {
     "  SNIFFTEST_SEND=1    answer the send question in CI, without remembering it",
     "",
     "Exit codes",
-    "  0  nothing tripped a rule",
-    "  1  at least one flag at or above the threshold",
-    "  2  the tool could not do its job: arguments, rules, files, or a failed request",
-    "  3  the judgment rules need a yes before anything is sent, and did not get one",
+    ...EXIT_RULES,
   ];
 }
 

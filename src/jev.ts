@@ -57,6 +57,28 @@ export const KEY_ENV = "TYPESAFE_API_KEY";
  */
 export const STATE_GUARD_CHARS = 24_000;
 
+/**
+ * The band in which a probability is not an opinion.
+ *
+ * Jev answers about 0.5 on state it cannot read, and the local guard above only
+ * catches the shapes we can recognise before sending. Anything else it cannot
+ * read comes back as a flat middle number, which is the one failure mode that
+ * looks exactly like a clean draft. So the middle is named: a reading from
+ * `NO_JUDGMENT_LOW` to `NO_JUDGMENT_HIGH` inclusive is reported as no judgment,
+ * counted, and never allowed to become a flag or to stand in for a pass.
+ *
+ * The width is the spike's (measured 2026-09-16), and it is deliberately wider
+ * than the flat answers observed, because a band that only just covers what has
+ * been seen is a band that stops working the first time the service changes.
+ */
+export const NO_JUDGMENT_LOW = 0.4;
+export const NO_JUDGMENT_HIGH = 0.6;
+
+/** Whether a probability sits inside the no-judgment band. */
+export function isNoJudgment(probability: number): boolean {
+  return probability >= NO_JUDGMENT_LOW && probability <= NO_JUDGMENT_HIGH;
+}
+
 /** US dollars per input token. Output tokens are free on this endpoint. */
 export const INPUT_TOKEN_PRICE_USD = 0.042e-6;
 
@@ -320,10 +342,15 @@ function readAnswer(parsed: unknown): Answer {
   const nouls: Record<string, number> = {};
   for (const [id, answer] of Object.entries(answers)) {
     const noul = asRecord(answer)?.["noul"];
-    // A missing or non-numeric noul is dropped rather than defaulted: the
-    // caller can tell "not answered" from "answered low" only if we never
-    // invent a number.
-    if (typeof noul === "number" && Number.isFinite(noul)) nouls[id] = noul;
+    // A missing noul, a noul that is not a number, and a number outside 0 to 1
+    // are all dropped rather than defaulted: the caller can tell "not answered"
+    // from "answered low" only if we never invent a number, and a probability
+    // of 7 is not a probability. The panel's reader holds its models to the
+    // same range (`src/bench/prompt.ts`), and two arms scored against each
+    // other have to be held to one contract.
+    if (typeof noul === "number" && Number.isFinite(noul) && noul >= 0 && noul <= 1) {
+      nouls[id] = noul;
+    }
   }
 
   const usage = asRecord(root?.["usage"]);
