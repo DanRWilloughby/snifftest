@@ -1,0 +1,146 @@
+#!/bin/sh
+#
+# Sniff Test pre-commit hook.
+#
+# Checks the prose you are about to commit against your house rules. By default
+# it runs the countable rules only, so nothing leaves your machine and the hook
+# costs nothing but a few milliseconds.
+#
+# Install, from the root of your repository, one command:
+#
+#   curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.1.0/hooks/pre-commit \
+#     -o .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+#
+# Skip it once:   SNIFFTEST_SKIP=1 git commit …     (git commit --no-verify also works)
+#
+# Two things here are deliberate and worth knowing before you change them.
+#
+# It checks the *staged* content, not what is sitting in your working tree. A
+# file you half-staged is checked as it will be committed, so the hook never
+# blocks a commit over a sentence you did not include in it.
+#
+# It never sends anything unless you say so twice: `SNIFFTEST_SEND=1` in the
+# environment *and* a key in `TYPESAFE_API_KEY`. Miss either and it quietly
+# falls back to the free rules rather than failing or, worse, asking.
+#
+# Environment
+#   SNIFFTEST_SKIP=1        skip the hook entirely
+#   SNIFFTEST_SEND=1        run the judgment rules too (needs TYPESAFE_API_KEY)
+#   SNIFFTEST_STRICT=1      treat a tool failure as a reason to block the commit
+#   SNIFFTEST_THRESHOLD=…   the probability at or above which a judgment counts
+#   SNIFFTEST_VERSION=…     the version fetched when snifftest is not installed
+#   SNIFFTEST_BIN=…         an absolute path to the executable to run
+
+SNIFFTEST_VERSION="${SNIFFTEST_VERSION:-0.1.0}"
+
+if [ "${SNIFFTEST_SKIP:-0}" = "1" ]; then
+  echo "snifftest: skipped (SNIFFTEST_SKIP=1)." >&2
+  exit 0
+fi
+
+# Added, copied, modified or renamed; deletions have nothing left to read.
+staged=$(
+  git diff --cached --name-only --diff-filter=ACMR -z |
+    tr '\0' '\n' |
+    grep -Ei '\.(md|markdown|txt)$'
+) || staged=''
+
+# Nothing anybody writes prose in. Leave without spawning a thing.
+[ -n "$staged" ] || exit 0
+
+tmp=$(mktemp -d 2>/dev/null || mktemp -d -t snifftest) || {
+  echo "snifftest: no temporary directory available; skipping the check." >&2
+  exit 0
+}
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+
+# The ruleset travels with the drafts: the staged copy of it, so a commit that
+# changes a rule is checked against the rule as committed.
+extract=$staged
+for candidate in .snifftest.yaml .snifftest.yml; do
+  if git ls-files --error-unmatch "$candidate" >/dev/null 2>&1; then
+    extract="$candidate
+$extract"
+  fi
+done
+
+printf '%s\n' "$extract" | tr '\n' '\0' | git checkout-index -z --stdin --prefix="$tmp/" || {
+  echo "snifftest: could not read the staged files; skipping the check." >&2
+  exit 0
+}
+
+# --- what to run ------------------------------------------------------------
+
+run_snifftest() {
+  if [ -n "${SNIFFTEST_BIN:-}" ]; then
+    "$SNIFFTEST_BIN" "$@"
+  elif command -v snifftest >/dev/null 2>&1; then
+    snifftest "$@"
+  elif command -v bunx >/dev/null 2>&1; then
+    bunx "snifftest@$SNIFFTEST_VERSION" "$@"
+  elif command -v npx >/dev/null 2>&1; then
+    npx --yes "snifftest@$SNIFFTEST_VERSION" "$@"
+  else
+    return 127
+  fi
+}
+
+set -- check
+
+if [ "${SNIFFTEST_SEND:-0}" = "1" ] && [ -n "${TYPESAFE_API_KEY:-}" ]; then
+  : # SNIFFTEST_SEND is already in the environment; the CLI reads it as the yes.
+else
+  if [ "${SNIFFTEST_SEND:-0}" = "1" ]; then
+    echo "snifftest: SNIFFTEST_SEND=1 but TYPESAFE_API_KEY is empty. Running the free rules only." >&2
+  fi
+  set -- "$@" --dry-run
+fi
+
+if [ -n "${SNIFFTEST_THRESHOLD:-}" ]; then
+  set -- "$@" --threshold "$SNIFFTEST_THRESHOLD"
+fi
+
+# Newline is the only separator, so a path with a space in it survives.
+old_ifs=$IFS
+IFS='
+'
+# shellcheck disable=SC2086 -- the split is the point, and IFS is a newline.
+set -- "$@" -- $staged
+IFS=$old_ifs
+
+# Paths are reported relative to the extraction root, which makes them read the
+# same as the repository-relative paths you staged.
+(cd "$tmp" && run_snifftest "$@")
+status=$?
+
+# --- what the exit code means -----------------------------------------------
+
+case $status in
+  0)
+    exit 0
+    ;;
+  1)
+    echo "snifftest: the staged prose trips the rules above." >&2
+    echo "           Fix it, or commit anyway with SNIFFTEST_SKIP=1 or --no-verify." >&2
+    exit 1
+    ;;
+  3)
+    echo "snifftest: the judgment rules need a yes before anything is sent." >&2
+    echo "           Set SNIFFTEST_SEND=1, or leave it and get the free rules." >&2
+    exit 1
+    ;;
+  127)
+    echo "snifftest: not installed and neither bunx nor npx is on PATH." >&2
+    echo "           Install it (npm i -g snifftest) or remove .git/hooks/pre-commit." >&2
+    [ "${SNIFFTEST_STRICT:-0}" = "1" ] && exit 1
+    exit 0
+    ;;
+  *)
+    # A broken tool is not evidence of a bad draft, and a hook that wedges every
+    # commit in the repository is worse than one that says so and steps aside.
+    echo "snifftest: could not finish (exit $status); the commit was not blocked." >&2
+    echo "           Set SNIFFTEST_STRICT=1 to treat this as a failure." >&2
+    [ "${SNIFFTEST_STRICT:-0}" = "1" ] && exit 1
+    exit 0
+    ;;
+esac
