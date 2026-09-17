@@ -34,8 +34,8 @@ function ruleset(body: string): ReturnType<typeof parseRuleset> {
   return parseRuleset(`version: 1\nrules:\n${body}`, "rules/test.yaml");
 }
 
-function chunk(text: string): Chunk {
-  return { file: "draft.md", line: 1, text };
+function chunk(text: string, kind: Chunk["kind"] = "prose"): Chunk {
+  return { file: "draft.md", line: 1, text, kind };
 }
 
 describe("parseRuleset", () => {
@@ -125,11 +125,18 @@ describe("regex checks", () => {
     expect(matches.map((m) => m.index)).toEqual([7, 21]);
   });
 
-  test("dash_present catches em and en dashes but not a hyphen", () => {
+  test("dash_present catches a prose dash but not a hyphen", () => {
     const rule = builtinRule("dash_present");
-    expect(checkRegexRule(rule, "the window July 21\u201325")).toHaveLength(1);
     expect(checkRegexRule(rule, "the refusal \u2014 and I did not plan for it")).toHaveLength(1);
+    expect(checkRegexRule(rule, "the window \u2013 as we planned it")).toHaveLength(1);
     expect(checkRegexRule(rule, "a prompt-to-app tool, twenty-four hours")).toHaveLength(0);
+  });
+
+  test("dash_present leaves a number range alone, because a range is not a dash for effect", () => {
+    const rule = builtinRule("dash_present");
+    expect(checkRegexRule(rule, "pages 10\u201320 and the years 2019\u20132024")).toHaveLength(0);
+    // The em dash is never a range, so it is still a flag between numerals.
+    expect(checkRegexRule(rule, "pages 10\u201420")).toHaveLength(1);
   });
 
   test("colon_count fires at its minimum and not below, under either spelling", () => {
@@ -143,13 +150,24 @@ describe("regex checks", () => {
 
   test("sentence_rhythm fires when sentence lengths are too uniform", () => {
     const rule = builtinRule("sentence_rhythm");
-    const uniform =
-      "The team shipped the feature today. The team wrote the tests first. The team read the code twice. The team merged the branch later.";
+    const uniform = new Array(6)
+      .fill("The team shipped the feature on the Tuesday of that particular week.")
+      .join(" ");
     const varied =
       "We shipped. The team spent the better part of a week reading the code before anyone touched a line of it, and that turned out to be the whole trick. Then we merged. Done.";
 
     expect(checkRegexRule(rule, uniform)).toHaveLength(1);
     expect(checkRegexRule(rule, varied)).toHaveLength(0);
+  });
+
+  test("sentence_rhythm stays quiet on a short status paragraph", () => {
+    const rule = builtinRule("sentence_rhythm");
+    const status =
+      "We shipped the fix on Tuesday morning. The build went green at noon. " +
+      "The release went out at four. Nobody noticed a thing.";
+
+    expect(checkRegexRule(rule, status)).toHaveLength(0);
+    expect(checkRegexRule(builtinRule("sentence_rhythm", { min_words: 10 }), status)).toHaveLength(1);
   });
 
   test("sentence_rhythm stays quiet when there are too few sentences to judge", () => {

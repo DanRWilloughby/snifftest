@@ -5,6 +5,14 @@
 # judgment calls and are answered by the judgment model, one probability
 # per rule per paragraph. A flag names its rule and its probability.
 #
+# A countable rule may name the kinds of block it applies to with `chunks`.
+# The kinds are front_matter, heading, table, link_definition, html_comment,
+# list, block_quote and prose. A rule that names none applies to prose, block
+# quotes, lists and headings, which is everything a person would call writing.
+# The judgment rules are asked about prose, block quotes and lists long enough
+# to hold a sentence, and never about the rest: a heading is not a paragraph,
+# and a request about one costs what a request about a paragraph costs.
+#
 # A `.snifftest.yaml` in your project extends or replaces this file. Copy a
 # rule, change its words, keep its id unique. The `seed` on each rule is how
 # `snifftest eval` manufactures one defect of that kind inside your own clean
@@ -27,17 +35,33 @@ rules:
   - id: dash_present
     kind: regex
     # The built-in matches two characters: an en dash (U+2013) and an em dash
-    # (U+2014). A plain hyphen in a compound word does not count.
+    # (U+2014). A plain hyphen in a compound word does not count, and neither
+    # does an en dash between numerals, because "pages 10-20" written with the
+    # typographer's dash is a range and this rule is about a writer reaching
+    # for a dash instead of a full stop.
+    #
+    # A block quote is somebody else's text, so its dashes are theirs and the
+    # rule stays out of it. A quotation running inline inside a sentence cannot
+    # be told from the writer's own words without parsing quotation marks that
+    # mean five other things as well, so an inline quotation is still flagged.
     builtin: dash_present
+    chunks: [prose, list, heading]
     message: "A long dash. Give the sentence a full stop instead."
     seed: { transform: insert_em_dash, count: 1 }
 
   - id: colon_heavy
     kind: regex
     # The built-in counts the colon character (U+003A) in the paragraph and
-    # trips at `min` or more. A semicolon is not a colon.
+    # trips at `min` or more. A semicolon is not a colon. The colon in a URL,
+    # the one in a clock time and the ones inside an HTML comment are not
+    # punctuation a reader sees, so they are not counted.
+    #
+    # A list is not one paragraph: four bullets with a colon apiece are four
+    # sentences, and counting them together told a design note to pick one
+    # colon out of four.
     builtin: colon_count
     min: 3
+    chunks: [prose, block_quote]
     message: "Three colons in one paragraph. Pick one."
     seed: { transform: add_colons, count: 3 }
 
@@ -45,10 +69,15 @@ rules:
     kind: regex
     # The built-in splits on (?<=[.!?])\s+, counts words per sentence, and
     # trips when the coefficient of variation (standard deviation over mean)
-    # is below `floor`. Paragraphs shorter than `min_sentences` are skipped.
+    # is below `floor`. Paragraphs with fewer than `min_sentences` sentences
+    # or fewer than `min_words` words are skipped: four six-word sentences are
+    # a status note, and telling its author that every sentence runs to the
+    # same length is telling them their note is a note.
     builtin: sentence_rhythm
     floor: 0.25
     min_sentences: 4
+    min_words: 60
+    chunks: [prose, block_quote]
     message: "Every sentence runs to the same length. The reader nods off by the third."
     seed: { transform: equalize_sentences }
 

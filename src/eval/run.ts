@@ -18,7 +18,7 @@
  * nothing sent.
  */
 
-import { runRegexArm } from "../engine.ts";
+import { classifyChunk, runRegexArm } from "../engine.ts";
 import { questionsFromRules, type JevClient } from "../jev.ts";
 import { type Chunk, type Ruleset, isJudgmentRule, isRegexRule } from "../types.ts";
 import {
@@ -309,7 +309,10 @@ async function armC(
 // --- shared ---------------------------------------------------------------
 
 function chunkOf(doc: EvalDocument): Chunk {
-  return { file: doc.id, line: 1, text: doc.text };
+  // A document here is one standalone block, so it is classified as one: a
+  // corpus of headings and tables measures what `check` would do to them only
+  // if the arms see the same kinds `check` sees.
+  return { file: doc.id, line: 1, text: doc.text, kind: classifyChunk(doc.text, 1) };
 }
 
 function zeroDocument(doc: EvalDocument): JudgedDocument {

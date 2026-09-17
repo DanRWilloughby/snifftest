@@ -2,7 +2,15 @@ import { describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
-import { chunkDocument, flagsFrom, mergeFlags, runJudgmentArm, runRegexArm } from "../src/engine.ts";
+import {
+  chunkDocument,
+  classifyChunk,
+  flagsFrom,
+  isProseLike,
+  mergeFlags,
+  runJudgmentArm,
+  runRegexArm,
+} from "../src/engine.ts";
 import type { JevClient, JevRequest, JevResult } from "../src/jev.ts";
 import { parseRuleset } from "../src/rules.ts";
 import type { Flag } from "../src/types.ts";
@@ -23,6 +31,12 @@ const pair = parseRuleset(
   "rules/pair.yaml",
 );
 
+/** The shipped ruleset, so the shapes are checked against what people get. */
+const defaults = parseRuleset(
+  readFileSync(join(here, "..", "rules", "default.yaml"), "utf8"),
+  "rules/default.yaml",
+);
+
 describe("chunkDocument", () => {
   test("splits on blank lines and records the first line of each paragraph", () => {
     const chunks = chunkDocument(text("flagged.md"), "flagged.md");
@@ -36,8 +50,8 @@ describe("chunkDocument", () => {
   test("treats a run of blank lines as one break and ignores trailing whitespace", () => {
     const chunks = chunkDocument("one\n\n\n\ntwo\n   \n", "d.md");
     expect(chunks).toHaveLength(2);
-    expect(chunks[0]).toEqual({ file: "d.md", line: 1, text: "one" });
-    expect(chunks[1]).toEqual({ file: "d.md", line: 5, text: "two" });
+    expect(chunks[0]).toEqual({ file: "d.md", line: 1, text: "one", kind: "prose" });
+    expect(chunks[1]).toEqual({ file: "d.md", line: 5, text: "two", kind: "prose" });
   });
 
   test("returns nothing for an empty document", () => {
@@ -53,6 +67,53 @@ describe("chunkDocument", () => {
     expect(chunks.every((c) => c.text.length <= 120)).toBe(true);
     expect(chunks.every((c) => c.line === 1)).toBe(true);
     expect(chunks.map((c) => c.text).join(" ")).toBe(sentence.repeat(6).trim());
+  });
+});
+
+describe("what a block is", () => {
+  const structure = text("structure.md");
+  const chunks = chunkDocument(structure, "structure.md");
+
+  test("every Markdown shape is named for what it is", () => {
+    expect(chunks.map((c) => c.kind)).toEqual([
+      "front_matter",
+      "heading",
+      "html_comment",
+      "table",
+      "list",
+      "block_quote",
+      "prose",
+      "prose",
+      "prose",
+      "prose",
+      "link_definition",
+    ]);
+  });
+
+  test("only writing is worth a paid question", () => {
+    expect(chunks.filter(isProseLike).map((c) => c.kind)).toEqual([
+      "list",
+      "block_quote",
+      "prose",
+      "prose",
+      "prose",
+      "prose",
+    ]);
+  });
+
+  test("a list too short to hold a sentence is not asked about", () => {
+    const [short] = chunkDocument("- one\n- two\n- three\n", "d.md");
+    expect(short?.kind).toBe("list");
+    expect(short === undefined ? true : isProseLike(short)).toBe(false);
+  });
+
+  test("three dashes in the middle of a file are a break, not front matter", () => {
+    expect(classifyChunk("---\nname: x\n---", 40)).toBe("prose");
+    expect(classifyChunk("---\nname: x\n---", 1)).toBe("front_matter");
+  });
+
+  test("the default ruleset stays quiet on every one of those shapes", () => {
+    expect(runRegexArm(chunks, defaults)).toEqual([]);
   });
 });
 
@@ -124,13 +185,16 @@ describe("runJudgmentArm", () => {
     const seen: JevRequest[] = [];
     const chunks = chunkDocument(text("flagged.md"), "flagged.md");
 
-    const result = await runJudgmentArm(chunks, mixed, client({ restating_closer: 0.4 }, seen));
+    const prose = chunks.filter(isProseLike);
+    const result = await runJudgmentArm(chunks, mixed, client({ restating_closer: 0.11 }, seen));
 
-    expect(seen).toHaveLength(chunks.length);
+    expect(prose.length).toBeLessThan(chunks.length);
+    expect(seen).toHaveLength(prose.length);
     expect(Object.keys(seen[0]?.questions ?? {})).toEqual(["restating_closer"]);
-    expect(result.usage.requests).toBe(chunks.length);
-    expect(result.usage.inputTokens).toBe(50 * chunks.length);
-    expect(result.usage.retries).toBe(chunks.length);
+    expect(result.usage.requests).toBe(prose.length);
+    expect(result.usage.inputTokens).toBe(50 * prose.length);
+    expect(result.usage.retries).toBe(prose.length);
+    expect(result.tally.structure).toBe(chunks.length - prose.length);
   });
 
   test("returns every reading, so a caller can calibrate below the threshold", async () => {
@@ -341,8 +405,8 @@ describe("fenced code blocks", () => {
     const chunks = chunkDocument(document, "d.md");
 
     expect(chunks).toEqual([
-      { file: "d.md", line: 1, text: "Prose one." },
-      { file: "d.md", line: 5, text: "Prose two." },
+      { file: "d.md", line: 1, text: "Prose one.", kind: "prose" },
+      { file: "d.md", line: 5, text: "Prose two.", kind: "prose" },
     ]);
   });
 });
