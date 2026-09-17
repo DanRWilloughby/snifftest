@@ -307,7 +307,18 @@ describe("CI never needs a key", () => {
   });
 
   test("the checker runs with the network off", () => {
-    expect(ci).toMatch(/cli\.ts check --dry-run/);
+    expect(ci).toMatch(/bin\.ts check --dry-run/);
+  });
+
+  test("CI runs the packed tarball through the link a package manager writes", () => {
+    // A bin that ends without running prints nothing and exits 0, which is this
+    // tool's word for "nothing tripped", so a dead release reads as a clean
+    // draft everywhere. Building it is not evidence that it runs.
+    for (const workflow of [ci, read(".github/workflows/release.yml")]) {
+      expect(workflow).toContain("npm pack");
+      expect(workflow).toContain("node_modules/.bin/snifftest");
+      expect(workflow).toContain('"$bin" --version');
+    }
   });
 
   test("the secret scan reads the history, not just the tip", () => {
