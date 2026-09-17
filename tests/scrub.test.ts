@@ -55,6 +55,34 @@ describe("scrubSecrets", () => {
     expect(out).toBe([HIDDEN, HIDDEN, HIDDEN].join(" | "));
   });
 
+  test("removes the tail of a secret, which is the shape a service logs", () => {
+    // Some services record the last characters of a credential rather than the
+    // first. A scrubber that only knew about prefixes handed that straight
+    // through, and the tail of a key is as much a key as the head of one.
+    const tail = fakeKey.slice(-20);
+    const out = scrubSecrets(`rejected the key ending ${tail}`, [fakeKey]);
+
+    expect(out).not.toContain(tail);
+    expect(out).toBe(`rejected the key ending ${HIDDEN}`);
+  });
+
+  test("removes a head copy and a tail copy in the same message", () => {
+    const head = fakeKey.slice(0, 22);
+    const tail = fakeKey.slice(-22);
+    const out = scrubSecrets(`sent ${head} ... ends ${tail}`, [fakeKey]);
+
+    expect(out).not.toContain(head);
+    expect(out).not.toContain(tail);
+  });
+
+  test("leaves a tail shorter than the floor alone, so prose survives", () => {
+    // Below the floor a fragment is short enough to be an ordinary word, and
+    // blanking real words makes a failure message useless without making
+    // anybody safer.
+    const short = fakeKey.slice(-6);
+    expect(scrubSecrets(`ends ${short}`, [fakeKey])).toBe(`ends ${short}`);
+  });
+
   test("returns the text unchanged when no secret is present", () => {
     expect(scrubSecrets("nothing to see", [fakeKey])).toBe("nothing to see");
   });
