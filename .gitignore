@@ -10,3 +10,6 @@ dist
 
 # Builder working notes, deliberately untracked.
 implementation-notes.md
+
+# Entire CLI checkpoints (local tooling, never published)
+.entire/
