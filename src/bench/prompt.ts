@@ -26,7 +26,7 @@
  * declined to answer as a model that answered perfectly on clean text.
  */
 
-import type { JudgmentRule } from "../types.ts";
+import { type JudgmentRule, asRecord } from "../types.ts";
 
 export class ReplyError extends Error {
   constructor(message: string) {
@@ -103,11 +103,11 @@ export function parseReply(text: string, ruleIds: readonly string[]): ParsedRepl
     throw new ReplyError(`the reply is not JSON: ${excerpt(body)} (${reason(error)})`);
   }
 
-  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+  const record = asRecord(parsed);
+  if (record === null) {
     throw new ReplyError(`the reply is JSON but not an object of rule ids: ${excerpt(body)}`);
   }
 
-  const record = parsed as Record<string, unknown>;
   const readings: Record<string, Reading> = {};
   const missing: string[] = [];
 
@@ -122,9 +122,9 @@ export function parseReply(text: string, ruleIds: readonly string[]): ParsedRepl
 }
 
 function readOne(value: unknown): Reading | undefined {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return undefined;
+  const record = asRecord(value);
+  if (record === null) return undefined;
 
-  const record = value as Record<string, unknown>;
   const flag = record["flag"];
   const p = record["p"];
 

@@ -37,7 +37,7 @@
  */
 
 import { scrubSecrets } from "./scrub.ts";
-import { type JudgmentRule } from "./types.ts";
+import { type JudgmentRule, asRecord } from "./types.ts";
 
 export const ENDPOINT = "https://api.typesafe.ai/v1/systemone";
 
@@ -328,11 +328,10 @@ function readAnswer(parsed: unknown): Answer {
 
   const usage = asRecord(root?.["usage"]);
   const inputTokens = countOf(usage?.["input_tokens"]);
+  const served = root?.["model"];
 
   return {
-    // SAFETY: the `typeof` check on the same line proves the field is a string;
-    // the index signature returns `unknown` and does not carry that across.
-    model: typeof root?.["model"] === "string" ? (root["model"] as string) : MODEL,
+    model: typeof served === "string" ? served : MODEL,
     nouls,
     inputTokens,
     outputTokens: countOf(usage?.["output_tokens"]),
@@ -363,11 +362,6 @@ function scrubbed(error: unknown, key: string): Error {
 function messageOf(error: unknown): string {
   if (error instanceof Error) return error.message;
   return String(error);
-}
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
 }
 
 function countOf(value: unknown): number {

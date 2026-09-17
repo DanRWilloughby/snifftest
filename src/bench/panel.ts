@@ -40,6 +40,13 @@ import { type YamlValue, parseYaml } from "../yaml.ts";
 export const PROVIDERS = ["openrouter", "anthropic"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
+/** The one place a string becomes a `Provider`, so nothing else has to assert it. */
+export function isProvider(value: unknown): value is Provider {
+  // SAFETY: widening a readonly tuple of string literals to `readonly string[]`
+  // is a supertype, which `includes` needs to accept an arbitrary string.
+  return typeof value === "string" && (PROVIDERS as readonly string[]).includes(value);
+}
+
 export class PanelError extends Error {
   constructor(message: string) {
     super(message);
@@ -174,7 +181,7 @@ function readEntry(value: YamlValue, where: string): PanelEntry {
 
   const id = requiredString(value["id"], `${where}.id`);
   const provider = requiredString(value["provider"], `${where}.provider`);
-  if (!(PROVIDERS as readonly string[]).includes(provider)) {
+  if (!isProvider(provider)) {
     throw new PanelError(
       `${where}.provider is "${provider}", and this bench has adapters for ${PROVIDERS.join(" and ")} only.`,
     );
@@ -206,7 +213,7 @@ function readEntry(value: YamlValue, where: string): PanelEntry {
     id,
     label: typeof label === "string" ? label : id,
     tier: typeof tier === "string" ? tier : "unlabelled",
-    provider: provider as Provider,
+    provider,
     match,
     ...(preferred === undefined ? {} : { prefer: preferred }),
     maxTokens: readBudget(value["max_tokens"], `${where}.max_tokens`) ?? DEFAULT_MAX_TOKENS,
@@ -264,6 +271,8 @@ function readReasoning(
 }
 
 function isEffort(value: unknown): value is ReasoningEffort {
+  // SAFETY: widening a readonly tuple of string literals to `readonly string[]`
+  // is a supertype, which `includes` needs to accept an arbitrary string.
   return typeof value === "string" && (REASONING_EFFORTS as readonly string[]).includes(value);
 }
 

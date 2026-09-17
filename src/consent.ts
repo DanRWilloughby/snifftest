@@ -20,6 +20,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { ENDPOINT, KEY_ENV } from "./jev.ts";
+import { asRecord } from "./types.ts";
 
 /** The one environment variable that answers, and the one value it answers with. */
 export const SEND_ENV = "SNIFFTEST_SEND";
@@ -153,15 +154,13 @@ function alreadyGranted(path: string, names: readonly string[]): boolean {
 function storedAnswer(path: string): readonly string[] | null {
   if (!existsSync(path)) return null;
   try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as {
-      granted?: unknown;
-      destinations?: unknown;
-    };
-    if (parsed.granted !== true) return null;
+    const parsed = asRecord(JSON.parse(readFileSync(path, "utf8")));
+    if (parsed === null || parsed["granted"] !== true) return null;
     // A file written before destinations were recorded answered for TypeSafe,
     // which was the only place anything went.
-    if (!Array.isArray(parsed.destinations)) return [TYPESAFE_DESTINATION.name];
-    return parsed.destinations.filter((name): name is string => typeof name === "string");
+    const destinations = parsed["destinations"];
+    if (!Array.isArray(destinations)) return [TYPESAFE_DESTINATION.name];
+    return destinations.filter((name): name is string => typeof name === "string");
   } catch {
     // An unreadable answer is not an answer. Asking again is the safe failure.
     return null;

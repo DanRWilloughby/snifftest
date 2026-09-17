@@ -44,6 +44,7 @@ import {
   PanelError,
   type Provider,
   type ResolvedModel,
+  isProvider,
   parsePanel,
   resolvePanel,
 } from "./bench/panel.ts";
@@ -74,7 +75,7 @@ import {
 } from "./jev.ts";
 import { RulesetError } from "./rules.ts";
 import { serve } from "./serve/command.ts";
-import { type Flag, type Ruleset, isJudgmentRule } from "./types.ts";
+import { type Flag, type Ruleset, asRecord, isJudgmentRule } from "./types.ts";
 import { YamlError } from "./yaml.ts";
 
 /** What each exit code means. Documented in `--help` and tested one by one. */
@@ -306,9 +307,8 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
   const judgmentRules = ruleset.rules.filter(isJudgmentRule);
   const wantsNetwork = !options.dryRun && judgmentRules.length > 0;
   const runDate = today();
-  const outDir = isAbsolute(options.outDir ?? "")
-    ? (options.outDir as string)
-    : resolve(deps.cwd, options.outDir ?? join("bench", "results", runDate));
+  const asked = options.outDir ?? join("bench", "results", runDate);
+  const outDir = isAbsolute(asked) ? asked : resolve(deps.cwd, asked);
 
   let client: JevClient | undefined;
   if (wantsNetwork) {
@@ -449,8 +449,11 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
 
   const priceTables = new Map<Provider, PriceTable>();
   for (const [provider, relative] of Object.entries(panel.prices)) {
+    // The panel parser has already refused any other name, so this only ever
+    // skips a key that could not have been looked up again anyway.
+    if (!isProvider(provider)) continue;
     const file = at(relative, dirname(panelFile));
-    priceTables.set(provider as Provider, parsePriceTable(readDraft(file), display(file, deps.cwd)));
+    priceTables.set(provider, parsePriceTable(readDraft(file), display(file, deps.cwd)));
   }
 
   const keys: Record<Provider, string> = {
@@ -484,7 +487,7 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
 
   if (options.modelsPath !== undefined) {
     const file = at(options.modelsPath, deps.cwd);
-    const payload = JSON.parse(readDraft(file)) as Record<string, unknown>;
+    const payload = asRecord(JSON.parse(readDraft(file))) ?? {};
     const openrouter = payload["data"] !== undefined ? payload : payload["openrouter"];
     if (openrouter !== undefined) catalogs.openrouter = readOpenRouterCatalog(openrouter);
     if (payload["anthropic"] !== undefined) {
@@ -712,19 +715,21 @@ function fromEvalDirectory(deps: CliDeps, options: Options, ruleset: Ruleset): B
 }
 
 function joinedArms(scores: Record<string, unknown>): JoinedArm[] {
-  const arms = scores["arms"];
-  if (typeof arms !== "object" || arms === null) return [];
+  const arms = asRecord(scores["arms"]);
+  if (arms === null) return [];
   const at = String(numberOf(scores["threshold"]));
 
   // Only the arms that made a call carry a model; the others say so with a dash
   // rather than borrowing the run's model string for a row it did not produce.
-  const served = typeof scores["served_model"] === "string" ? (scores["served_model"] as string) : null;
+  const servedName = scores["served_model"];
+  const served = typeof servedName === "string" ? servedName : null;
 
   const out: JoinedArm[] = [];
-  for (const [id, value] of Object.entries(arms as Record<string, unknown>)) {
-    const arm = value as Record<string, unknown>;
-    const overall = (arm["overall"] as Record<string, Record<string, unknown>> | undefined)?.[at];
-    const summary = arm["summary"] as Record<string, unknown> | undefined;
+  for (const [id, value] of Object.entries(arms)) {
+    const arm = asRecord(value);
+    if (arm === null) continue;
+    const overall = asRecord(asRecord(arm["overall"])?.[at]);
+    const summary = asRecord(arm["summary"]);
     out.push({
       arm: id,
       label: typeof arm["label"] === "string" ? arm["label"] : id,
@@ -770,8 +775,8 @@ function paragraphsOf(doc: Record<string, unknown>): { id: string; text: string;
 
   const out: { id: string; text: string; rule?: string }[] = [];
   for (const value of paragraphs) {
-    if (typeof value !== "object" || value === null) continue;
-    const record = value as Record<string, unknown>;
+    const record = asRecord(value);
+    if (record === null) continue;
     const id = record["id"];
     const text = record["text"];
     if (typeof id !== "string" || typeof text !== "string") continue;
@@ -782,11 +787,9 @@ function paragraphsOf(doc: Record<string, unknown>): { id: string; text: string;
 
 function readJson(file: string): Record<string, unknown> {
   try {
-    const parsed = JSON.parse(readFileSync(file, "utf8")) as unknown;
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      throw new Error("it is not a JSON object");
-    }
-    return parsed as Record<string, unknown>;
+    const parsed = asRecord(JSON.parse(readFileSync(file, "utf8")));
+    if (parsed === null) throw new Error("it is not a JSON object");
+    return parsed;
   } catch (error) {
     throw new UsageError(`${file} could not be read (${messageOf(error)})`);
   }
@@ -940,6 +943,8 @@ function parseArgs(argv: readonly string[]): Options {
 }
 
 function isCommand(value: string): value is Command {
+  // SAFETY: widening a readonly tuple of string literals to `readonly string[]`
+  // is a supertype, which `includes` needs to accept an arbitrary string.
   return (COMMANDS as readonly string[]).includes(value);
 }
 
@@ -1104,8 +1109,8 @@ function messageOf(error: unknown): string {
 function version(): string {
   try {
     const raw = readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8");
-    const parsed = JSON.parse(raw) as { version?: unknown };
-    if (typeof parsed.version === "string") return parsed.version;
+    const declared = asRecord(JSON.parse(raw))?.["version"];
+    if (typeof declared === "string") return declared;
   } catch {
     // A missing package.json is not worth failing a --version over.
   }
