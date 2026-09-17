@@ -159,7 +159,7 @@ h1 {
 
 .writing:focus-within .gutter path { stroke: var(--soft); }
 
-#draft, .mirror {
+#draft, .measure {
   margin: 0;
   padding: 0;
   border: 0;
@@ -194,7 +194,7 @@ h1 {
 
 #draft::placeholder { color: var(--soft); opacity: 1; }
 
-.mirror {
+.measure {
   position: absolute;
   top: 0;
   left: var(--gutter);
@@ -219,7 +219,7 @@ h1 {
   stroke-linejoin: round;
 }
 
-.marks .ghost { stroke-width: 1.1; opacity: 0.45; }
+.marks .underdraw { stroke-width: 1.1; opacity: 0.45; }
 .marks .ring { stroke-width: 1.4; fill: var(--ground); }
 .marks .on .main { stroke-width: 3.2; }
 .marks .on .ring { stroke-width: 2; }
@@ -385,7 +385,7 @@ h1 {
         <svg class="gutter" viewBox="0 0 6 1000" preserveAspectRatio="none" aria-hidden="true" focusable="false">
           <path d="M3.1 1C1.6 140 4.4 262 2.8 398S1.7 650 3.3 760 4.1 905 2.7 999"/>
         </svg>
-        <div class="mirror" id="mirror" aria-hidden="true"></div>
+        <div class="measure" id="measure" aria-hidden="true"></div>
         <svg class="marks" id="marks" aria-hidden="true" focusable="false"></svg>
         <textarea id="draft" rows="8" spellcheck="false" autocomplete="off" autocorrect="off" placeholder="Paste a draft, or start typing. Half a second after you stop, the nose has a sniff."></textarea>
       </div>
@@ -419,7 +419,7 @@ h1 {
 
   const draft = document.getElementById("draft");
   const writing = document.getElementById("writing");
-  const mirror = document.getElementById("mirror");
+  const measure = document.getElementById("measure");
   const marksLayer = document.getElementById("marks");
   const flagList = document.getElementById("flags");
   const verdict = document.getElementById("verdict");
@@ -651,14 +651,14 @@ h1 {
   const textAfter = document.createTextNode("");
   const caretMarker = document.createElement("span");
   caretMarker.textContent = "⁠";
-  mirror.append(textBefore, caretMarker, textAfter);
+  measure.append(textBefore, caretMarker, textAfter);
 
   function syncTwin() {
     const value = draft.value;
     const at = Math.min(value.length, draft.selectionStart || 0);
     textBefore.data = value.slice(0, at);
     textAfter.data = value.slice(at);
-    mirror.style.width = draft.clientWidth + "px";
+    measure.style.width = draft.clientWidth + "px";
   }
 
   function grow() {
@@ -754,7 +754,7 @@ h1 {
         lines.forEach((box, i) => {
           const y = box.bottom - 1;
           mark.paths.push(el("path", { class: "main", pathLength: "1", d: line(box.left - 1, y + sway(seed + i, 0.8), box.right + 2, y + sway(seed + i + 5, 0.8), seed + i * 11, 1.3) }, group));
-          mark.paths.push(el("path", { class: "ghost", pathLength: "1", d: line(box.left + 4, y + 2.4, box.right - 3, y + 2.1 + sway(seed + i + 8, 0.6), seed + i * 13 + 3, 1) }, group));
+          mark.paths.push(el("path", { class: "underdraw", pathLength: "1", d: line(box.left + 4, y + 2.4, box.right - 3, y + 2.1 + sway(seed + i + 8, 0.6), seed + i * 13 + 3, 1) }, group));
         });
         const last = lines[lines.length - 1];
         tagX = last.right + 11;
