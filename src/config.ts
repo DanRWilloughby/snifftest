@@ -62,7 +62,13 @@ export interface ResolvedRuleset {
 }
 
 /** Every top-level key a ruleset file may set. */
-const KNOWN_KEYS: readonly string[] = ["version", "threshold", "rules", "extends"];
+const KNOWN_KEYS: readonly string[] = [
+  "version",
+  "threshold",
+  "off_by_default",
+  "rules",
+  "extends",
+];
 
 /**
  * The ruleset that ships in the package.
@@ -81,6 +87,57 @@ export function resolveRuleset(options: ResolveRulesetOptions): ResolvedRuleset 
   const warnings: string[] = [];
   const ruleset = load(start, defaultPath, sources, warnings, 0);
   return { ruleset, sources, warnings };
+}
+
+/** Which tags a run wants, and which it does not. */
+export interface TagSelection {
+  /** Run only the rules carrying one of these tags. */
+  readonly only?: readonly string[];
+  /** Never run a rule carrying one of these tags. */
+  readonly skip?: readonly string[];
+}
+
+export interface SelectedRules {
+  readonly ruleset: Ruleset;
+  /** Rule ids that sat this run out, with the tag that kept them out. */
+  readonly dropped: readonly { readonly rule: string; readonly reason: string }[];
+}
+
+/**
+ * The rules a run actually uses, after its tags are read.
+ *
+ * `--only` names what a run wants and nothing else, which is also how a tag
+ * that is off by default is switched on: naming it is asking for it. Without
+ * `--only`, everything runs except the tags the ruleset sits out and the tags
+ * `--skip` names. A ruleset that wants all of its own rules back writes
+ * `off_by_default: []` in a file that extends this one.
+ */
+export function selectRules(ruleset: Ruleset, selection: TagSelection = {}): SelectedRules {
+  const only = selection.only ?? [];
+  const skip = selection.skip ?? [];
+  const off = only.length > 0 ? [] : (ruleset.off_by_default ?? []);
+  const dropped: { rule: string; reason: string }[] = [];
+
+  const rules = ruleset.rules.filter((rule) => {
+    const tags = rule.tags ?? [];
+    const skipped = tags.find((tag) => skip.includes(tag));
+    if (skipped !== undefined) {
+      dropped.push({ rule: rule.id, reason: `--skip ${skipped}` });
+      return false;
+    }
+    if (only.length > 0 && !tags.some((tag) => only.includes(tag))) {
+      dropped.push({ rule: rule.id, reason: `--only ${only.join(",")}` });
+      return false;
+    }
+    const sittingOut = tags.find((tag) => off.includes(tag));
+    if (sittingOut !== undefined) {
+      dropped.push({ rule: rule.id, reason: `the tag "${sittingOut}" is off by default` });
+      return false;
+    }
+    return true;
+  });
+
+  return { ruleset: { ...ruleset, rules }, dropped };
 }
 
 function startingFile(options: ResolveRulesetOptions, defaultPath: string): string {
@@ -166,9 +223,13 @@ function merge(base: Ruleset, child: Ruleset): Ruleset {
   for (const rule of child.rules) if (!taken.has(rule.id)) rules.push(rule);
 
   const threshold = child.threshold ?? base.threshold;
+  // A child that writes `off_by_default: []` turns every tag back on, which is
+  // how a marketing page asks for the rules an ordinary document sits out.
+  const offByDefault = child.off_by_default ?? base.off_by_default;
   return {
     version: 1,
     ...(threshold === undefined ? {} : { threshold }),
+    ...(offByDefault === undefined ? {} : { off_by_default: offByDefault }),
     rules,
   };
 }

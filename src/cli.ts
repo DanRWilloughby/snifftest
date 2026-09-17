@@ -52,7 +52,7 @@ import { PriceError, type PriceTable, parsePriceTable, priceCitation, priceFor }
 import { readAnthropicCatalog } from "./bench/anthropic.ts";
 import { type BenchDocument, runBench } from "./bench/run.ts";
 import { type JoinedArm, buildBenchReport, writeBenchReport } from "./bench/tables.ts";
-import { ConfigError, type ResolvedRuleset, resolveRuleset } from "./config.ts";
+import { ConfigError, type ResolvedRuleset, resolveRuleset, selectRules } from "./config.ts";
 import { type Destination, type Env, requestConsent } from "./consent.ts";
 import {
   type JudgmentArmResult,
@@ -167,6 +167,9 @@ interface Options {
   readonly modelsPath?: string;
   /** An `eval` results directory: its corpus is reused and its arms are joined. */
   readonly evalDir?: string;
+  /** Tags: run only these, and never run these. */
+  readonly only?: readonly string[];
+  readonly skip?: readonly string[];
 }
 
 // --- the entry point ------------------------------------------------------
@@ -212,8 +215,21 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
     ...(options.rulesPath === undefined ? {} : { rulesPath: options.rulesPath }),
     ...(deps.defaultRulesPath === undefined ? {} : { defaultRulesPath: deps.defaultRulesPath }),
   });
-  const ruleset = resolved.ruleset;
+  const selected = selectRules(resolved.ruleset, {
+    ...(options.only === undefined ? {} : { only: options.only }),
+    ...(options.skip === undefined ? {} : { skip: options.skip }),
+  });
+  const ruleset = selected.ruleset;
   warnAbout(deps, resolved);
+  // One line per reason rather than per rule: five rules sitting out one tag is
+  // one fact about the run, and five lines of it drowns the flags underneath.
+  const byReason = new Map<string, string[]>();
+  for (const row of selected.dropped) {
+    byReason.set(row.reason, [...(byReason.get(row.reason) ?? []), row.rule]);
+  }
+  for (const [reason, names] of byReason) {
+    deps.writeError(`${names.join(", ")} sat this run out: ${reason}.`);
+  }
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
 
   const files = collectFiles(options.paths, deps.cwd);
@@ -971,9 +987,14 @@ function rules(deps: CliDeps, options: Options): number {
   for (const file of resolved.sources) deps.write(display(file, deps.cwd));
   deps.write("");
   deps.write(`threshold ${(resolved.ruleset.threshold ?? DEFAULT_THRESHOLD).toFixed(2)}`);
+  const off = resolved.ruleset.off_by_default ?? [];
+  if (off.length > 0) deps.write(`off by default, unless --only names one: ${off.join(", ")}`);
   for (const rule of resolved.ruleset.rules) {
     const how = rule.kind === "regex" ? (rule.source === "builtin" ? rule.builtin : "pattern") : "jev";
-    deps.write(`  ${rule.id.padEnd(22)} ${rule.kind.padEnd(9)} ${how}`);
+    const tags = rule.tags ?? [];
+    const sitsOut = tags.some((tag) => off.includes(tag)) ? "  (off by default)" : "";
+    const shown = tags.length === 0 ? "" : `  [${tags.join(", ")}]`;
+    deps.write(`  ${rule.id.padEnd(22)} ${rule.kind.padEnd(9)} ${how}${shown}${sitsOut}`);
   }
   return EXIT.ok;
 }
@@ -999,6 +1020,8 @@ function parseArgs(argv: readonly string[]): Options {
   let modelsPath: string | undefined;
   let evalDir: string | undefined;
   let repeats: number | undefined;
+  let only: string[] | undefined;
+  let skip: string[] | undefined;
 
   for (let i = 1; i < argv.length; i++) {
     const argument = argv[i] ?? "";
@@ -1049,6 +1072,12 @@ function parseArgs(argv: readonly string[]): Options {
       case "--repeats":
         repeats = wholeNumber(valueFor(argv, ++i, "--repeats"), "--repeats", 1);
         break;
+      case "--only":
+        only = tagList(valueFor(argv, ++i, "--only"), "--only");
+        break;
+      case "--skip":
+        skip = tagList(valueFor(argv, ++i, "--skip"), "--skip");
+        break;
       default:
         throw new UsageError(`unknown option "${argument}". Try snifftest --help.`);
     }
@@ -1073,6 +1102,8 @@ function parseArgs(argv: readonly string[]): Options {
     ...(modelsPath === undefined ? {} : { modelsPath }),
     ...(evalDir === undefined ? {} : { evalDir }),
     ...(repeats === undefined ? {} : { repeats }),
+    ...(only === undefined ? {} : { only }),
+    ...(skip === undefined ? {} : { skip }),
   };
 }
 
@@ -1088,6 +1119,16 @@ function valueFor(argv: readonly string[], index: number, name: string): string 
     throw new UsageError(`${name} needs a value.`);
   }
   return value;
+}
+
+/** A comma-separated tag list, as a person types it. */
+function tagList(value: string, name: string): string[] {
+  const tags = value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag !== "");
+  if (tags.length === 0) throw new UsageError(`${name} needs at least one tag.`);
+  return tags;
 }
 
 function formatValue(value: string): "text" | "json" {
@@ -1268,6 +1309,8 @@ function helpLines(): string[] {
     "  --rules <path>      use this ruleset instead of .snifftest.yaml or the built-in one",
     "  --threshold <0-1>   the probability at or above which a judgment counts as a flag",
     "  --format text|json  how to print the flags (default text)",
+    "  --only <tags>       run only the rules carrying one of these tags",
+    "  --skip <tags>       never run a rule carrying one of these tags",
     "  --dry-run           run the countable rules only; nothing leaves the machine",
     "  --yes, -y           answer the send question for this run and remember the answer",
     "  --help, --version",
