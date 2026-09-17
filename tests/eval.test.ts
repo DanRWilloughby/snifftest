@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -596,6 +596,33 @@ describe("snifftest eval", () => {
     };
     expect(Object.keys(scores.arms).sort()).toEqual(["A", "B", "C"]);
     expect(result.out).toContain("arm C");
+  });
+
+  test("the results directory ignores itself, and the run says where the prose went", async () => {
+    // `inputs/clean.json` carries every paragraph of the corpus verbatim, and
+    // the default destination is inside the user's own repository. An
+    // unpublished draft should not be one `git add .` away from a commit, and
+    // the run should not have to be read carefully to learn that it was written.
+    const out = sandbox();
+    const result = await cli({
+      argv: ["eval", "--dry-run", "--rules", "tests/fixtures/eval/rules.yaml", "--out", out, CORPUS],
+    });
+
+    expect(readFileSync(join(out, ".gitignore"), "utf8")).toContain("*");
+    expect(result.out).toContain("inputs");
+
+    const clean = readFileSync(join(out, "inputs/clean.json"), "utf8");
+    expect(clean.length).toBeGreaterThan(0);
+  });
+
+  test("a .gitignore already in the results directory is left as the user wrote it", async () => {
+    const out = sandbox();
+    writeFileSync(join(out, ".gitignore"), "# mine\n", "utf8");
+    await cli({
+      argv: ["eval", "--dry-run", "--rules", "tests/fixtures/eval/rules.yaml", "--out", out, CORPUS],
+    });
+
+    expect(readFileSync(join(out, ".gitignore"), "utf8")).toBe("# mine\n");
   });
 
   test("the seeded inputs name the rule and the transform behind every paragraph", async () => {
