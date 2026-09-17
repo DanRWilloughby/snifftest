@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { request as httpRequest } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
@@ -12,6 +20,12 @@ import { chunkDocument, runRegexArm } from "../src/engine.ts";
 import type { JevClient, JevRequest, JevResult } from "../src/jev.ts";
 import { type ServeHandle, serve } from "../src/serve/command.ts";
 import { type PageConfig, renderPage } from "../src/serve/page.ts";
+import {
+  RecordError,
+  newestCommittedRunDate,
+  recordReplay,
+  sentencePrefixes,
+} from "../src/serve/record.ts";
 import { ReplayError, createReplayClient, loadReplay, replaysDir } from "../src/serve/replay.ts";
 import { createScorer, reactionFor } from "../src/serve/score.ts";
 import { DEFAULT_PORT, LOOPBACK, MAX_BODY_BYTES, ServeError, startServer } from "../src/serve/server.ts";
@@ -649,11 +663,36 @@ describe("serve: live mode asks before anything leaves", () => {
     expect(readdirSync(home)).toEqual([]);
   });
 
-  test("the serve sources import nothing that writes", () => {
+  test("the page's own sources import nothing that writes", () => {
     const dir = join(repoRoot, "src/serve");
-    for (const name of readdirSync(dir).filter((file) => file.endsWith(".ts"))) {
+    // command.ts is the one exception, and it is checked on its own below: it
+    // holds `serve --record`, whose whole job is to write the file it was
+    // asked for. Nothing that serves the page may write anything.
+    const pageSources = readdirSync(dir).filter(
+      (file) => file.endsWith(".ts") && file !== "command.ts",
+    );
+    expect(pageSources.length).toBeGreaterThan(3);
+    for (const name of pageSources) {
       const source = readFileSync(join(dir, name), "utf8");
       expect(source).not.toMatch(/writeFile|appendFile|createWriteStream|mkdir|openSync|localStorage/);
+    }
+  });
+
+  test("the only thing the serve command writes is a recording it was asked for", () => {
+    const source = readFileSync(join(repoRoot, "src/serve/command.ts"), "utf8");
+    const record = source.indexOf("async function record(");
+    const afterRecord = source.indexOf("\n// ---", record);
+    expect(record).toBeGreaterThan(-1);
+    expect(afterRecord).toBeGreaterThan(record);
+
+    const writes = /writeFileSync|mkdirSync|appendFile|createWriteStream|openSync|localStorage/g;
+    for (const use of source.matchAll(writes)) {
+      // The import line names them. Every call has to sit inside `record`.
+      const lineStart = source.lastIndexOf("\n", use.index) + 1;
+      if (source.slice(lineStart, use.index).trimStart() === "" && lineStart < record) continue;
+      if (source.startsWith("import", lineStart)) continue;
+      expect(use.index).toBeGreaterThan(record);
+      expect(use.index).toBeLessThan(afterRecord);
     }
   });
 });
@@ -816,5 +855,210 @@ describe("serve: the page", () => {
     const ruleset = resolveRuleset({ cwd: sandbox() }).ruleset;
     const flags = runRegexArm(chunkDocument(visible, "page"), ruleset);
     expect(flags.map((flag) => `${flag.rule}: ${flag.message}`)).toEqual([]);
+  });
+});
+
+// --- recording a replay ----------------------------------------------------
+
+describe("serve: recording a replay", () => {
+  const DRAFT = [
+    "The counter in the hallway has been wrong since the day it was installed.",
+    "It reads high by four.",
+    "In short, that is what the paragraph just said.",
+  ].join(" ");
+
+  function draftIn(dir: string, name: string, text: string): string {
+    writeFileSync(join(dir, name), `${text}\n`, "utf8");
+    return name;
+  }
+
+  async function runRecord(
+    argv: string[],
+    cwd: string,
+    overrides: Partial<CliDeps> = {},
+  ): Promise<{ code: number; out: string[]; err: string[] }> {
+    const out: string[] = [];
+    const err: string[] = [];
+    const code = await serve({
+      argv: ["serve", ...argv],
+      env: { TYPESAFE_API_KEY: FAKE_KEY, SNIFFTEST_SEND: "typesafe" },
+      cwd,
+      homedir: cwd,
+      write: (line) => out.push(line),
+      writeError: (line) => err.push(line),
+      isTty: false,
+      ...overrides,
+    });
+    return { code, out, err };
+  }
+
+  test("every sentence boundary is a prefix, and the whole draft is the last one", () => {
+    expect(sentencePrefixes("One. Two! Three?")).toEqual(["One.", "One. Two!", "One. Two! Three?"]);
+    // A draft that does not end on a terminator still gets its whole self.
+    expect(sentencePrefixes("One. And then")).toEqual(["One.", "One. And then"]);
+    expect(sentencePrefixes("   ")).toEqual([]);
+  });
+
+  test("the writer records what the client answered, at every state the page would score", async () => {
+    const seen: JevRequest[] = [];
+    const recorded = await recordReplay({
+      ruleset: mixed(),
+      client: stubClient(
+        (state) => ({ restating_closer: state.includes("In short") ? 0.93 : 0.04 }),
+        seen,
+      ),
+      drafts: [{ name: "draft.md", text: DRAFT }],
+      runDate: "2026-09-17",
+    });
+
+    expect(recorded.file.measured).toBe(true);
+    expect(recorded.file.runDate).toBe("2026-09-17");
+    // Three sentences, so three states of the one paragraph.
+    expect(recorded.prefixes).toBe(3);
+    expect(recorded.asked).toBe(3);
+    expect(seen).toHaveLength(3);
+
+    // Shortest match first, so the playback's last-match-wins picks the state
+    // closest to what is on the page.
+    const lengths = recorded.file.responses.map((row) => row.match.length);
+    expect([...lengths].sort((a, b) => a - b)).toEqual(lengths);
+    expect(recorded.file.responses[2]?.nouls["restating_closer"]).toBe(0.93);
+    expect(recorded.file.responses[0]?.nouls["restating_closer"]).toBe(0.04);
+    // Real numbers from the reply, not placeholders.
+    expect(recorded.file.responses[0]?.inputTokens).toBe(120);
+    expect(recorded.file.responses[0]?.latencyMs).toBe(11);
+    // A paragraph the recording does not hold claims nothing.
+    expect(recorded.file.default).toEqual({
+      nouls: {},
+      inputTokens: 0,
+      latencyMs: 0,
+      estimatedCostUsd: 0,
+    });
+  });
+
+  test("a recording plays back through the replay client it was written for", async () => {
+    const recorded = await recordReplay({
+      ruleset: mixed(),
+      client: stubClient(
+        (state) => ({ restating_closer: state.includes("In short") ? 0.93 : 0.04 }),
+        [],
+      ),
+      drafts: [{ name: "draft.md", text: DRAFT }],
+      runDate: "2026-09-17",
+    });
+
+    const scorer = createScorer({
+      ruleset: mixed(),
+      threshold: 0.7,
+      client: createReplayClient(recorded.file),
+    });
+    const result = await scorer.score(DRAFT);
+
+    expect(result.flags.map((flag) => flag.rule)).toContain("restating_closer");
+    expect(result.ms).toBe(11);
+  });
+
+  test("one failed answer means no file at all", async () => {
+    const attempt = recordReplay({
+      ruleset: mixed(),
+      client: {
+        async ask(): Promise<JevResult> {
+          throw new Error("jev returned 503: model_unavailable");
+        },
+      },
+      drafts: [{ name: "draft.md", text: DRAFT }],
+      runDate: "2026-09-17",
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(RecordError);
+    await expect(attempt).rejects.toThrow(/nothing was written/);
+  });
+
+  test("a reply with no usable reading is a failure, not a recording of silence", async () => {
+    const attempt = recordReplay({
+      ruleset: mixed(),
+      client: stubClient(() => ({}), []),
+      drafts: [{ name: "draft.md", text: DRAFT }],
+      runDate: "2026-09-17",
+    });
+
+    await expect(attempt).rejects.toBeInstanceOf(RecordError);
+  });
+
+  test("the command writes the file, and never starts a page", async () => {
+    const dir = sandbox();
+    const name = draftIn(dir, "draft.md", DRAFT);
+    const seen: JevRequest[] = [];
+
+    const result = await runRecord(
+      ["--record", "out/replay.json", "--rules", MIXED, "--run-date", "2026-09-17", "--yes", name],
+      dir,
+      { createClient: () => stubClient(() => ({ restating_closer: 0.93 }), seen) },
+    );
+
+    expect(result.code).toBe(0);
+    const written = JSON.parse(readFileSync(join(dir, "out", "replay.json"), "utf8")) as {
+      measured: boolean;
+      runDate: string;
+      responses: { match: string }[];
+    };
+    expect(written.measured).toBe(true);
+    expect(written.runDate).toBe("2026-09-17");
+    expect(written.responses.length).toBeGreaterThan(0);
+    expect(result.out.join("\n")).toContain("recorded");
+  });
+
+  test("without a yes there is no recording, because there would be nothing in it", async () => {
+    const dir = sandbox();
+    const name = draftIn(dir, "draft.md", DRAFT);
+
+    const result = await runRecord(
+      ["--record", "out/replay.json", "--rules", MIXED, "--run-date", "2026-09-17", name],
+      dir,
+      { createClient: forbiddenClient },
+    );
+
+    expect(result.code).toBe(2);
+    expect(existsSync(join(dir, "out", "replay.json"))).toBe(false);
+  });
+
+  test("--record and --replay are not asked for together", async () => {
+    const dir = sandbox();
+    const name = draftIn(dir, "draft.md", DRAFT);
+    const result = await runRecord(
+      ["--record", "out.json", "--replay", "example.json", "--rules", MIXED, name],
+      dir,
+      { createClient: forbiddenClient },
+    );
+
+    expect(result.code).toBe(2);
+    expect(result.err.join("\n")).toContain("cannot be asked for together");
+  });
+
+  test("a draft named without --record says what to do with it", async () => {
+    const dir = sandbox();
+    const name = draftIn(dir, "draft.md", DRAFT);
+    const result = await runRecord(["--rules", MIXED, name], dir, { createClient: forbiddenClient });
+
+    expect(result.code).toBe(2);
+    expect(result.err.join("\n")).toContain("--record");
+  });
+
+  test("with no committed run and no --run-date, nothing is recorded", async () => {
+    const dir = sandbox();
+    const name = draftIn(dir, "draft.md", DRAFT);
+    const result = await runRecord(
+      ["--record", "out/replay.json", "--rules", MIXED, "--yes", name],
+      dir,
+      { createClient: () => stubClient(() => ({ restating_closer: 0.93 }), []) },
+    );
+
+    expect(result.code).toBe(2);
+    expect(result.err.join("\n")).toContain("bench/results");
+    expect(existsSync(join(dir, "out", "replay.json"))).toBe(false);
+  });
+
+  test("this repository's own newest committed run is the one a recording would name", () => {
+    expect(newestCommittedRunDate(repoRoot)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
