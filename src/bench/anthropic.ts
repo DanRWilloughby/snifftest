@@ -10,6 +10,11 @@
  * dated file (`src/bench/prices.ts`). A served model the file has no row for is
  * metered with no cost at all, which is Houston's rule at
  * `src/producer/llm.ts` and for its reason: an invented zero reads as "free".
+ *
+ * This adapter honours the row's own completion budget, and has no extended
+ * thinking wired into it. A panel row that asks for reasoning on this provider
+ * is refused when the file is read, rather than being sent a request without
+ * the setting and printed in a footnote that says it had one.
  */
 
 import {
@@ -30,7 +35,6 @@ export const ANTHROPIC_MODELS_ENDPOINT = "https://api.anthropic.com/v1/models";
 export const ANTHROPIC_KEY_ENV = "ANTHROPIC_API_KEY";
 
 const API_VERSION = "2023-06-01";
-const MAX_TOKENS = 900;
 
 export function readAnthropicCatalog(payload: unknown): CatalogEntry[] {
   const data = asRecord(payload)?.["data"];
@@ -67,7 +71,7 @@ export function createAnthropicAdapter(options: AdapterOptions): ModelAdapter {
     async call(request: ModelCall): Promise<ModelReply> {
       const body = JSON.stringify({
         model: request.slug,
-        max_tokens: MAX_TOKENS,
+        max_tokens: request.maxTokens,
         temperature: 0,
         system: request.system,
         messages: [{ role: "user", content: request.user }],
@@ -80,12 +84,19 @@ export function createAnthropicAdapter(options: AdapterOptions): ModelAdapter {
 
       const root = asRecord(parsed);
       const usage = asRecord(root?.["usage"]);
+      const served = root?.["model"];
+      const stopReason = root?.["stop_reason"];
 
       return {
-        servedModel: typeof root?.["model"] === "string" ? (root["model"] as string) : request.slug,
+        servedModel: typeof served === "string" ? served : request.slug,
         text: textOf(root),
         inputTokens: countOf(usage?.["input_tokens"]),
         outputTokens: countOf(usage?.["output_tokens"]),
+        // No row asks this adapter for extended thinking, and the panel refuses
+        // a row that tries, so there is no reasoning here to report.
+        reasoningTokens: 0,
+        finishReason: typeof stopReason === "string" ? stopReason : null,
+        truncated: stopReason === "max_tokens",
         latencyMs,
         attempts,
       };

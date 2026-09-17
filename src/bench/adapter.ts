@@ -20,7 +20,7 @@
 
 import { scrubSecrets } from "../scrub.ts";
 import type { FetchLike } from "../jev.ts";
-import type { CatalogEntry, Provider } from "./panel.ts";
+import type { CatalogEntry, Provider, ReasoningSetting } from "./panel.ts";
 
 export type { FetchLike };
 
@@ -31,6 +31,10 @@ export interface ModelCall {
   readonly user: string;
   /** Whether to ask for structured output; set from the model's catalogue entry. */
   readonly jsonMode: boolean;
+  /** The completion budget for this row, from its panel entry. */
+  readonly maxTokens: number;
+  /** Absent when the row asks for no reasoning at all. */
+  readonly reasoning?: ReasoningSetting;
 }
 
 export interface ModelReply {
@@ -39,6 +43,18 @@ export interface ModelReply {
   readonly text: string;
   readonly inputTokens: number;
   readonly outputTokens: number;
+  /**
+   * The internal reasoning the provider billed for, when it reports any.
+   *
+   * Reported separately from `outputTokens` because it is the number that
+   * explains a deep row's cost and a deep row's truncations, and because a
+   * reader comparing two rows deserves to see which one was thinking.
+   */
+  readonly reasoningTokens: number;
+  /** The provider's own word for why it stopped, or nothing when it said none. */
+  readonly finishReason: string | null;
+  /** The reply ran out of completion budget. A different failure from a torn one. */
+  readonly truncated: boolean;
   readonly latencyMs: number;
   readonly attempts: number;
 }

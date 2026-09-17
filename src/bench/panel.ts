@@ -18,6 +18,20 @@
  * match two slugs at once (a model and its thinking variant). A preference is
  * still checked against the live list; it chooses between things that exist, it
  * never asserts that one does.
+ *
+ * ## Why a row may declare a budget and a reasoning setting
+ *
+ * On most providers a reasoning model's internal tokens come out of the same
+ * completion budget as its answer. One budget for every row therefore does not
+ * treat every row the same: it hands the deep rows a smaller answer than the
+ * fast ones, and a row that spends the budget thinking is cut off before it
+ * writes anything and reads as a parse failure. That would be a table rigged
+ * against the rows it most wants to show.
+ *
+ * So a row may declare `max_tokens` and `reasoning` of its own. Those settings
+ * are written into the raw output and printed under the tables, because a
+ * comparison whose rows were sent different requests has to say so rather than
+ * let a reader assume otherwise.
  */
 
 import { type YamlValue, parseYaml } from "../yaml.ts";
@@ -33,6 +47,38 @@ export class PanelError extends Error {
   }
 }
 
+/** The efforts OpenRouter documents for its `reasoning` request field. */
+export const REASONING_EFFORTS = ["minimal", "low", "medium", "high"] as const;
+export type ReasoningEffort = (typeof REASONING_EFFORTS)[number];
+
+/**
+ * What a panel row asks a reasoning model to do.
+ *
+ * Named after the provider's own field so that the setting a reader sees in the
+ * footnote is the setting that went down the wire. One of `effort` and
+ * `max_tokens`, never both: OpenRouter documents them as alternatives and a
+ * request carrying both is a request whose behaviour nobody can predict.
+ */
+export interface ReasoningSetting {
+  readonly effort?: ReasoningEffort;
+  /** A token budget for the internal reasoning, when a row prefers one to an effort. */
+  readonly maxTokens?: number;
+  /** Ask the provider to spend the reasoning but leave it out of the reply. */
+  readonly exclude?: boolean;
+}
+
+/**
+ * The completion budget a row gets when its panel entry asks for no other.
+ *
+ * Long enough for a deep model on a paragraph, short enough to fail a run in a
+ * day. It is the right number only for a row that does not reason: on most
+ * providers the internal reasoning comes out of this same budget, so a
+ * reasoning row left on this default can spend the whole of it thinking and be
+ * cut off before it writes the JSON object it was asked for. Such a row is
+ * declared in the panel file with a budget of its own.
+ */
+export const DEFAULT_MAX_TOKENS = 900;
+
 export interface PanelEntry {
   /** The id used in tables, file names and the joined report. */
   readonly id: string;
@@ -44,6 +90,10 @@ export interface PanelEntry {
   readonly match: string;
   /** Exact ids to take first when they exist, in order. */
   readonly prefer?: readonly string[];
+  /** The completion budget sent for this row. Always a number, so the footnote can print it. */
+  readonly maxTokens: number;
+  /** Absent when the row asks for no reasoning at all. */
+  readonly reasoning?: ReasoningSetting;
   readonly note?: string;
 }
 
@@ -150,6 +200,7 @@ function readEntry(value: YamlValue, where: string): PanelEntry {
   const label = value["label"];
   const tier = value["tier"];
   const note = value["note"];
+  const reasoning = readReasoning(value["reasoning"], `${where}.reasoning`, provider);
 
   return {
     id,
@@ -158,8 +209,70 @@ function readEntry(value: YamlValue, where: string): PanelEntry {
     provider: provider as Provider,
     match,
     ...(preferred === undefined ? {} : { prefer: preferred }),
+    maxTokens: readBudget(value["max_tokens"], `${where}.max_tokens`) ?? DEFAULT_MAX_TOKENS,
+    ...(reasoning === undefined ? {} : { reasoning }),
     ...(typeof note === "string" ? { note } : {}),
   };
+}
+
+/**
+ * A row's reasoning setting, refused rather than half honoured.
+ *
+ * The Anthropic direct adapter has no extended thinking wired into it, so a row
+ * that asks for reasoning on that provider is an error here rather than a
+ * setting the footnote prints and the request never carries.
+ */
+function readReasoning(
+  value: YamlValue | undefined,
+  where: string,
+  provider: string,
+): ReasoningSetting | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!isMapping(value)) throw new PanelError(`${where} is a mapping of the provider's own fields.`);
+  if (provider !== "openrouter") {
+    throw new PanelError(
+      `${where} is set, and only the openrouter adapter sends a reasoning request; the ${provider} adapter has no extended thinking wired into it.`,
+    );
+  }
+
+  const effort = value["effort"];
+  if (effort !== undefined && effort !== null && !isEffort(effort)) {
+    throw new PanelError(`${where}.effort is one of ${REASONING_EFFORTS.join(", ")}.`);
+  }
+
+  const budget = readBudget(value["max_tokens"], `${where}.max_tokens`);
+  if (isEffort(effort) && budget !== undefined) {
+    throw new PanelError(
+      `${where} sets both effort and max_tokens, and the provider documents them as alternatives. Pick one.`,
+    );
+  }
+
+  const exclude = value["exclude"];
+  if (exclude !== undefined && exclude !== null && typeof exclude !== "boolean") {
+    throw new PanelError(`${where}.exclude is true or false.`);
+  }
+
+  const setting: ReasoningSetting = {
+    ...(isEffort(effort) ? { effort } : {}),
+    ...(budget === undefined ? {} : { maxTokens: budget }),
+    ...(typeof exclude === "boolean" ? { exclude } : {}),
+  };
+  if (Object.keys(setting).length === 0) {
+    throw new PanelError(`${where} is empty; leave it out to ask for no reasoning at all.`);
+  }
+  return setting;
+}
+
+function isEffort(value: unknown): value is ReasoningEffort {
+  return typeof value === "string" && (REASONING_EFFORTS as readonly string[]).includes(value);
+}
+
+function readBudget(value: YamlValue | undefined, where: string): number | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "number" || !Number.isInteger(value) || value <= 0) {
+    throw new PanelError(`${where} is a whole number of tokens above zero.`);
+  }
+  return value;
 }
 
 function readPrices(value: YamlValue | undefined, file: string): Record<string, string> {
