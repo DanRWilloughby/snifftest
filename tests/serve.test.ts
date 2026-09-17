@@ -126,6 +126,7 @@ function stubClient(answer: (state: string) => Record<string, number>, seen: Jev
         inputTokens: 120,
         outputTokens: 0,
         estimatedCostUsd: 120 * 0.042e-6,
+        usageReported: true,
         latencyMs: 11,
         attempts: 1,
       };

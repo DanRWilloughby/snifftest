@@ -488,6 +488,7 @@ function collectObservation(
     latencyMs: record.latency_ms,
     inputTokens: record.usage.input_tokens,
     outputTokens: record.usage.output_tokens,
+    usageReported: true,
     costUsd: costOf(record.usage, model.prices),
     requests: 1,
     retries: Math.max(0, record.attempts - 1),
