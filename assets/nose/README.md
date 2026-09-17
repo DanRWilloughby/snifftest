@@ -8,15 +8,36 @@ source, no fonts, no dependencies.
 
 | Path | What it is |
 | --- | --- |
-| `concepts/a-snoot.svg` | **Recommended.** Profile nose, pen line. |
-| `concepts/b-bulb.svg` | Front-on bulb, two nostrils. Strongest silhouette at 16 px. |
-| `concepts/c-beak.svg` | Long pointed profile. The most character. |
-| `concepts/d-blot.svg` | Wildcard. Solid ink silhouette with knock-out nostril (mask). |
-| `expressions.json` | The rig manifest: parts, pivots, six expressions per concept, beat timing. |
-| `frames/a-01-rest.svg` … `a-06-twitch.svg` | Concept A baked one state per file with a little line boil. The alternative to tweening. |
-| `favicon.svg` | Concept A strokes, construction marks dropped, weight up, filled to the box. |
-| `contact-sheet.html` | Self-contained review page: every concept and expression at 16, 64 and 400 px on light and dark, rig-versus-frames motion, browser-tab mock. Open it in a browser. |
-| `build.mjs` | Regenerates A, B, C, the manifest, frames, favicon and the contact sheet. `bun assets/nose/build.mjs assets/nose`. D is hand-authored and only read. |
+| `concepts/e-sketch.svg` | **Round 2, recommended.** Pencil profile: brow into bridge, round tip, wing, nostril, lip hint, hatching. |
+| `concepts/f-sketch-3q.svg` | Round 2 wildcard. Pencil three-quarter view, both wings and nostrils, philtrum below. |
+| `concepts/a-snoot.svg` | Round 1 pick. Profile nose, ink line. |
+| `concepts/b-bulb.svg` | Round 1. Front-on bulb, two nostrils. Strongest silhouette at 16 px. |
+| `concepts/c-beak.svg` | Round 1. Long pointed profile. |
+| `concepts/d-blot.svg` | Round 1 wildcard. Solid ink silhouette with knock-out nostril (mask). |
+| `expressions.json` | The rig manifest: parts, pivots, six expressions per concept, beat timing, `round` and `frames` per concept. |
+| `frames/e-01-rest.svg` … `e-06-twitch.svg`, `frames/a-*.svg` | E and A baked one state per file with a little line boil. The alternative to tweening. |
+| `favicon-sketch.svg` | Round 2 favicon: E's main contours only, weight up so the pencil line survives 16 px. |
+| `favicon.svg` | Round 1 favicon: A's strokes, heavier, filled to the box. |
+| `contact-sheet.html` | Self-contained review page: round 1 versus round 2 at 16, 64 and 400 px on light and dark, every concept and expression, rig-versus-frames motion, browser-tab mock. Open it in a browser. |
+| `build.mjs` | Regenerates A, B, C, E, F, the manifest, frames, favicons and the contact sheet. `bun assets/nose/build.mjs assets/nose`. D is hand-authored and only read. |
+
+## Round 2: the pencil sketch
+
+Round 1 was an inked cartoon; the note was that the edges were too bold and the shape not
+clearly enough a nose. Round 2 keeps the rig and redraws in pencil:
+
+- The main contour is thin (about 1.3 units at its heaviest on a 100-unit canvas) and drawn
+  at 80 percent opacity, so it reads as graphite rather than ink on both grounds.
+- Two fainter passes shadow each contour, offset by under a unit: the searching line of a
+  quick sketch. Construction marks (a circle for the tip, a guide for the bridge) sit at 0.16.
+- Hatching (short bowed strokes at 0.5 wide) shades under the tip and beside the bridge; the
+  nostril is a soft fill with hatch inside it, not a solid blob.
+- The anatomy is explicit: brow into bridge, round tip, ala (wing), nostril, and a lip hint
+  below the columella in a static `lip` group inside `nose`, so the silhouette reads as a nose
+  on a face rather than a hook or a shell.
+
+A pencil line does not survive 16 px, so `favicon-sketch.svg` is the same centrelines with the
+weight up and only the main contours. Use it for the tab icon and the rig for everything else.
 
 ## How the drawing works
 
@@ -76,8 +97,9 @@ part, so a tween is a field-by-field lerp between two states; there is nothing t
 | `recoil` | recoiling | nose translate 9,-4, rotate 12°, scale 0.94; nostrils flare 1.25–1.3; wrinkles 0.7; stink on |
 | `twitch` | a flick | nose rotate -4°; right nostril 1.18×1.1 rotate -6°; left nostril 0.9; flick marks on |
 
-Concept B overrides the head moves so the front-on face lifts and drops without rotating.
-`timing` in the manifest gives a hold and ease per state for a default loop.
+Concept B overrides the head moves so the front-on face lifts and drops without rotating;
+F does the same with a small rotation. `timing` in the manifest gives a hold and ease per
+state for a default loop.
 
 ### Rig or frames
 
@@ -91,7 +113,7 @@ The contact sheet shows both side by side. Pick one.
 - Web page: inline `concepts/<pick>.svg`, set the six states from `expressions.json`, tween
   with a lerp on a `requestAnimationFrame` loop or CSS transitions on `transform` and
   `opacity` (set `transform-box: fill-box; transform-origin` per part if you go the CSS route).
-  Use `favicon.svg` as the tab icon.
+  Use `favicon-sketch.svg` (round 2) or `favicon.svg` (round 1) as the tab icon to match the pick.
 - Video template: read the manifest, interpolate two states for the current frame, write
   `transform` and `opacity` per part, or cross-cut the frames on the beat schedule.
 
