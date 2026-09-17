@@ -153,7 +153,7 @@ beforeAll(() => {
   realRunner = join(dir, "snifftest");
   writeFileSync(
     realRunner,
-    `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(join(repoRoot, "src", "cli.ts"))} "$@"\n`,
+    `#!/bin/sh\nexec ${JSON.stringify(process.execPath)} ${JSON.stringify(join(repoRoot, "src", "bin.ts"))} "$@"\n`,
   );
   chmodSync(realRunner, 0o755);
 });
@@ -434,6 +434,75 @@ describe("when the checker never got as far as an opinion", () => {
   });
 });
 
+describe("a tool failure never makes the hook more permissive than no key at all", () => {
+  // Turning the judgment pass on and having the service refuse the key made the
+  // hook let a draft through that the free rules had already flagged: the CLI
+  // prints the countable flags and exits 2, and exit 2 was read as "the checker
+  // did not run". The countable result is local, it is complete, and it does
+  // not depend on the arm that failed.
+  const FLAG = "post.md:1 dash_present 1.00 A long dash. Give the sentence a full stop instead.";
+
+  test("exit 2 with a flag line blocks the commit and blames the tool, not the draft", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner({
+      code: 2,
+      stdout: FLAG,
+      stderr: "the judgment rules could not run: HTTP 401",
+    });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "bad key"], { SNIFFTEST_BIN: runner.bin });
+
+    expect(commit.code).not.toBe(0);
+    expect(commit.stdout + commit.stderr).toContain("dash_present");
+    expect(commit.stderr).toContain("did not finish");
+    expect(git(dir, ["log", "--oneline"]).stdout).not.toContain("bad key");
+  });
+
+  test("exit 3 with a flag line blocks on the countable result", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner({ code: 3, stdout: FLAG });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "no answer"], { SNIFFTEST_BIN: runner.bin });
+
+    expect(commit.code).not.toBe(0);
+    expect(commit.stdout + commit.stderr).toContain("dash_present");
+  });
+
+  test("exit 3 with nothing flagged is not a verdict on the prose", () => {
+    // Nothing was sent and nothing was read, so there is no finding to report.
+    // The hook says what happened and how to answer, and steps aside.
+    const dir = scratchRepo();
+    const runner = recordingRunner({ code: 3 });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "unanswered"], { SNIFFTEST_BIN: runner.bin });
+
+    expect(commit.code).toBe(0);
+    expect(commit.stderr).toContain("SNIFFTEST_SEND");
+    expect(commit.stderr).not.toContain("trips the rules");
+    expect(git(dir, ["log", "--oneline"]).stdout).toContain("unanswered");
+  });
+
+  test("SNIFFTEST_STRICT=1 blocks an unanswered run as well", () => {
+    const dir = scratchRepo();
+    const runner = recordingRunner({ code: 3 });
+    writeFileSync(join(dir, "post.md"), CLEAN);
+    git(dir, ["add", "post.md"]);
+
+    const commit = git(dir, ["commit", "-m", "strict unanswered"], {
+      SNIFFTEST_BIN: runner.bin,
+      SNIFFTEST_STRICT: "1",
+    });
+
+    expect(commit.code).not.toBe(0);
+  });
+});
+
 describe("when the checker itself is broken", () => {
   test("a tool failure warns and lets the commit through", () => {
     const dir = scratchRepo();
@@ -444,7 +513,11 @@ describe("when the checker itself is broken", () => {
     const commit = git(dir, ["commit", "-m", "broken tool"], { SNIFFTEST_BIN: runner.bin });
 
     expect(commit.code).toBe(0);
-    expect(commit.stderr).toContain("could not finish");
+    expect(commit.stderr).toContain("did not finish");
+    // The wording matters as much as the exit code: an exit 2 says nothing
+    // about the draft, and the hook has to say so rather than leave a writer
+    // reading a tool failure as a verdict.
+    expect(commit.stderr).toContain("the tool, not your draft");
   });
 
   test("SNIFFTEST_STRICT=1 turns the same failure into a blocked commit", () => {

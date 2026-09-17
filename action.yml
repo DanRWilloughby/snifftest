@@ -55,6 +55,9 @@ outputs:
   report:
     description: Path on the runner to the checker's output.
     value: ${{ steps.run.outputs.report }}
+  verdict:
+    description: findings, clean, failure or consent. What the exit code means, in a word.
+    value: ${{ steps.run.outputs.verdict }}
 
 runs:
   using: composite
@@ -166,14 +169,41 @@ runs:
           > "$report" 2>&1 || status=$?
 
         cat "$report"
+
+        # What the exit code means, in a word, because three of the four codes
+        # are not about the prose at all. A checker that could not finish, or a
+        # run nobody answered the sending question for, reported under a
+        # sentence about the writing is a false accusation the writer cannot
+        # argue with. Every surface below chooses its wording from this.
+        case "$status" in
+          0) verdict=clean ;;
+          1) verdict=findings ;;
+          3) verdict=consent ;;
+          *) verdict=failure ;;
+        esac
+
         echo "exit-code=$status" >> "$GITHUB_OUTPUT"
         echo "report=$report" >> "$GITHUB_OUTPUT"
+        echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
 
-        if [ "$status" = "0" ]; then
-          echo "### Sniff Test: nothing tripped" >> "$GITHUB_STEP_SUMMARY"
-        else
+        case "$verdict" in
+          clean)
+            echo "### Sniff Test: nothing tripped" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          findings)
+            heading="### Sniff Test: the prose trips the rules below"
+            ;;
+          consent)
+            heading="### Sniff Test: the judgment rules were not run"
+            ;;
+          *)
+            heading="### Sniff Test: the checker could not finish. This is the tool, not the prose."
+            ;;
+        esac
+
+        if [ "$verdict" != "clean" ]; then
           {
-            echo "### Sniff Test"
+            echo "$heading"
             echo ""
             echo '```'
             cat "$report"
@@ -188,6 +218,7 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         SNIFFTEST_REPORT: ${{ steps.run.outputs.report }}
+        SNIFFTEST_VERDICT: ${{ steps.run.outputs.verdict }}
         SNIFFTEST_PR: ${{ github.event.pull_request.number }}
       run: |
         set -euo pipefail
@@ -196,9 +227,25 @@ runs:
         # probability, and the message the ruleset wrote. No sentence of the
         # draft is ever read out of the file and into a comment, which is the
         # whole reason this step posts a report rather than a diff.
+        #
+        # The opening line is chosen by what actually happened. Posting "flagged
+        # the prose" over a 401, a timeout or an unanswered sending question
+        # tells an author their writing was judged when it never was.
+        case "${SNIFFTEST_VERDICT:-failure}" in
+          findings)
+            opening="**Sniff Test** flagged the prose in this pull request."
+            ;;
+          consent)
+            opening="**Sniff Test** did not run the judgment rules: nothing was sent, because the sending question was not answered. Nothing below is a judgment on the prose."
+            ;;
+          *)
+            opening="**Sniff Test** could not finish. This is the checker failing, not a finding about the prose."
+            ;;
+        esac
+
         body="${RUNNER_TEMP:-/tmp}/snifftest-comment.md"
         {
-          echo "**Sniff Test** flagged the prose in this pull request."
+          echo "$opening"
           echo ""
           echo '```'
           head -c 60000 "$SNIFFTEST_REPORT"

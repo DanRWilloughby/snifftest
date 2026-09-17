@@ -192,22 +192,53 @@ not_run() {
   exit 0
 }
 
+flagged() {
+  grep -Eq "$FLAG_LINE" "$out"
+}
+
+blocked() {
+  echo "snifftest: the staged prose trips the rules above." >&2
+  echo "           Fix it, or commit anyway with SNIFFTEST_SKIP=1 or --no-verify." >&2
+  exit 1
+}
+
+# The checker stopped somewhere after the countable rules had already run.
+#
+# Those rules are regular expressions run here, on the staged text, and their
+# result does not depend on the arm that failed. Dropping it made turning the
+# judgment pass on with a key the service refuses *more* permissive than having
+# no key at all: the same draft that a free run blocks was committed, because
+# exit 2 was read as "nothing was checked". So the local verdict is enforced
+# when there is one, and the message says which part failed, because a tool
+# failure is never evidence about the prose.
+did_not_finish() {
+  echo "snifftest: the checker did not finish (exit $1). That is the tool, not your draft." >&2
+  cat "$err" >/dev/null 2>&1
+  if flagged; then
+    echo "           The countable rules ran first, and what they found is above." >&2
+    blocked
+  fi
+  echo "           Nothing was flagged before it stopped, so nothing is claimed about the prose." >&2
+  echo "           Set SNIFFTEST_STRICT=1 to treat this as a failure." >&2
+  [ "${SNIFFTEST_STRICT:-0}" = "1" ] && exit 1
+  exit 0
+}
+
 case $status in
   0)
     exit 0
     ;;
   1)
-    if grep -Eq "$FLAG_LINE" "$out"; then
-      echo "snifftest: the staged prose trips the rules above." >&2
-      echo "           Fix it, or commit anyway with SNIFFTEST_SKIP=1 or --no-verify." >&2
-      exit 1
+    if flagged; then
+      blocked
     fi
     not_run "$status"
     ;;
   3)
-    echo "snifftest: the judgment rules need a yes before anything is sent." >&2
-    echo "           Set SNIFFTEST_SEND=1, or leave it and get the free rules." >&2
-    exit 1
+    echo "snifftest: the judgment rules needed a yes before anything was sent, and did not get one." >&2
+    echo "           Nothing was sent. Set SNIFFTEST_SEND to the destinations you are" >&2
+    echo "           answering for, or leave it and get the countable rules." >&2
+    did_not_finish "$status"
     ;;
   127)
     echo "snifftest: not installed and neither bunx nor npx is on PATH." >&2
@@ -218,9 +249,6 @@ case $status in
   *)
     # A broken tool is not evidence of a bad draft, and a hook that wedges every
     # commit in the repository is worse than one that says so and steps aside.
-    echo "snifftest: could not finish (exit $status); the commit was not blocked." >&2
-    echo "           Set SNIFFTEST_STRICT=1 to treat this as a failure." >&2
-    [ "${SNIFFTEST_STRICT:-0}" = "1" ] && exit 1
-    exit 0
+    did_not_finish "$status"
     ;;
 esac
