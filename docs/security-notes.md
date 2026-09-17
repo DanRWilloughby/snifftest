@@ -3,7 +3,8 @@
 A record of the decisions behind the security work, kept so that a reader who
 disagrees with one can see what it was weighed against rather than guessing.
 What the tool sends, when it asks and where keys come from belongs in
-`SECURITY.md`, which is a reader's document. This one is for the choices.
+`SECURITY.md`, a reader's document that is being written and is not in the tree
+yet. This one is for the choices.
 
 ## Considered and rejected
 
@@ -56,6 +57,30 @@ re-opened by new evidence, never by being raised again.
   the tag, and step one of the checklist in `docs/releasing.md` is to bump it.
   It is the first thing that has to happen to cut `v0.1.0`, which is what owning
   the name needs.
+
+- **Refusing a hostile regular expression by shape, rather than by running it
+  with a timeout.** Rejected on the timeout: nothing in JavaScript can interrupt
+  a regular expression once it starts, so a timeout would have to be a worker,
+  and that is a thread per rule to move a hang somewhere it can be killed. Two
+  shapes are refused when the ruleset is read: a repetition applied to a group
+  that already holds one, and a repeated group whose alternatives can match the
+  same text. `(cat|dog)+` survives, because two branches that cannot begin on
+  the same character give the engine one way through; `(a|a)+`, `(a|ab)+` and
+  `(x|xx)*` do not, and `(a|a)+` was measured at 174 ms over twenty-four
+  characters and roughly 1.84 per character after that. The false positive this
+  costs, a branch whose first character cannot be read off the pattern, is a
+  shape a prose ruleset does not write.
+
+  Under both of those the pattern is run against strings of four to twenty-four
+  characters before the ruleset is accepted, and one that climbs out of a few
+  milliseconds in that range is refused with the length and the time. The
+  lengths climb rather than jumping to the longest, because measuring the cost
+  of a pattern is the one thing that can itself hang. That probe is a
+  measurement on a short string and not a proof about a long one. The 8,000
+  character cap on how much of a paragraph a ruleset's pattern reads is the last
+  layer, and it is a cap on the length rather than on the cost: for a pattern
+  that backtracks exponentially those are not the same thing, which is why the
+  refusals are what this rests on.
 
 - **Putting the answer cache next to the files being checked.** Rejected: a
   cache written into the directory under check is a file somebody commits

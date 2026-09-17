@@ -92,19 +92,44 @@ describe("what the published tarball may contain", () => {
 
   test("the allowlist is exactly what the commands need and nothing else", () => {
     // The corpus, the fault bank, the panel and the price files are here
-    // because `eval` and `bench` read them. Without them both commands work
-    // from a clone of this repo and from nowhere else, which is not what they
-    // are described as. `bench/results/` is deliberately not named: a run's own
-    // output is not part of the tool.
+    // because `eval`, `bench` and `serve --replay` read them at run time.
+    // Without them those commands work from a clone of this repo and from
+    // nowhere else, which is not what they are described as. `bench/results/`
+    // is deliberately not named: a run's own output is not part of the tool.
+    // Nor are `examples/adversarial/`, three files of injection payloads that
+    // nobody wants in their node_modules, or `examples/structure/`, which is a
+    // clone's exercise. The reason for each entry lives beside it in the gate.
     expect(pkg.files).toEqual([
       "dist",
       "rules",
-      "examples",
       "bench/panel.yaml",
       "bench/prices",
+      "examples/CORPUS.md",
+      "examples/corpus",
+      "examples/seeds",
+      "examples/replays",
       "README.md",
+      "SECURITY.md",
       "LICENSE",
     ]);
+  });
+
+  test("the gate names every path the manifest ships, and both workflows run it", () => {
+    // The manifest decides what npm packs; the gate decides whether that was
+    // meant. They were allowed to disagree once, and the build stayed red
+    // rather than the question getting answered.
+    const gate = read(".github/scripts/tarball-allowlist.mjs");
+    for (const entry of pkg.files) {
+      // A directory in the manifest is a prefix in the gate.
+      const named = gate.includes(`"${entry}/"`) || gate.includes(`"${entry}"`);
+      expect(`${entry}: ${String(named)}`).toBe(`${entry}: true`);
+    }
+
+    for (const name of ["ci.yml", "release.yml"]) {
+      expect(read(`.github/workflows/${name}`)).toContain(
+        "node .github/scripts/tarball-allowlist.mjs pack.json",
+      );
+    }
   });
 
   test("no runtime dependency, which is the promise on the first screen", () => {
