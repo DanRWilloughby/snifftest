@@ -82,3 +82,26 @@ the reason. A line is reopened by new evidence, not by asking again.
   scored against arms A and B over the same corpus, because moving it would
   give the project two recall figures for one arm measured two ways, which is
   the fault this change exists to remove.
+
+## Two rules now ask about a sentence, not a paragraph
+
+`self_undercutting` and `first_x_that` used to ask whether "the paragraph"
+contained the fault. A single bad sentence inside an otherwise confident
+paragraph scored just under the bar, between 0.43 and 0.68, because the rest of
+the paragraph pulled the answer down. Both rules now say that one sentence is
+enough, in the description and in the criterion.
+
+Measured on 2026-09-17 over the packaged corpus, eight seeds per rule, seed 1,
+faults from the independent bank, flags counted at 0.7, same day and same
+served model for both wordings:
+
+| Rule | Old wording | New wording |
+|---|---|---|
+| self_undercutting | 4 of 8 | 7 of 8 |
+| first_x_that | 5 of 8 | 6 of 8 |
+| Clean paragraphs flagged, all rules | 2 of 54 | 2 of 54 |
+
+Sixteen seeds is a small sample, and the wording was first tried on an easier
+seed set before it was checked here. The run with the new wording is committed
+under `bench/results/2026-09-17/`. The other judgment rules already asked about
+"at least one" sentence or run and were left alone.

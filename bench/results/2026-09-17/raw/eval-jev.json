@@ -1,0 +1,4336 @@
+{
+ "run_date": "2026-09-17",
+ "model": "jev-1.13.0",
+ "endpoint_model_requested": "jev-latest",
+ "question_ids": [
+  "not_x_but_y",
+  "tricolon",
+  "stacked_hedging",
+  "rhetorical_opener",
+  "restating_closer",
+  "self_undercutting",
+  "first_x_that",
+  "naked_cost_figure",
+  "jobs_claim",
+  "pullquote_fragment"
+ ],
+ "usd_per_input_token": 4.2e-8,
+ "records": [
+  {
+   "id": "C00",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.4,
+    "tricolon": 0.29,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.16,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.11,
+    "jobs_claim": 0.13,
+    "pullquote_fragment": 0.13
+   },
+   "usage": {
+    "input_tokens": 2857,
+    "output_tokens": 198
+   },
+   "latency_s": 0.475,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119994,
+   "error": null
+  },
+  {
+   "id": "C01",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.32,
+    "tricolon": 0.24,
+    "stacked_hedging": 0.14,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.29,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.12,
+    "pullquote_fragment": 0.14
+   },
+   "usage": {
+    "input_tokens": 2853,
+    "output_tokens": 198
+   },
+   "latency_s": 0.188,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119826,
+   "error": null
+  },
+  {
+   "id": "C02",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.4,
+    "tricolon": 0.23,
+    "stacked_hedging": 0.16,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.18,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2865,
+    "output_tokens": 198
+   },
+   "latency_s": 0.182,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012033,
+   "error": null
+  },
+  {
+   "id": "C03",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.16,
+    "tricolon": 0.39,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.4,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2857,
+    "output_tokens": 198
+   },
+   "latency_s": 0.217,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119994,
+   "error": null
+  },
+  {
+   "id": "C04",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.24,
+    "tricolon": 0.24,
+    "stacked_hedging": 0.2,
+    "rhetorical_opener": 0.17,
+    "restating_closer": 0.69,
+    "self_undercutting": 0.3,
+    "first_x_that": 0.08,
+    "naked_cost_figure": 0.08,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.13
+   },
+   "usage": {
+    "input_tokens": 2847,
+    "output_tokens": 198
+   },
+   "latency_s": 0.183,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011957399999999999,
+   "error": null
+  },
+  {
+   "id": "C05",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.68,
+    "tricolon": 0.46,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2854,
+    "output_tokens": 198
+   },
+   "latency_s": 0.204,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119868,
+   "error": null
+  },
+  {
+   "id": "C06",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.1,
+    "tricolon": 0.29,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.07,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2847,
+    "output_tokens": 198
+   },
+   "latency_s": 0.159,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011957399999999999,
+   "error": null
+  },
+  {
+   "id": "C07",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.1,
+    "tricolon": 0.19,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2859,
+    "output_tokens": 198
+   },
+   "latency_s": 0.181,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120078,
+   "error": null
+  },
+  {
+   "id": "C08",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.24,
+    "tricolon": 0.18,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.03,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.12,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2855,
+    "output_tokens": 198
+   },
+   "latency_s": 0.238,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011991,
+   "error": null
+  },
+  {
+   "id": "C09",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.33,
+    "tricolon": 0.3,
+    "stacked_hedging": 0.14,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.09,
+    "self_undercutting": 0.35,
+    "first_x_that": 0.22,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.07,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2970,
+    "output_tokens": 198
+   },
+   "latency_s": 0.209,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012474,
+   "error": null
+  },
+  {
+   "id": "C10",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.09,
+    "tricolon": 0.24,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.01,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.21,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2884,
+    "output_tokens": 198
+   },
+   "latency_s": 0.181,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121128,
+   "error": null
+  },
+  {
+   "id": "C11",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.18,
+    "tricolon": 0.45,
+    "stacked_hedging": 0.13,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.3,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.02,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2907,
+    "output_tokens": 198
+   },
+   "latency_s": 0.15,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000122094,
+   "error": null
+  },
+  {
+   "id": "C12",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.3,
+    "stacked_hedging": 0.16,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2910,
+    "output_tokens": 198
+   },
+   "latency_s": 0.276,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012222,
+   "error": null
+  },
+  {
+   "id": "C13",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.23,
+    "stacked_hedging": 0.1,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2935,
+    "output_tokens": 198
+   },
+   "latency_s": 0.251,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012327,
+   "error": null
+  },
+  {
+   "id": "C14",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.39,
+    "tricolon": 0.4,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.08
+   },
+   "usage": {
+    "input_tokens": 2867,
+    "output_tokens": 198
+   },
+   "latency_s": 0.196,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120414,
+   "error": null
+  },
+  {
+   "id": "C15",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.36,
+    "tricolon": 0.23,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.12,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.28,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2853,
+    "output_tokens": 198
+   },
+   "latency_s": 0.237,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119826,
+   "error": null
+  },
+  {
+   "id": "C16",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.53,
+    "tricolon": 0.39,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2851,
+    "output_tokens": 198
+   },
+   "latency_s": 0.159,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011974199999999999,
+   "error": null
+  },
+  {
+   "id": "C17",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.16,
+    "tricolon": 0.16,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.02
+   },
+   "usage": {
+    "input_tokens": 2863,
+    "output_tokens": 198
+   },
+   "latency_s": 0.167,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120246,
+   "error": null
+  },
+  {
+   "id": "C18",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.1,
+    "tricolon": 0.12,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.1,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2848,
+    "output_tokens": 198
+   },
+   "latency_s": 0.169,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119616,
+   "error": null
+  },
+  {
+   "id": "C19",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.08,
+    "tricolon": 0.12,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.05,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2851,
+    "output_tokens": 198
+   },
+   "latency_s": 0.199,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011974199999999999,
+   "error": null
+  },
+  {
+   "id": "C20",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.18,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2859,
+    "output_tokens": 198
+   },
+   "latency_s": 0.162,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120078,
+   "error": null
+  },
+  {
+   "id": "C21",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.16,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.14,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.03,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2852,
+    "output_tokens": 198
+   },
+   "latency_s": 0.217,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011978399999999999,
+   "error": null
+  },
+  {
+   "id": "C22",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.19,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.06,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.17,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2855,
+    "output_tokens": 198
+   },
+   "latency_s": 0.44,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011991,
+   "error": null
+  },
+  {
+   "id": "C23",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.14,
+    "tricolon": 0.16,
+    "stacked_hedging": 0.13,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.09,
+    "self_undercutting": 0.15,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2874,
+    "output_tokens": 198
+   },
+   "latency_s": 0.156,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120708,
+   "error": null
+  },
+  {
+   "id": "N01",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.68,
+    "tricolon": 0.45,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.94,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2867,
+    "output_tokens": 198
+   },
+   "latency_s": 0.468,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120414,
+   "error": null
+  },
+  {
+   "id": "N02",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.17,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.13,
+    "self_undercutting": 0.36,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2869,
+    "output_tokens": 198
+   },
+   "latency_s": 0.199,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120498,
+   "error": null
+  },
+  {
+   "id": "N03",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.14,
+    "tricolon": 0.22,
+    "stacked_hedging": 0.13,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2950,
+    "output_tokens": 198
+   },
+   "latency_s": 0.18,
+   "attempts": 1,
+   "estimated_cost_usd": 0.0001239,
+   "error": null
+  },
+  {
+   "id": "N04",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.37,
+    "tricolon": 0.38,
+    "stacked_hedging": 0.17,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.18,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2889,
+    "output_tokens": 198
+   },
+   "latency_s": 0.201,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121338,
+   "error": null
+  },
+  {
+   "id": "N05",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.66,
+    "tricolon": 0.45,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.13,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2874,
+    "output_tokens": 198
+   },
+   "latency_s": 0.269,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120708,
+   "error": null
+  },
+  {
+   "id": "N06",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.4,
+    "tricolon": 0.17,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2888,
+    "output_tokens": 198
+   },
+   "latency_s": 0.329,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121296,
+   "error": null
+  },
+  {
+   "id": "N07",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.09,
+    "tricolon": 0.32,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.12,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2863,
+    "output_tokens": 198
+   },
+   "latency_s": 0.168,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120246,
+   "error": null
+  },
+  {
+   "id": "N08",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.11,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.19,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.1,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2863,
+    "output_tokens": 198
+   },
+   "latency_s": 0.186,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120246,
+   "error": null
+  },
+  {
+   "id": "N09",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.24,
+    "tricolon": 0.18,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.12,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2871,
+    "output_tokens": 198
+   },
+   "latency_s": 0.205,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012058199999999999,
+   "error": null
+  },
+  {
+   "id": "N10",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.52,
+    "tricolon": 0.4,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.13,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2868,
+    "output_tokens": 198
+   },
+   "latency_s": 0.284,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120456,
+   "error": null
+  },
+  {
+   "id": "N11",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.15,
+    "tricolon": 0.17,
+    "stacked_hedging": 0.13,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.18,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2890,
+    "output_tokens": 198
+   },
+   "latency_s": 0.164,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012137999999999999,
+   "error": null
+  },
+  {
+   "id": "N12",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.14,
+    "tricolon": 0.34,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.41,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2873,
+    "output_tokens": 198
+   },
+   "latency_s": 0.259,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120666,
+   "error": null
+  },
+  {
+   "id": "N13",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.22,
+    "tricolon": 0.55,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.33,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.52,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.12
+   },
+   "usage": {
+    "input_tokens": 2929,
+    "output_tokens": 198
+   },
+   "latency_s": 0.163,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000123018,
+   "error": null
+  },
+  {
+   "id": "N14",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.4,
+    "tricolon": 0.28,
+    "stacked_hedging": 0.16,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.19,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2883,
+    "output_tokens": 198
+   },
+   "latency_s": 0.18,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121086,
+   "error": null
+  },
+  {
+   "id": "N15",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.36,
+    "tricolon": 0.33,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.1,
+    "self_undercutting": 0.44,
+    "first_x_that": 0.24,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.06,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2983,
+    "output_tokens": 198
+   },
+   "latency_s": 0.192,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000125286,
+   "error": null
+  },
+  {
+   "id": "N16",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.41,
+    "tricolon": 0.24,
+    "stacked_hedging": 0.14,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.2,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2879,
+    "output_tokens": 198
+   },
+   "latency_s": 0.144,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120918,
+   "error": null
+  },
+  {
+   "id": "N17",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.36,
+    "tricolon": 0.28,
+    "stacked_hedging": 0.13,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.16,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.07,
+    "jobs_claim": 0.08,
+    "pullquote_fragment": 0.12
+   },
+   "usage": {
+    "input_tokens": 2878,
+    "output_tokens": 198
+   },
+   "latency_s": 0.188,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120876,
+   "error": null
+  },
+  {
+   "id": "N18",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.72,
+    "tricolon": 0.51,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.11,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2875,
+    "output_tokens": 198
+   },
+   "latency_s": 0.214,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012075,
+   "error": null
+  },
+  {
+   "id": "N19",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.23,
+    "stacked_hedging": 0.1,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.23,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.09
+   },
+   "usage": {
+    "input_tokens": 2903,
+    "output_tokens": 198
+   },
+   "latency_s": 0.205,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121926,
+   "error": null
+  },
+  {
+   "id": "N20",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.29,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.08,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2865,
+    "output_tokens": 198
+   },
+   "latency_s": 0.186,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012033,
+   "error": null
+  },
+  {
+   "id": "N21",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.18,
+    "tricolon": 0.16,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.1,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2869,
+    "output_tokens": 198
+   },
+   "latency_s": 0.392,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120498,
+   "error": null
+  },
+  {
+   "id": "N22",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.14,
+    "tricolon": 0.18,
+    "stacked_hedging": 0.1,
+    "rhetorical_opener": 0.07,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.19,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2877,
+    "output_tokens": 198
+   },
+   "latency_s": 0.268,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120834,
+   "error": null
+  },
+  {
+   "id": "N23",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.17,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.03,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.1,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2874,
+    "output_tokens": 198
+   },
+   "latency_s": 0.176,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120708,
+   "error": null
+  },
+  {
+   "id": "N24",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.66,
+    "tricolon": 0.33,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.16,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.07,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2865,
+    "output_tokens": 198
+   },
+   "latency_s": 0.148,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012033,
+   "error": null
+  },
+  {
+   "id": "N25",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.35,
+    "tricolon": 0.22,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.13,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.34,
+    "jobs_claim": 0.06,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2869,
+    "output_tokens": 198
+   },
+   "latency_s": 0.18,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120498,
+   "error": null
+  },
+  {
+   "id": "N26",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.18,
+    "tricolon": 0.18,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.16,
+    "jobs_claim": 0.06,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2868,
+    "output_tokens": 198
+   },
+   "latency_s": 0.162,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120456,
+   "error": null
+  },
+  {
+   "id": "N27",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.31,
+    "tricolon": 0.21,
+    "stacked_hedging": 0.13,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.16,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2880,
+    "output_tokens": 198
+   },
+   "latency_s": 0.26,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012096,
+   "error": null
+  },
+  {
+   "id": "N28",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.36,
+    "tricolon": 0.39,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.23
+   },
+   "usage": {
+    "input_tokens": 2879,
+    "output_tokens": 198
+   },
+   "latency_s": 0.175,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120918,
+   "error": null
+  },
+  {
+   "id": "N29",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.26,
+    "tricolon": 0.23,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.16,
+    "jobs_claim": 0.06,
+    "pullquote_fragment": 0.1
+   },
+   "usage": {
+    "input_tokens": 2873,
+    "output_tokens": 198
+   },
+   "latency_s": 0.566,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120666,
+   "error": null
+  },
+  {
+   "id": "N30",
+   "kind": "clean",
+   "truth": null,
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.13,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.08,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2859,
+    "output_tokens": 198
+   },
+   "latency_s": 0.215,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120078,
+   "error": null
+  },
+  {
+   "id": "S01",
+   "kind": "seeded",
+   "truth": "dash_present",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.07,
+    "tricolon": 0.12,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.06,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2851,
+    "output_tokens": 198
+   },
+   "latency_s": 0.178,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011974199999999999,
+   "error": null
+  },
+  {
+   "id": "S02",
+   "kind": "seeded",
+   "truth": "dash_present",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.32,
+    "tricolon": 0.22,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.11,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.29,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2853,
+    "output_tokens": 198
+   },
+   "latency_s": 0.162,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119826,
+   "error": null
+  },
+  {
+   "id": "S03",
+   "kind": "seeded",
+   "truth": "dash_present",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.2,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2859,
+    "output_tokens": 198
+   },
+   "latency_s": 0.19,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120078,
+   "error": null
+  },
+  {
+   "id": "S04",
+   "kind": "seeded",
+   "truth": "dash_present",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.67,
+    "tricolon": 0.44,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.11,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2854,
+    "output_tokens": 198
+   },
+   "latency_s": 0.138,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119868,
+   "error": null
+  },
+  {
+   "id": "S05",
+   "kind": "seeded",
+   "truth": "dash_present",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.4,
+    "tricolon": 0.28,
+    "stacked_hedging": 0.17,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.2,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.16,
+    "jobs_claim": 0.12,
+    "pullquote_fragment": 0.14
+   },
+   "usage": {
+    "input_tokens": 2857,
+    "output_tokens": 198
+   },
+   "latency_s": 0.158,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119994,
+   "error": null
+  },
+  {
+   "id": "S06",
+   "kind": "seeded",
+   "truth": "dash_present",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.35,
+    "tricolon": 0.31,
+    "stacked_hedging": 0.16,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.09,
+    "self_undercutting": 0.36,
+    "first_x_that": 0.21,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.07,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2970,
+    "output_tokens": 198
+   },
+   "latency_s": 0.639,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012474,
+   "error": null
+  },
+  {
+   "id": "S07",
+   "kind": "seeded",
+   "truth": "dash_present",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.17,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.14,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.03,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2852,
+    "output_tokens": 198
+   },
+   "latency_s": 0.199,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011978399999999999,
+   "error": null
+  },
+  {
+   "id": "S08",
+   "kind": "seeded",
+   "truth": "dash_present",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.38,
+    "tricolon": 0.23,
+    "stacked_hedging": 0.11,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.26,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.1,
+    "pullquote_fragment": 0.09
+   },
+   "usage": {
+    "input_tokens": 2853,
+    "output_tokens": 198
+   },
+   "latency_s": 0.191,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119826,
+   "error": null
+  },
+  {
+   "id": "S09",
+   "kind": "seeded",
+   "truth": "colon_heavy",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.21,
+    "tricolon": 0.21,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.12,
+    "restating_closer": 0.66,
+    "self_undercutting": 0.23,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.06,
+    "pullquote_fragment": 0.14
+   },
+   "usage": {
+    "input_tokens": 2847,
+    "output_tokens": 198
+   },
+   "latency_s": 0.207,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011957399999999999,
+   "error": null
+  },
+  {
+   "id": "S10",
+   "kind": "seeded",
+   "truth": "colon_heavy",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.52,
+    "tricolon": 0.4,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.12,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2851,
+    "output_tokens": 198
+   },
+   "latency_s": 0.177,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011974199999999999,
+   "error": null
+  },
+  {
+   "id": "S11",
+   "kind": "seeded",
+   "truth": "colon_heavy",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.4,
+    "tricolon": 0.4,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.09
+   },
+   "usage": {
+    "input_tokens": 2867,
+    "output_tokens": 198
+   },
+   "latency_s": 0.171,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120414,
+   "error": null
+  },
+  {
+   "id": "S12",
+   "kind": "seeded",
+   "truth": "colon_heavy",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.34,
+    "tricolon": 0.27,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.11,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.31,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2853,
+    "output_tokens": 198
+   },
+   "latency_s": 0.187,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119826,
+   "error": null
+  },
+  {
+   "id": "S13",
+   "kind": "seeded",
+   "truth": "colon_heavy",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.28,
+    "stacked_hedging": 0.17,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.11,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2910,
+    "output_tokens": 198
+   },
+   "latency_s": 0.156,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012222,
+   "error": null
+  },
+  {
+   "id": "S14",
+   "kind": "seeded",
+   "truth": "colon_heavy",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.33,
+    "tricolon": 0.32,
+    "stacked_hedging": 0.16,
+    "rhetorical_opener": 0.04,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.39,
+    "first_x_that": 0.19,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.07,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2970,
+    "output_tokens": 198
+   },
+   "latency_s": 0.163,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012474,
+   "error": null
+  },
+  {
+   "id": "S15",
+   "kind": "seeded",
+   "truth": "colon_heavy",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.23,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2859,
+    "output_tokens": 198
+   },
+   "latency_s": 0.163,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120078,
+   "error": null
+  },
+  {
+   "id": "S16",
+   "kind": "seeded",
+   "truth": "colon_heavy",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.16,
+    "tricolon": 0.35,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.41,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2857,
+    "output_tokens": 198
+   },
+   "latency_s": 0.17,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119994,
+   "error": null
+  },
+  {
+   "id": "S17",
+   "kind": "seeded",
+   "truth": "sentence_rhythm",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.25,
+    "stacked_hedging": 0.19,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2916,
+    "output_tokens": 198
+   },
+   "latency_s": 0.176,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000122472,
+   "error": null
+  },
+  {
+   "id": "S18",
+   "kind": "seeded",
+   "truth": "sentence_rhythm",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.18,
+    "tricolon": 0.31,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.35,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.08
+   },
+   "usage": {
+    "input_tokens": 2858,
+    "output_tokens": 198
+   },
+   "latency_s": 0.223,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120036,
+   "error": null
+  },
+  {
+   "id": "S19",
+   "kind": "seeded",
+   "truth": "sentence_rhythm",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.76,
+    "tricolon": 0.47,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.12,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2853,
+    "output_tokens": 198
+   },
+   "latency_s": 0.16,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119826,
+   "error": null
+  },
+  {
+   "id": "S20",
+   "kind": "seeded",
+   "truth": "sentence_rhythm",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.21,
+    "tricolon": 0.36,
+    "stacked_hedging": 0.13,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.31,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2913,
+    "output_tokens": 198
+   },
+   "latency_s": 0.152,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012234599999999998,
+   "error": null
+  },
+  {
+   "id": "S21",
+   "kind": "seeded",
+   "truth": "sentence_rhythm",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.59,
+    "tricolon": 0.39,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.17,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.11
+   },
+   "usage": {
+    "input_tokens": 2854,
+    "output_tokens": 198
+   },
+   "latency_s": 0.201,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119868,
+   "error": null
+  },
+  {
+   "id": "S22",
+   "kind": "seeded",
+   "truth": "sentence_rhythm",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.15,
+    "tricolon": 0.17,
+    "stacked_hedging": 0.12,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.1,
+    "self_undercutting": 0.17,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2878,
+    "output_tokens": 198
+   },
+   "latency_s": 0.155,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120876,
+   "error": null
+  },
+  {
+   "id": "S23",
+   "kind": "seeded",
+   "truth": "sentence_rhythm",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.24,
+    "stacked_hedging": 0.1,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2937,
+    "output_tokens": 198
+   },
+   "latency_s": 0.205,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000123354,
+   "error": null
+  },
+  {
+   "id": "S24",
+   "kind": "seeded",
+   "truth": "sentence_rhythm",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.32,
+    "tricolon": 0.23,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.23,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.1,
+    "pullquote_fragment": 0.1
+   },
+   "usage": {
+    "input_tokens": 2853,
+    "output_tokens": 198
+   },
+   "latency_s": 0.361,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119826,
+   "error": null
+  },
+  {
+   "id": "S25",
+   "kind": "seeded",
+   "truth": "slop_vocab",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.21,
+    "tricolon": 0.19,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.11,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.12
+   },
+   "usage": {
+    "input_tokens": 2864,
+    "output_tokens": 198
+   },
+   "latency_s": 0.149,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120288,
+   "error": null
+  },
+  {
+   "id": "S26",
+   "kind": "seeded",
+   "truth": "slop_vocab",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.41,
+    "tricolon": 0.46,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.09
+   },
+   "usage": {
+    "input_tokens": 2877,
+    "output_tokens": 198
+   },
+   "latency_s": 0.16,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120834,
+   "error": null
+  },
+  {
+   "id": "S27",
+   "kind": "seeded",
+   "truth": "slop_vocab",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.19,
+    "tricolon": 0.5,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.25,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.02,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2916,
+    "output_tokens": 198
+   },
+   "latency_s": 0.22,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000122472,
+   "error": null
+  },
+  {
+   "id": "S28",
+   "kind": "seeded",
+   "truth": "slop_vocab",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.15,
+    "tricolon": 0.21,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2868,
+    "output_tokens": 198
+   },
+   "latency_s": 0.198,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120456,
+   "error": null
+  },
+  {
+   "id": "S29",
+   "kind": "seeded",
+   "truth": "slop_vocab",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.27,
+    "stacked_hedging": 0.16,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.08
+   },
+   "usage": {
+    "input_tokens": 2920,
+    "output_tokens": 198
+   },
+   "latency_s": 0.285,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012264,
+   "error": null
+  },
+  {
+   "id": "S30",
+   "kind": "seeded",
+   "truth": "slop_vocab",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.21,
+    "tricolon": 0.25,
+    "stacked_hedging": 0.2,
+    "rhetorical_opener": 0.19,
+    "restating_closer": 0.71,
+    "self_undercutting": 0.27,
+    "first_x_that": 0.08,
+    "naked_cost_figure": 0.08,
+    "jobs_claim": 0.06,
+    "pullquote_fragment": 0.13
+   },
+   "usage": {
+    "input_tokens": 2856,
+    "output_tokens": 198
+   },
+   "latency_s": 0.154,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011995199999999999,
+   "error": null
+  },
+  {
+   "id": "S31",
+   "kind": "seeded",
+   "truth": "slop_vocab",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.18,
+    "tricolon": 0.4,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.44,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2867,
+    "output_tokens": 198
+   },
+   "latency_s": 0.363,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120414,
+   "error": null
+  },
+  {
+   "id": "S32",
+   "kind": "seeded",
+   "truth": "slop_vocab",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.13,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.06,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.07,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2857,
+    "output_tokens": 198
+   },
+   "latency_s": 0.175,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119994,
+   "error": null
+  },
+  {
+   "id": "S33",
+   "kind": "seeded",
+   "truth": "not_x_but_y",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.24,
+    "tricolon": 0.2,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.13,
+    "jobs_claim": 0.07,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2868,
+    "output_tokens": 198
+   },
+   "latency_s": 0.275,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120456,
+   "error": null
+  },
+  {
+   "id": "S34",
+   "kind": "seeded",
+   "truth": "not_x_but_y",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.5,
+    "tricolon": 0.25,
+    "stacked_hedging": 0.16,
+    "rhetorical_opener": 0.08,
+    "restating_closer": 0.66,
+    "self_undercutting": 0.22,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.1
+   },
+   "usage": {
+    "input_tokens": 2862,
+    "output_tokens": 198
+   },
+   "latency_s": 0.181,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120204,
+   "error": null
+  },
+  {
+   "id": "S35",
+   "kind": "seeded",
+   "truth": "not_x_but_y",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.84,
+    "tricolon": 0.46,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.12,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2870,
+    "output_tokens": 198
+   },
+   "latency_s": 0.221,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012054,
+   "error": null
+  },
+  {
+   "id": "S36",
+   "kind": "seeded",
+   "truth": "not_x_but_y",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.45,
+    "tricolon": 0.29,
+    "stacked_hedging": 0.16,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.19,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2881,
+    "output_tokens": 198
+   },
+   "latency_s": 0.168,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012100199999999999,
+   "error": null
+  },
+  {
+   "id": "S37",
+   "kind": "seeded",
+   "truth": "not_x_but_y",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.71,
+    "tricolon": 0.14,
+    "stacked_hedging": 0.11,
+    "rhetorical_opener": 0.05,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.48,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2867,
+    "output_tokens": 198
+   },
+   "latency_s": 0.201,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120414,
+   "error": null
+  },
+  {
+   "id": "S38",
+   "kind": "seeded",
+   "truth": "not_x_but_y",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.14,
+    "tricolon": 0.29,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.04,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.16,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2926,
+    "output_tokens": 198
+   },
+   "latency_s": 0.172,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000122892,
+   "error": null
+  },
+  {
+   "id": "S39",
+   "kind": "seeded",
+   "truth": "not_x_but_y",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.79,
+    "tricolon": 0.4,
+    "stacked_hedging": 0.1,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.11,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.43,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2872,
+    "output_tokens": 198
+   },
+   "latency_s": 0.211,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120624,
+   "error": null
+  },
+  {
+   "id": "S40",
+   "kind": "seeded",
+   "truth": "not_x_but_y",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.24,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.22,
+    "naked_cost_figure": 0.14,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.12
+   },
+   "usage": {
+    "input_tokens": 2898,
+    "output_tokens": 198
+   },
+   "latency_s": 0.143,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121716,
+   "error": null
+  },
+  {
+   "id": "S41",
+   "kind": "seeded",
+   "truth": "tricolon",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.14,
+    "tricolon": 0.9,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.16,
+    "jobs_claim": 0.1,
+    "pullquote_fragment": 0.11
+   },
+   "usage": {
+    "input_tokens": 2857,
+    "output_tokens": 198
+   },
+   "latency_s": 0.313,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119994,
+   "error": null
+  },
+  {
+   "id": "S42",
+   "kind": "seeded",
+   "truth": "tricolon",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.07,
+    "tricolon": 0.83,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.06,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2866,
+    "output_tokens": 198
+   },
+   "latency_s": 0.25,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012037199999999999,
+   "error": null
+  },
+  {
+   "id": "S43",
+   "kind": "seeded",
+   "truth": "tricolon",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.34,
+    "tricolon": 0.39,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.25,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.09,
+    "pullquote_fragment": 0.12
+   },
+   "usage": {
+    "input_tokens": 2862,
+    "output_tokens": 198
+   },
+   "latency_s": 0.217,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120204,
+   "error": null
+  },
+  {
+   "id": "S44",
+   "kind": "seeded",
+   "truth": "tricolon",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.78,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.04,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.2
+   },
+   "usage": {
+    "input_tokens": 2921,
+    "output_tokens": 198
+   },
+   "latency_s": 0.138,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000122682,
+   "error": null
+  },
+  {
+   "id": "S45",
+   "kind": "seeded",
+   "truth": "tricolon",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.36,
+    "tricolon": 0.84,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.13,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.29,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2863,
+    "output_tokens": 198
+   },
+   "latency_s": 0.234,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120246,
+   "error": null
+  },
+  {
+   "id": "S46",
+   "kind": "seeded",
+   "truth": "tricolon",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.14,
+    "tricolon": 0.65,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.15,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.08
+   },
+   "usage": {
+    "input_tokens": 2862,
+    "output_tokens": 198
+   },
+   "latency_s": 0.17,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120204,
+   "error": null
+  },
+  {
+   "id": "S47",
+   "kind": "seeded",
+   "truth": "tricolon",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.68,
+    "stacked_hedging": 0.12,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.09
+   },
+   "usage": {
+    "input_tokens": 2942,
+    "output_tokens": 198
+   },
+   "latency_s": 0.192,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000123564,
+   "error": null
+  },
+  {
+   "id": "S48",
+   "kind": "seeded",
+   "truth": "tricolon",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.09,
+    "tricolon": 0.72,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.18,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.09
+   },
+   "usage": {
+    "input_tokens": 2895,
+    "output_tokens": 198
+   },
+   "latency_s": 0.145,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012158999999999999,
+   "error": null
+  },
+  {
+   "id": "S49",
+   "kind": "seeded",
+   "truth": "stacked_hedging",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.26,
+    "tricolon": 0.24,
+    "stacked_hedging": 0.69,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.75,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.08,
+    "pullquote_fragment": 0.12
+   },
+   "usage": {
+    "input_tokens": 2873,
+    "output_tokens": 198
+   },
+   "latency_s": 0.828,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120666,
+   "error": null
+  },
+  {
+   "id": "S50",
+   "kind": "seeded",
+   "truth": "stacked_hedging",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.22,
+    "stacked_hedging": 0.89,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.6,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2947,
+    "output_tokens": 198
+   },
+   "latency_s": 0.172,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000123774,
+   "error": null
+  },
+  {
+   "id": "S51",
+   "kind": "seeded",
+   "truth": "stacked_hedging",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.09,
+    "tricolon": 0.29,
+    "stacked_hedging": 0.7,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.65,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.09,
+    "jobs_claim": 0.06,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2867,
+    "output_tokens": 198
+   },
+   "latency_s": 0.181,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120414,
+   "error": null
+  },
+  {
+   "id": "S52",
+   "kind": "seeded",
+   "truth": "stacked_hedging",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.28,
+    "tricolon": 0.23,
+    "stacked_hedging": 0.72,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.37,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.13,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2874,
+    "output_tokens": 198
+   },
+   "latency_s": 0.167,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120708,
+   "error": null
+  },
+  {
+   "id": "S53",
+   "kind": "seeded",
+   "truth": "stacked_hedging",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.41,
+    "tricolon": 0.42,
+    "stacked_hedging": 0.82,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.4,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.08
+   },
+   "usage": {
+    "input_tokens": 2885,
+    "output_tokens": 198
+   },
+   "latency_s": 0.181,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012117,
+   "error": null
+  },
+  {
+   "id": "S54",
+   "kind": "seeded",
+   "truth": "stacked_hedging",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.43,
+    "tricolon": 0.27,
+    "stacked_hedging": 0.74,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.25,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.07,
+    "jobs_claim": 0.07,
+    "pullquote_fragment": 0.09
+   },
+   "usage": {
+    "input_tokens": 2875,
+    "output_tokens": 198
+   },
+   "latency_s": 0.178,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012075,
+   "error": null
+  },
+  {
+   "id": "S55",
+   "kind": "seeded",
+   "truth": "stacked_hedging",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.49,
+    "tricolon": 0.42,
+    "stacked_hedging": 0.27,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.46,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.09
+   },
+   "usage": {
+    "input_tokens": 2870,
+    "output_tokens": 198
+   },
+   "latency_s": 0.192,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012054,
+   "error": null
+  },
+  {
+   "id": "S56",
+   "kind": "seeded",
+   "truth": "stacked_hedging",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.33,
+    "tricolon": 0.24,
+    "stacked_hedging": 0.79,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.24,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2882,
+    "output_tokens": 198
+   },
+   "latency_s": 0.208,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121044,
+   "error": null
+  },
+  {
+   "id": "S57",
+   "kind": "seeded",
+   "truth": "rhetorical_opener",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.2,
+    "tricolon": 0.34,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.93,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.4,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2870,
+    "output_tokens": 198
+   },
+   "latency_s": 0.296,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012054,
+   "error": null
+  },
+  {
+   "id": "S58",
+   "kind": "seeded",
+   "truth": "rhetorical_opener",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.38,
+    "tricolon": 0.37,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.81,
+    "restating_closer": 0.09,
+    "self_undercutting": 0.37,
+    "first_x_that": 0.21,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.08,
+    "pullquote_fragment": 0.08
+   },
+   "usage": {
+    "input_tokens": 2984,
+    "output_tokens": 198
+   },
+   "latency_s": 0.198,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000125328,
+   "error": null
+  },
+  {
+   "id": "S59",
+   "kind": "seeded",
+   "truth": "rhetorical_opener",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.32,
+    "tricolon": 0.21,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.95,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.3,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2866,
+    "output_tokens": 198
+   },
+   "latency_s": 0.159,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012037199999999999,
+   "error": null
+  },
+  {
+   "id": "S60",
+   "kind": "seeded",
+   "truth": "rhetorical_opener",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.25,
+    "tricolon": 0.43,
+    "stacked_hedging": 0.1,
+    "rhetorical_opener": 0.85,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.26,
+    "first_x_that": 0.03,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2917,
+    "output_tokens": 198
+   },
+   "latency_s": 0.188,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000122514,
+   "error": null
+  },
+  {
+   "id": "S61",
+   "kind": "seeded",
+   "truth": "rhetorical_opener",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.32,
+    "stacked_hedging": 0.1,
+    "rhetorical_opener": 0.9,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.28,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.1
+   },
+   "usage": {
+    "input_tokens": 2896,
+    "output_tokens": 198
+   },
+   "latency_s": 0.194,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012163199999999999,
+   "error": null
+  },
+  {
+   "id": "S62",
+   "kind": "seeded",
+   "truth": "rhetorical_opener",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.28,
+    "tricolon": 0.19,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.92,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.11,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.14,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2866,
+    "output_tokens": 198
+   },
+   "latency_s": 0.237,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012037199999999999,
+   "error": null
+  },
+  {
+   "id": "S63",
+   "kind": "seeded",
+   "truth": "rhetorical_opener",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.18,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.95,
+    "restating_closer": 0.14,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2864,
+    "output_tokens": 198
+   },
+   "latency_s": 0.167,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120288,
+   "error": null
+  },
+  {
+   "id": "S64",
+   "kind": "seeded",
+   "truth": "rhetorical_opener",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.43,
+    "tricolon": 0.29,
+    "stacked_hedging": 0.1,
+    "rhetorical_opener": 0.94,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.14,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.08,
+    "jobs_claim": 0.06,
+    "pullquote_fragment": 0.08
+   },
+   "usage": {
+    "input_tokens": 2869,
+    "output_tokens": 198
+   },
+   "latency_s": 0.153,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120498,
+   "error": null
+  },
+  {
+   "id": "S65",
+   "kind": "seeded",
+   "truth": "restating_closer",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.2,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.77,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2874,
+    "output_tokens": 198
+   },
+   "latency_s": 0.151,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120708,
+   "error": null
+  },
+  {
+   "id": "S66",
+   "kind": "seeded",
+   "truth": "restating_closer",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.16,
+    "tricolon": 0.22,
+    "stacked_hedging": 0.13,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.91,
+    "self_undercutting": 0.19,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.02,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2888,
+    "output_tokens": 198
+   },
+   "latency_s": 0.138,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121296,
+   "error": null
+  },
+  {
+   "id": "S67",
+   "kind": "seeded",
+   "truth": "restating_closer",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.34,
+    "tricolon": 0.31,
+    "stacked_hedging": 0.14,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.88,
+    "self_undercutting": 0.38,
+    "first_x_that": 0.2,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.06,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2982,
+    "output_tokens": 198
+   },
+   "latency_s": 0.147,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000125244,
+   "error": null
+  },
+  {
+   "id": "S68",
+   "kind": "seeded",
+   "truth": "restating_closer",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.25,
+    "tricolon": 0.45,
+    "stacked_hedging": 0.12,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.9,
+    "self_undercutting": 0.27,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.02,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2922,
+    "output_tokens": 198
+   },
+   "latency_s": 0.197,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000122724,
+   "error": null
+  },
+  {
+   "id": "S69",
+   "kind": "seeded",
+   "truth": "restating_closer",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.15,
+    "tricolon": 0.39,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.95,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.36,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2872,
+    "output_tokens": 198
+   },
+   "latency_s": 0.261,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120624,
+   "error": null
+  },
+  {
+   "id": "S70",
+   "kind": "seeded",
+   "truth": "restating_closer",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.23,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.8,
+    "self_undercutting": 0.13,
+    "first_x_that": 0.03,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.02,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2866,
+    "output_tokens": 198
+   },
+   "latency_s": 0.15,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012037199999999999,
+   "error": null
+  },
+  {
+   "id": "S71",
+   "kind": "seeded",
+   "truth": "restating_closer",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.41,
+    "tricolon": 0.26,
+    "stacked_hedging": 0.13,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.68,
+    "self_undercutting": 0.13,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2873,
+    "output_tokens": 198
+   },
+   "latency_s": 0.16,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120666,
+   "error": null
+  },
+  {
+   "id": "S72",
+   "kind": "seeded",
+   "truth": "restating_closer",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.22,
+    "tricolon": 0.27,
+    "stacked_hedging": 0.17,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.84,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.03,
+    "naked_cost_figure": 0.02,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2924,
+    "output_tokens": 198
+   },
+   "latency_s": 0.205,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000122808,
+   "error": null
+  },
+  {
+   "id": "S73",
+   "kind": "seeded",
+   "truth": "self_undercutting",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.18,
+    "stacked_hedging": 0.12,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.59,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.07,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2860,
+    "output_tokens": 198
+   },
+   "latency_s": 0.173,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012012,
+   "error": null
+  },
+  {
+   "id": "S74",
+   "kind": "seeded",
+   "truth": "self_undercutting",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.14,
+    "tricolon": 0.2,
+    "stacked_hedging": 0.17,
+    "rhetorical_opener": 0.06,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.74,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2868,
+    "output_tokens": 198
+   },
+   "latency_s": 0.267,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120456,
+   "error": null
+  },
+  {
+   "id": "S75",
+   "kind": "seeded",
+   "truth": "self_undercutting",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.33,
+    "tricolon": 0.35,
+    "stacked_hedging": 0.19,
+    "rhetorical_opener": 0.04,
+    "restating_closer": 0.09,
+    "self_undercutting": 0.74,
+    "first_x_that": 0.18,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.07,
+    "pullquote_fragment": 0.1
+   },
+   "usage": {
+    "input_tokens": 2985,
+    "output_tokens": 198
+   },
+   "latency_s": 0.197,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012537,
+   "error": null
+  },
+  {
+   "id": "S76",
+   "kind": "seeded",
+   "truth": "self_undercutting",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.31,
+    "tricolon": 0.26,
+    "stacked_hedging": 0.14,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.94,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.32,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2863,
+    "output_tokens": 198
+   },
+   "latency_s": 0.16,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120246,
+   "error": null
+  },
+  {
+   "id": "S77",
+   "kind": "seeded",
+   "truth": "self_undercutting",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.36,
+    "stacked_hedging": 0.11,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.78,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.09,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.12
+   },
+   "usage": {
+    "input_tokens": 2861,
+    "output_tokens": 198
+   },
+   "latency_s": 0.157,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012016199999999999,
+   "error": null
+  },
+  {
+   "id": "S78",
+   "kind": "seeded",
+   "truth": "self_undercutting",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.21,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.85,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2875,
+    "output_tokens": 198
+   },
+   "latency_s": 0.231,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012075,
+   "error": null
+  },
+  {
+   "id": "S79",
+   "kind": "seeded",
+   "truth": "self_undercutting",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.16,
+    "stacked_hedging": 0.17,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.1,
+    "self_undercutting": 0.84,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2890,
+    "output_tokens": 198
+   },
+   "latency_s": 0.157,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012137999999999999,
+   "error": null
+  },
+  {
+   "id": "S80",
+   "kind": "seeded",
+   "truth": "self_undercutting",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.39,
+    "tricolon": 0.24,
+    "stacked_hedging": 0.2,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.89,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2878,
+    "output_tokens": 198
+   },
+   "latency_s": 0.151,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120876,
+   "error": null
+  },
+  {
+   "id": "S81",
+   "kind": "seeded",
+   "truth": "first_x_that",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.27,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.21,
+    "naked_cost_figure": 0.02,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2925,
+    "output_tokens": 198
+   },
+   "latency_s": 0.198,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012285,
+   "error": null
+  },
+  {
+   "id": "S82",
+   "kind": "seeded",
+   "truth": "first_x_that",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.52,
+    "tricolon": 0.35,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.14,
+    "first_x_that": 0.84,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2863,
+    "output_tokens": 198
+   },
+   "latency_s": 0.191,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120246,
+   "error": null
+  },
+  {
+   "id": "S83",
+   "kind": "seeded",
+   "truth": "first_x_that",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.17,
+    "tricolon": 0.38,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.7,
+    "naked_cost_figure": 0.44,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2871,
+    "output_tokens": 198
+   },
+   "latency_s": 0.149,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012058199999999999,
+   "error": null
+  },
+  {
+   "id": "S84",
+   "kind": "seeded",
+   "truth": "first_x_that",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.18,
+    "tricolon": 0.17,
+    "stacked_hedging": 0.12,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.17,
+    "first_x_that": 0.77,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2889,
+    "output_tokens": 198
+   },
+   "latency_s": 0.201,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121338,
+   "error": null
+  },
+  {
+   "id": "S85",
+   "kind": "seeded",
+   "truth": "first_x_that",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.1,
+    "tricolon": 0.26,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.88,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.1
+   },
+   "usage": {
+    "input_tokens": 2899,
+    "output_tokens": 198
+   },
+   "latency_s": 0.205,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121758,
+   "error": null
+  },
+  {
+   "id": "S86",
+   "kind": "seeded",
+   "truth": "first_x_that",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.24,
+    "tricolon": 0.44,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.28,
+    "first_x_that": 0.51,
+    "naked_cost_figure": 0.02,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.08
+   },
+   "usage": {
+    "input_tokens": 2925,
+    "output_tokens": 198
+   },
+   "latency_s": 0.159,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012285,
+   "error": null
+  },
+  {
+   "id": "S87",
+   "kind": "seeded",
+   "truth": "first_x_that",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.2,
+    "tricolon": 0.21,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.76,
+    "naked_cost_figure": 0.13,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2870,
+    "output_tokens": 198
+   },
+   "latency_s": 0.584,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012054,
+   "error": null
+  },
+  {
+   "id": "S88",
+   "kind": "seeded",
+   "truth": "first_x_that",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.14,
+    "tricolon": 0.2,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.96,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2875,
+    "output_tokens": 198
+   },
+   "latency_s": 0.164,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012075,
+   "error": null
+  },
+  {
+   "id": "S89",
+   "kind": "seeded",
+   "truth": "naked_cost_figure",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.3,
+    "tricolon": 0.25,
+    "stacked_hedging": 0.12,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.31,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.82,
+    "jobs_claim": 0.12,
+    "pullquote_fragment": 0.11
+   },
+   "usage": {
+    "input_tokens": 2868,
+    "output_tokens": 198
+   },
+   "latency_s": 0.149,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120456,
+   "error": null
+  },
+  {
+   "id": "S90",
+   "kind": "seeded",
+   "truth": "naked_cost_figure",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.25,
+    "stacked_hedging": 0.13,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.61,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2945,
+    "output_tokens": 198
+   },
+   "latency_s": 0.202,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012369,
+   "error": null
+  },
+  {
+   "id": "S91",
+   "kind": "seeded",
+   "truth": "naked_cost_figure",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.13,
+    "tricolon": 0.19,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.07,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.16,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.76,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2868,
+    "output_tokens": 198
+   },
+   "latency_s": 0.191,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120456,
+   "error": null
+  },
+  {
+   "id": "S92",
+   "kind": "seeded",
+   "truth": "naked_cost_figure",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.64,
+    "tricolon": 0.42,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.13,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.8,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2867,
+    "output_tokens": 198
+   },
+   "latency_s": 0.178,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120414,
+   "error": null
+  },
+  {
+   "id": "S93",
+   "kind": "seeded",
+   "truth": "naked_cost_figure",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.12,
+    "tricolon": 0.16,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.89,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2876,
+    "output_tokens": 198
+   },
+   "latency_s": 0.188,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012079199999999999,
+   "error": null
+  },
+  {
+   "id": "S94",
+   "kind": "seeded",
+   "truth": "naked_cost_figure",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.17,
+    "tricolon": 0.18,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.94,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2875,
+    "output_tokens": 198
+   },
+   "latency_s": 0.195,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012075,
+   "error": null
+  },
+  {
+   "id": "S95",
+   "kind": "seeded",
+   "truth": "naked_cost_figure",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.27,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.09,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.71,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2919,
+    "output_tokens": 198
+   },
+   "latency_s": 0.229,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000122598,
+   "error": null
+  },
+  {
+   "id": "S96",
+   "kind": "seeded",
+   "truth": "naked_cost_figure",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.09,
+    "tricolon": 0.28,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.57,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2857,
+    "output_tokens": 198
+   },
+   "latency_s": 0.173,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000119994,
+   "error": null
+  },
+  {
+   "id": "S97",
+   "kind": "seeded",
+   "truth": "jobs_claim",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.42,
+    "tricolon": 0.41,
+    "stacked_hedging": 0.07,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.08,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.93,
+    "pullquote_fragment": 0.07
+   },
+   "usage": {
+    "input_tokens": 2882,
+    "output_tokens": 198
+   },
+   "latency_s": 0.242,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121044,
+   "error": null
+  },
+  {
+   "id": "S98",
+   "kind": "seeded",
+   "truth": "jobs_claim",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.68,
+    "tricolon": 0.42,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.11,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.05
+   },
+   "usage": {
+    "input_tokens": 2866,
+    "output_tokens": 198
+   },
+   "latency_s": 0.165,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012037199999999999,
+   "error": null
+  },
+  {
+   "id": "S99",
+   "kind": "seeded",
+   "truth": "jobs_claim",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.28,
+    "tricolon": 0.27,
+    "stacked_hedging": 0.12,
+    "rhetorical_opener": 0.09,
+    "restating_closer": 0.66,
+    "self_undercutting": 0.22,
+    "first_x_that": 0.07,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.8,
+    "pullquote_fragment": 0.1
+   },
+   "usage": {
+    "input_tokens": 2861,
+    "output_tokens": 198
+   },
+   "latency_s": 0.151,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012016199999999999,
+   "error": null
+  },
+  {
+   "id": "S100",
+   "kind": "seeded",
+   "truth": "jobs_claim",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.18,
+    "tricolon": 0.46,
+    "stacked_hedging": 0.14,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.05,
+    "self_undercutting": 0.34,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.14,
+    "jobs_claim": 0.4,
+    "pullquote_fragment": 0.06
+   },
+   "usage": {
+    "input_tokens": 2921,
+    "output_tokens": 198
+   },
+   "latency_s": 0.222,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000122682,
+   "error": null
+  },
+  {
+   "id": "S101",
+   "kind": "seeded",
+   "truth": "jobs_claim",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.15,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.05,
+    "jobs_claim": 0.88,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2874,
+    "output_tokens": 198
+   },
+   "latency_s": 0.188,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120708,
+   "error": null
+  },
+  {
+   "id": "S102",
+   "kind": "seeded",
+   "truth": "jobs_claim",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.16,
+    "tricolon": 0.16,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.06,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.8,
+    "pullquote_fragment": 0.03
+   },
+   "usage": {
+    "input_tokens": 2867,
+    "output_tokens": 198
+   },
+   "latency_s": 0.198,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120414,
+   "error": null
+  },
+  {
+   "id": "S103",
+   "kind": "seeded",
+   "truth": "jobs_claim",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.3,
+    "tricolon": 0.31,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.08,
+    "self_undercutting": 0.4,
+    "first_x_that": 0.17,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.67,
+    "pullquote_fragment": 0.08
+   },
+   "usage": {
+    "input_tokens": 2982,
+    "output_tokens": 198
+   },
+   "latency_s": 0.178,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000125244,
+   "error": null
+  },
+  {
+   "id": "S104",
+   "kind": "seeded",
+   "truth": "jobs_claim",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.16,
+    "tricolon": 0.19,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.15,
+    "self_undercutting": 0.28,
+    "first_x_that": 0.03,
+    "naked_cost_figure": 0.06,
+    "jobs_claim": 0.86,
+    "pullquote_fragment": 0.04
+   },
+   "usage": {
+    "input_tokens": 2867,
+    "output_tokens": 198
+   },
+   "latency_s": 0.202,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120414,
+   "error": null
+  },
+  {
+   "id": "S105",
+   "kind": "seeded",
+   "truth": "pullquote_fragment",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.6,
+    "tricolon": 0.36,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.16,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.87
+   },
+   "usage": {
+    "input_tokens": 2859,
+    "output_tokens": 198
+   },
+   "latency_s": 0.166,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120078,
+   "error": null
+  },
+  {
+   "id": "S106",
+   "kind": "seeded",
+   "truth": "pullquote_fragment",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.34,
+    "tricolon": 0.32,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.09,
+    "self_undercutting": 0.37,
+    "first_x_that": 0.18,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.07,
+    "pullquote_fragment": 0.51
+   },
+   "usage": {
+    "input_tokens": 2981,
+    "output_tokens": 198
+   },
+   "latency_s": 0.17,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012520199999999998,
+   "error": null
+  },
+  {
+   "id": "S107",
+   "kind": "seeded",
+   "truth": "pullquote_fragment",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.28,
+    "tricolon": 0.41,
+    "stacked_hedging": 0.08,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.1,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.35,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.85
+   },
+   "usage": {
+    "input_tokens": 2867,
+    "output_tokens": 198
+   },
+   "latency_s": 0.212,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120414,
+   "error": null
+  },
+  {
+   "id": "S108",
+   "kind": "seeded",
+   "truth": "pullquote_fragment",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.13,
+    "stacked_hedging": 0.05,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.05,
+    "naked_cost_figure": 0.09,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.49
+   },
+   "usage": {
+    "input_tokens": 2859,
+    "output_tokens": 198
+   },
+   "latency_s": 0.166,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000120078,
+   "error": null
+  },
+  {
+   "id": "S109",
+   "kind": "seeded",
+   "truth": "pullquote_fragment",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.11,
+    "tricolon": 0.21,
+    "stacked_hedging": 0.09,
+    "rhetorical_opener": 0.02,
+    "restating_closer": 0.04,
+    "self_undercutting": 0.11,
+    "first_x_that": 0.22,
+    "naked_cost_figure": 0.04,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.83
+   },
+   "usage": {
+    "input_tokens": 2894,
+    "output_tokens": 198
+   },
+   "latency_s": 0.347,
+   "attempts": 1,
+   "estimated_cost_usd": 0.000121548,
+   "error": null
+  },
+  {
+   "id": "S110",
+   "kind": "seeded",
+   "truth": "pullquote_fragment",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.22,
+    "tricolon": 0.48,
+    "stacked_hedging": 0.15,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.06,
+    "self_undercutting": 0.28,
+    "first_x_that": 0.04,
+    "naked_cost_figure": 0.02,
+    "jobs_claim": 0.03,
+    "pullquote_fragment": 0.77
+   },
+   "usage": {
+    "input_tokens": 2915,
+    "output_tokens": 198
+   },
+   "latency_s": 0.21,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012243,
+   "error": null
+  },
+  {
+   "id": "S111",
+   "kind": "seeded",
+   "truth": "pullquote_fragment",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.1,
+    "tricolon": 0.14,
+    "stacked_hedging": 0.06,
+    "rhetorical_opener": 0.03,
+    "restating_closer": 0.07,
+    "self_undercutting": 0.07,
+    "first_x_that": 0.08,
+    "naked_cost_figure": 0.03,
+    "jobs_claim": 0.04,
+    "pullquote_fragment": 0.93
+   },
+   "usage": {
+    "input_tokens": 2861,
+    "output_tokens": 198
+   },
+   "latency_s": 0.158,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00012016199999999999,
+   "error": null
+  },
+  {
+   "id": "S112",
+   "kind": "seeded",
+   "truth": "pullquote_fragment",
+   "model": "jev-1.13.0",
+   "nouls": {
+    "not_x_but_y": 0.23,
+    "tricolon": 0.27,
+    "stacked_hedging": 0.18,
+    "rhetorical_opener": 0.1,
+    "restating_closer": 0.64,
+    "self_undercutting": 0.22,
+    "first_x_that": 0.08,
+    "naked_cost_figure": 0.07,
+    "jobs_claim": 0.05,
+    "pullquote_fragment": 0.61
+   },
+   "usage": {
+    "input_tokens": 2856,
+    "output_tokens": 198
+   },
+   "latency_s": 0.176,
+   "attempts": 1,
+   "estimated_cost_usd": 0.00011995199999999999,
+   "error": null
+  }
+ ]
+}
