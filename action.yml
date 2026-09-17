@@ -93,6 +93,21 @@ runs:
 
         send="$SNIFFTEST_SEND_INPUT"
 
+        # The fork test below reads a field that only a pull-request-shaped
+        # event has, so on any other event it is empty and decides nothing. An
+        # event this Action has not been reasoned about is therefore an event
+        # whose fork guard is not running, and the honest answer to that is the
+        # free rules rather than a guess. A comment event, for one, runs in the
+        # base repository's context with its secrets and does not end in
+        # _target, so the refusal above does not cover it either.
+        case "${GITHUB_EVENT_NAME:-}" in
+          pull_request | push | workflow_dispatch | schedule | merge_group) ;;
+          *)
+            echo "::notice::Sniff Test has no fork guard for a ${GITHUB_EVENT_NAME:-nameless} event: countable rules only."
+            send=false
+            ;;
+        esac
+
         # A pull request from a fork is somebody else's branch running against
         # our workflow. It gets the free rules, whatever the caller asked for.
         if [ "${SNIFFTEST_IS_FORK:-}" = "true" ]; then

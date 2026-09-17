@@ -136,7 +136,7 @@ models:
 `;
 
 const PRICE_YAML = `version: 1
-source: houston/src/producer/llm.ts PRICES, re-verify against the published price list on the run date
+source: published list prices, transcribed; re-verify against the published price list on the run date
 verified_on: 2026-09-17
 currency: usd_per_million_tokens
 models:
@@ -335,7 +335,7 @@ describe("the dated price table", () => {
     const table = parsePriceTable(PRICE_YAML, "anthropic-2026-09-17.yaml");
 
     expect(table.verified_on).toBe("2026-09-17");
-    expect(table.source).toContain("houston");
+    expect(table.source).toContain("published list prices");
     expect(priceFor(table, "claude-sonnet-5-20260101")?.inputUsdPerToken).toBe(3e-6);
     expect(priceFor(table, "claude-sonnet-5-20260101")?.outputUsdPerToken).toBe(15e-6);
   });
