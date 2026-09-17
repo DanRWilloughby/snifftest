@@ -81,7 +81,7 @@
   {
    "id": "N13",
    "rule": "restating_closer",
-   "why": "a closing sentence carrying a number the paragraph had not given",
+   "why": "a closing sentence carrying a mechanism the paragraph had not given",
    "flagged_by": []
   },
   {
@@ -112,7 +112,9 @@
    "id": "N18",
    "rule": "self_undercutting",
    "why": "a specific past failure the paragraph then explains",
-   "flagged_by": []
+   "flagged_by": [
+    "C (countable rules plus judgment): not_x_but_y"
+   ]
   },
   {
    "id": "N19",
@@ -221,6 +223,13 @@
   ]
  },
  "served_model": "jev-1.13.0",
+ "judgment": {
+  "answered": 1660,
+  "sent": 166,
+  "structure": 0,
+  "stopped": null,
+  "notSent": 0
+ },
  "classes": [
   "dash_present",
   "colon_heavy",
@@ -1664,8 +1673,8 @@
     "unanswered": 0,
     "median_latency_ms": 0,
     "p95_latency_ms": 1,
-    "ms_per_paragraph": 0.25301204819277107,
-    "ms_per_100_paragraphs": 25.301204819277107,
+    "ms_per_paragraph": 0.1144578313253012,
+    "ms_per_100_paragraphs": 11.44578313253012,
     "input_tokens": 0,
     "output_tokens": 0,
     "paragraphs_without_usage": 0,
@@ -2882,21 +2891,21 @@
     "requests": 166,
     "retries": 0,
     "unanswered": 0,
-    "median_latency_ms": 188,
-    "p95_latency_ms": 361,
-    "ms_per_paragraph": 211.1265060240964,
-    "ms_per_100_paragraphs": 21112.650602409638,
-    "input_tokens": 478398,
+    "median_latency_ms": 181.5,
+    "p95_latency_ms": 282,
+    "ms_per_paragraph": 200.72289156626505,
+    "ms_per_100_paragraphs": 20072.289156626506,
+    "input_tokens": 510935,
     "output_tokens": 32868,
     "paragraphs_without_usage": 0,
-    "usd_total": 0.020092716,
-    "usd_per_paragraph": 0.00012104045783132531,
-    "usd_per_100_paragraphs": 0.01210404578313253
+    "usd_total": 0.021459269999999992,
+    "usd_per_paragraph": 0.00012927271084337344,
+    "usd_per_100_paragraphs": 0.012927271084337343
    },
    "overall": {
     "0.5": {
-     "recall": 0.9107,
-     "hits": 102,
+     "recall": 0.9286,
+     "hits": 104,
      "positives": 112,
      "countable": {
       "rules": 5,
@@ -2911,34 +2920,34 @@
      },
      "judgment": {
       "rules": 10,
-      "hits": 70,
+      "hits": 72,
       "positives": 80,
-      "recall": 0.875,
+      "recall": 0.9,
       "interval": {
-       "low": 0.785,
-       "high": 0.9307
+       "low": 0.8149,
+       "high": 0.9485
       },
       "by_construction": false
      },
-     "fp_clean_paragraphs": 9,
+     "fp_clean_paragraphs": 10,
      "clean_paragraphs": 54,
      "fp_paragraph_interval": {
-      "low": 0.0902,
-      "high": 0.2874
+      "low": 0.1038,
+      "high": 0.3084
      },
      "fireable_clean_cells": 540,
-     "fp_rate_per_fireable_clean_cell": 0.0222,
-     "fp_rate_per_clean_cell": 0.0148,
-     "fp_cells": 12,
+     "fp_rate_per_fireable_clean_cell": 0.0185,
+     "fp_rate_per_clean_cell": 0.0123,
+     "fp_cells": 10,
      "clean_cells": 810,
-     "fp_clean_documents_with_any_flag": 0.1667,
-     "off_rule_flags": 17,
-     "off_rule_flags_on_seeded_cells": 0.0108,
-     "fp_rate_per_negative_cell": 0.0122
+     "fp_clean_documents_with_any_flag": 0.1852,
+     "off_rule_flags": 24,
+     "off_rule_flags_on_seeded_cells": 0.0153,
+     "fp_rate_per_negative_cell": 0.0143
     },
     "0.7": {
-     "recall": 0.8036,
-     "hits": 90,
+     "recall": 0.8482,
+     "hits": 95,
      "positives": 112,
      "countable": {
       "rules": 5,
@@ -2953,54 +2962,12 @@
      },
      "judgment": {
       "rules": 10,
-      "hits": 58,
+      "hits": 63,
       "positives": 80,
-      "recall": 0.725,
+      "recall": 0.7875,
       "interval": {
-       "low": 0.6186,
-       "high": 0.8108
-      },
-      "by_construction": false
-     },
-     "fp_clean_paragraphs": 2,
-     "clean_paragraphs": 54,
-     "fp_paragraph_interval": {
-      "low": 0.0102,
-      "high": 0.1254
-     },
-     "fireable_clean_cells": 540,
-     "fp_rate_per_fireable_clean_cell": 0.0037,
-     "fp_rate_per_clean_cell": 0.0025,
-     "fp_cells": 2,
-     "clean_cells": 810,
-     "fp_clean_documents_with_any_flag": 0.037,
-     "off_rule_flags": 3,
-     "off_rule_flags_on_seeded_cells": 0.0019,
-     "fp_rate_per_negative_cell": 0.0021
-    },
-    "0.9": {
-     "recall": 0.4196,
-     "hits": 47,
-     "positives": 112,
-     "countable": {
-      "rules": 5,
-      "hits": 32,
-      "positives": 32,
-      "recall": 1,
-      "interval": {
-       "low": 0.8928,
-       "high": 1
-      },
-      "by_construction": true
-     },
-     "judgment": {
-      "rules": 10,
-      "hits": 15,
-      "positives": 80,
-      "recall": 0.1875,
-      "interval": {
-       "low": 0.1171,
-       "high": 0.2866
+       "low": 0.6858,
+       "high": 0.8629
       },
       "by_construction": false
      },
@@ -3016,9 +2983,51 @@
      "fp_cells": 1,
      "clean_cells": 810,
      "fp_clean_documents_with_any_flag": 0.0185,
+     "off_rule_flags": 3,
+     "off_rule_flags_on_seeded_cells": 0.0019,
+     "fp_rate_per_negative_cell": 0.0017
+    },
+    "0.9": {
+     "recall": 0.5,
+     "hits": 56,
+     "positives": 112,
+     "countable": {
+      "rules": 5,
+      "hits": 32,
+      "positives": 32,
+      "recall": 1,
+      "interval": {
+       "low": 0.8928,
+       "high": 1
+      },
+      "by_construction": true
+     },
+     "judgment": {
+      "rules": 10,
+      "hits": 24,
+      "positives": 80,
+      "recall": 0.3,
+      "interval": {
+       "low": 0.2106,
+       "high": 0.4077
+      },
+      "by_construction": false
+     },
+     "fp_clean_paragraphs": 0,
+     "clean_paragraphs": 54,
+     "fp_paragraph_interval": {
+      "low": 0,
+      "high": 0.0664
+     },
+     "fireable_clean_cells": 540,
+     "fp_rate_per_fireable_clean_cell": 0,
+     "fp_rate_per_clean_cell": 0,
+     "fp_cells": 0,
+     "clean_cells": 810,
+     "fp_clean_documents_with_any_flag": 0,
      "off_rule_flags": 0,
      "off_rule_flags_on_seeded_cells": 0,
-     "fp_rate_per_negative_cell": 0.0004
+     "fp_rate_per_negative_cell": 0
     }
    },
    "per_rule": {
@@ -3204,8 +3213,8 @@
         "low": 0.2152,
         "high": 0.7848
        },
-       "fp_rate_clean": 0.1296,
-       "fps": 7
+       "fp_rate_clean": 0.1111,
+       "fps": 6
       },
       "0.7": {
        "recall": 0.375,
@@ -3234,21 +3243,21 @@
      "n_clean": 54,
      "at": {
       "0.5": {
+       "recall": 1,
+       "hits": 8,
+       "interval": {
+        "low": 0.6756,
+        "high": 1
+       },
+       "fp_rate_clean": 0.0556,
+       "fps": 3
+      },
+      "0.7": {
        "recall": 0.875,
        "hits": 7,
        "interval": {
         "low": 0.5291,
         "high": 0.9776
-       },
-       "fp_rate_clean": 0.037,
-       "fps": 2
-      },
-      "0.7": {
-       "recall": 0.625,
-       "hits": 5,
-       "interval": {
-        "low": 0.3057,
-        "high": 0.8632
        },
        "fp_rate_clean": 0,
        "fps": 0
@@ -3280,11 +3289,11 @@
        "fps": 0
       },
       "0.7": {
-       "recall": 0.75,
-       "hits": 6,
+       "recall": 0.625,
+       "hits": 5,
        "interval": {
-        "low": 0.4093,
-        "high": 0.9285
+        "low": 0.3057,
+        "high": 0.8632
        },
        "fp_rate_clean": 0,
        "fps": 0
@@ -3384,36 +3393,10 @@
         "low": 0.6756,
         "high": 1
        },
-       "fp_rate_clean": 0.0185,
-       "fps": 1
+       "fp_rate_clean": 0,
+       "fps": 0
       },
       "0.7": {
-       "recall": 0.875,
-       "hits": 7,
-       "interval": {
-        "low": 0.5291,
-        "high": 0.9776
-       },
-       "fp_rate_clean": 0.0185,
-       "fps": 1
-      },
-      "0.9": {
-       "recall": 0.125,
-       "hits": 1,
-       "interval": {
-        "low": 0.0224,
-        "high": 0.4709
-       },
-       "fp_rate_clean": 0.0185,
-       "fps": 1
-      }
-     }
-    },
-    "first_x_that": {
-     "n_positive": 8,
-     "n_clean": 54,
-     "at": {
-      "0.5": {
        "recall": 0.875,
        "hits": 7,
        "interval": {
@@ -3423,12 +3406,38 @@
        "fp_rate_clean": 0,
        "fps": 0
       },
-      "0.7": {
+      "0.9": {
+       "recall": 0.125,
+       "hits": 1,
+       "interval": {
+        "low": 0.0224,
+        "high": 0.4709
+       },
+       "fp_rate_clean": 0,
+       "fps": 0
+      }
+     }
+    },
+    "first_x_that": {
+     "n_positive": 8,
+     "n_clean": 54,
+     "at": {
+      "0.5": {
        "recall": 0.75,
        "hits": 6,
        "interval": {
         "low": 0.4093,
         "high": 0.9285
+       },
+       "fp_rate_clean": 0,
+       "fps": 0
+      },
+      "0.7": {
+       "recall": 0.625,
+       "hits": 5,
+       "interval": {
+        "low": 0.3057,
+        "high": 0.8632
        },
        "fp_rate_clean": 0,
        "fps": 0
@@ -3456,8 +3465,8 @@
         "low": 0.6756,
         "high": 1
        },
-       "fp_rate_clean": 0.0185,
-       "fps": 1
+       "fp_rate_clean": 0,
+       "fps": 0
       },
       "0.7": {
        "recall": 0.75,
@@ -3486,31 +3495,31 @@
      "n_clean": 54,
      "at": {
       "0.5": {
-       "recall": 0.75,
-       "hits": 6,
+       "recall": 0.875,
+       "hits": 7,
        "interval": {
-        "low": 0.4093,
-        "high": 0.9285
+        "low": 0.5291,
+        "high": 0.9776
        },
        "fp_rate_clean": 0,
        "fps": 0
       },
       "0.7": {
-       "recall": 0.625,
-       "hits": 5,
+       "recall": 0.875,
+       "hits": 7,
        "interval": {
-        "low": 0.3057,
-        "high": 0.8632
+        "low": 0.5291,
+        "high": 0.9776
        },
        "fp_rate_clean": 0,
        "fps": 0
       },
       "0.9": {
-       "recall": 0.125,
-       "hits": 1,
+       "recall": 0.625,
+       "hits": 5,
        "interval": {
-        "low": 0.0224,
-        "high": 0.4709
+        "low": 0.3057,
+        "high": 0.8632
        },
        "fp_rate_clean": 0,
        "fps": 0
@@ -3522,31 +3531,31 @@
      "n_clean": 54,
      "at": {
       "0.5": {
-       "recall": 0.875,
-       "hits": 7,
+       "recall": 1,
+       "hits": 8,
        "interval": {
-        "low": 0.5291,
-        "high": 0.9776
+        "low": 0.6756,
+        "high": 1
        },
        "fp_rate_clean": 0,
        "fps": 0
       },
       "0.7": {
-       "recall": 0.625,
-       "hits": 5,
+       "recall": 1,
+       "hits": 8,
        "interval": {
-        "low": 0.3057,
-        "high": 0.8632
+        "low": 0.6756,
+        "high": 1
        },
        "fp_rate_clean": 0,
        "fps": 0
       },
       "0.9": {
-       "recall": 0.125,
-       "hits": 1,
+       "recall": 0.75,
+       "hits": 6,
        "interval": {
-        "low": 0.0224,
-        "high": 0.4709
+        "low": 0.4093,
+        "high": 0.9285
        },
        "fp_rate_clean": 0,
        "fps": 0
@@ -3556,117 +3565,105 @@
    },
    "calibration": {
     "0.0-0.1": {
-     "n": 1800,
-     "defective": 1,
-     "fraction_defective": 0.0006
+     "n": 1784,
+     "defective": 0,
+     "fraction_defective": 0
     },
     "0.1-0.2": {
-     "n": 301,
-     "defective": 2,
-     "fraction_defective": 0.0066
+     "n": 313,
+     "defective": 3,
+     "fraction_defective": 0.0096
     },
     "0.2-0.3": {
      "n": 126,
-     "defective": 3,
-     "fraction_defective": 0.0238
+     "defective": 2,
+     "fraction_defective": 0.0159
     },
     "0.3-0.4": {
-     "n": 78,
+     "n": 100,
      "defective": 1,
-     "fraction_defective": 0.0128
+     "fraction_defective": 0.01
     },
     "0.4-0.5": {
-     "n": 54,
-     "defective": 3,
-     "fraction_defective": 0.0556
+     "n": 29,
+     "defective": 2,
+     "fraction_defective": 0.069
     },
     "0.5-0.6": {
-     "n": 14,
-     "defective": 5,
-     "fraction_defective": 0.3571
+     "n": 18,
+     "defective": 3,
+     "fraction_defective": 0.1667
     },
     "0.6-0.7": {
-     "n": 22,
-     "defective": 7,
-     "fraction_defective": 0.3182
+     "n": 21,
+     "defective": 6,
+     "fraction_defective": 0.2857
     },
     "0.7-0.8": {
-     "n": 22,
-     "defective": 18,
-     "fraction_defective": 0.8182
+     "n": 19,
+     "defective": 15,
+     "fraction_defective": 0.7895
     },
     "0.8-0.9": {
-     "n": 25,
-     "defective": 25,
+     "n": 24,
+     "defective": 24,
      "fraction_defective": 1
     },
     "0.9-1.0": {
-     "n": 48,
-     "defective": 47,
-     "fraction_defective": 0.9792
+     "n": 56,
+     "defective": 56,
+     "fraction_defective": 1
     }
    },
    "calibration_unanswered": 0,
    "misses_at_0_7": [
     {
-     "doc": "S98",
-     "rule": "jobs_claim",
-     "probability": 0.04,
-     "text": "The last pass is the one most people skip, which is a night's sleep. A draft read the next morning is a different object from the draft you finished at eleven. Sentences you were proud of turn out to be carrying a private meaning that never made it onto the page, and sentences you nearly cut turn out to hold the argument together. The text is the same as it was at eleven. The typing pool went the same way and nobody missed it. You are the one who changed, because for eight hours you stopped being its author and became its reader, and the reader is the only person whose opinion matters. If the deadline will not allow a night, an hour away from the screen recovers some of the effect, and a walk recovers more of it than a coffee does. Send the piece after the morning read, and keep the evening version in a drawer so you can see, later, how much the sleep was worth."
-    },
-    {
      "doc": "S40",
      "rule": "not_x_but_y",
-     "probability": 0.12,
+     "probability": 0.11,
      "text": "In 1732 I first publish'd my Almanack, under the name of Richard Saunders; it was continu'd by me about twenty-five years, commonly call'd Poor Richard's Almanac. The route was fine. The walking was the part nobody costed. I endeavour'd to make it both entertaining and useful, and it accordingly came to be in such demand, that I reap'd considerable profit from it, vending annually near ten thousand. And observing that it was generally read, scarce any neighborhood in the province being without it, I consider'd it as a proper vehicle for conveying instruction among the common people, who bought scarcely any other books; I therefore filled all the little spaces that occurr'd between the remarkable days in the calendar with proverbial sentences, chiefly such as inculcated industry and frugality, as the means of procuring wealth, and thereby securing virtue; it being more difficult for a man in want, to act always honestly, as, to use here one of those proverbs, it is hard for an empty sack to stand upright."
+    },
+    {
+     "doc": "S98",
+     "rule": "jobs_claim",
+     "probability": 0.14,
+     "text": "The last pass is the one most people skip, which is a night's sleep. A draft read the next morning is a different object from the draft you finished at eleven. Sentences you were proud of turn out to be carrying a private meaning that never made it onto the page, and sentences you nearly cut turn out to hold the argument together. The text is the same as it was at eleven. The typing pool went the same way and nobody missed it. You are the one who changed, because for eight hours you stopped being its author and became its reader, and the reader is the only person whose opinion matters. If the deadline will not allow a night, an hour away from the screen recovers some of the effect, and a walk recovers more of it than a coffee does. Send the piece after the morning read, and keep the evening version in a drawer so you can see, later, how much the sleep was worth."
     },
     {
      "doc": "S38",
      "rule": "not_x_but_y",
-     "probability": 0.14,
+     "probability": 0.15,
      "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up. He retained a great deal of his old enthusiasms and lov'd argumentation. You did not forget the step. You decided it did not apply to you. We therefore had many disputations. I used to work him so with my Socratic method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led to the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new sect. He was to preach the doctrines, and I was to confound all opponents. When he came to explain with me upon the doctrines, I found several conundrums which I objected to, unless I might have my way a little too, and introduce some of mine."
     },
     {
      "doc": "S81",
      "rule": "first_x_that",
-     "probability": 0.21,
+     "probability": 0.26,
      "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up. We got there before anybody else: nobody had timed the walk at all. He retained a great deal of his old enthusiasms and lov'd argumentation. We therefore had many disputations. I used to work him so with my Socratic method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led to the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new sect. He was to preach the doctrines, and I was to confound all opponents. When he came to explain with me upon the doctrines, I found several conundrums which I objected to, unless I might have my way a little too, and introduce some of mine."
-    },
-    {
-     "doc": "S33",
-     "rule": "not_x_but_y",
-     "probability": 0.24,
-     "text": "The app runs on any phone sold in the last six years and on a browser at the office. It does not draw plans, and it does not try to. The plan is a picture you upload once per job, and a note pins to a spot on that picture. Offline storage holds about three months of a busy crew's notes before the oldest entries are moved to the server, from where they can still be read whenever there is signal. The shop never lost its customers. It stopped answering the door. Photos are kept at full size for ninety days and at screen size after that, unless the account asks for full-size retention, which costs extra because storage does. Support is by email and is answered by the two people who built the thing, usually the same working day, and the answer is a fix or a plain reason why not. Bugs found by customers are listed on a public page with the date they were reported and the version that fixed them."
     },
     {
      "doc": "S55",
      "rule": "stacked_hedging",
-     "probability": 0.27,
+     "probability": 0.29,
      "text": "The list has to be owned by the people who use it, or it dies within a month. A list handed down from an office is followed for a week and then kept in a drawer, because the person at the bench can see which items are theatre. A list the bench wrote itself gets edited, which is the sign that it is alive. Put the date of the last edit at the top and the name of whoever changed it, and review it whenever something goes wrong that the list should have caught. If the list keeps growing, it is collecting fear rather than steps, and it needs the same edit a draft needs. Ten items that get read beat forty that get skimmed. It could be said, loosely, that the meeting may have had a purpose of some kind. Cut until it fits on one side of a card. Hang it where the job happens and keep a pen on a string next to it, so that the edits happen at the bench."
     },
     {
-     "doc": "S43",
-     "rule": "tricolon",
-     "probability": 0.39,
-     "text": "Subject lines are read more than bodies, so write the subject last, after you know what the message is actually about. Six words or fewer, with the specific thing in it. A subject that could have been sent to anyone reads as a mass mailing, and the filter in the reader's head is faster than any spam filter. Avoid the tricks. A fake reply prefix or a question mark bolted onto a statement both worked once, years ago, and now each one marks the message as a template. Count them, name them, forget them. Send on a Tuesday or Wednesday morning in the reader's time zone, because Monday's inbox is a backlog and Friday's is a countdown. Follow up once, after five working days, with a shorter message that adds one new thing. A second follow-up is a nuisance. If two messages have gone unanswered, the answer is no, and the polite move is to believe it."
+     "doc": "S33",
+     "rule": "not_x_but_y",
+     "probability": 0.3,
+     "text": "The app runs on any phone sold in the last six years and on a browser at the office. It does not draw plans, and it does not try to. The plan is a picture you upload once per job, and a note pins to a spot on that picture. Offline storage holds about three months of a busy crew's notes before the oldest entries are moved to the server, from where they can still be read whenever there is signal. The shop never lost its customers. It stopped answering the door. Photos are kept at full size for ninety days and at screen size after that, unless the account asks for full-size retention, which costs extra because storage does. Support is by email and is answered by the two people who built the thing, usually the same working day, and the answer is a fix or a plain reason why not. Bugs found by customers are listed on a public page with the date they were reported and the version that fixed them."
     },
     {
-     "doc": "S100",
-     "rule": "jobs_claim",
-     "probability": 0.4,
-     "text": "While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in the Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method. Every hour it saves is an hour somebody no longer gets paid for. I was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter. And being then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them in difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved."
+     "doc": "S86",
+     "rule": "first_x_that",
+     "probability": 0.46,
+     "text": "While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in the Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method. Ours is the earliest field notebook a crew could carry down a mine with no signal. I was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter. And being then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them in difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved."
     },
     {
      "doc": "S36",
      "rule": "not_x_but_y",
-     "probability": 0.45,
+     "probability": 0.47,
      "text": "Measure it. Keep a plain spreadsheet with the date, the recipient's role, the first line you used, and whether a reply came inside a week. After thirty messages the sheet will tell you which opening lines earn replies and which do not, and the answer will surprise you at least once. Most people find that the messages they were proudest of did worst, because pride shows, and the plain ones did best. Everyone described the delay as bad luck. The calendar had said so in June. Reply rates for a well-aimed cold email sit somewhere between one in ten and one in four, depending on the industry and on how well the list was built. Below one in twenty, the list is wrong and no amount of rewriting will fix it. Above one in three, you are probably emailing people who already know you, which is a different and easier game. Keep the sheet for a year, because the seasons matter more than anyone expects, and a line that dies in August may come back in October."
-    },
-    {
-     "doc": "S108",
-     "rule": "pullquote_fragment",
-     "probability": 0.49,
-     "text": "The second change is to the configuration file. *\"Twelve minutes, every morning.\"* The tool used to look for its settings in four places in a fixed order and take the first one it found, and the order was documented only in a comment in the source. Now it looks in the current directory and then in the home directory, and it prints which file it chose when run with the verbose flag. Anything found under the two old locations is still read this release, with a warning that names the new path, and it stops being read in the next major version. The warning is printed once per run rather than once per file, because an earlier draft of this change printed it per file and one user reported a log of forty thousand identical lines. Migration is a single move command and the release notes carry the exact line to run. The move takes under a second and is safe to run twice."
     },
     {
      "doc": "S34",
@@ -3675,79 +3672,55 @@
      "text": "The second pass is for the paragraph endings. A first draft tends to finish each paragraph twice, once when the point lands and once more when the writer, not trusting the landing, says it again in different words. Read only the last sentence of each paragraph, top to bottom, and ask what each one adds that the sentence before it did not. When the answer is nothing, cut it. The paragraph will feel abrupt for a day, and then it will feel finished. The same test applies to the opening sentence of the whole piece. Writers warm up in public, and the first sentence is often a stretch before the run. What we called a draft was closer to a promise we had already made. If the second sentence would make a better first sentence, promote it and let the original go. Most pieces lose between five and fifteen percent of their length on this pass, and nobody has ever asked for the cut material back."
     },
     {
-     "doc": "S86",
-     "rule": "first_x_that",
-     "probability": 0.51,
-     "text": "While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in the Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method. Ours is the earliest field notebook a crew could carry down a mine with no signal. I was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter. And being then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them in difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved."
-    },
-    {
-     "doc": "S106",
-     "rule": "pullquote_fragment",
-     "probability": 0.51,
-     "text": "The breaking into this money of Vernon's was one of the first great errata of my life; and this affair show'd that my father was not much out in his judgment when he suppos'd me too young to manage business of importance. But Sir William, on reading his letter, said he was too prudent. There was great difference in persons; and discretion did not always accompany years, nor was youth always without it. \"And since he will not set you up,\" says he, \"I will do it myself. Give me an inventory of the things necessary to be had from England, and I will send for them. You shall repay me when you are able; I am resolv'd to have a good printer here, and I am sure you must succeed.\" This was spoken with such an appearance of cordiality, that I had not the least doubt of his meaning what he said. I had hitherto kept the proposition of my setting up, a secret in Philadelphia, and I still kept it. *\"Read aloud, or not at all.\"* Had it been known that I depended on the governor, probably some friend, that knew him better, would have advis'd me not to rely on him, as I afterwards heard it as his known character to be liberal of promises which he never meant to keep. Yet, unsolicited as he was by me, how could I think his generous offers insincere? I believ'd him one of the best men in the world."
+     "doc": "S43",
+     "rule": "tricolon",
+     "probability": 0.5,
+     "text": "Subject lines are read more than bodies, so write the subject last, after you know what the message is actually about. Six words or fewer, with the specific thing in it. A subject that could have been sent to anyone reads as a mass mailing, and the filter in the reader's head is faster than any spam filter. Avoid the tricks. A fake reply prefix or a question mark bolted onto a statement both worked once, years ago, and now each one marks the message as a template. Count them, name them, forget them. Send on a Tuesday or Wednesday morning in the reader's time zone, because Monday's inbox is a backlog and Friday's is a countdown. Follow up once, after five working days, with a shorter message that adds one new thing. A second follow-up is a nuisance. If two messages have gone unanswered, the answer is no, and the polite move is to believe it."
     },
     {
      "doc": "S96",
      "rule": "naked_cost_figure",
-     "probability": 0.57,
+     "probability": 0.58,
      "text": "Crews on a job site write things down on whatever is nearest, which is usually a glove or the back of a delivery note. The whole afternoon of compute came to eleven pounds. By the time the day ends, the note is in a skip and the measurement is a memory. The app gives each crew a shared notebook that works without signal, accepts a photo or a voice note as easily as a number typed with a wet thumb, and syncs when the van gets back to the yard. Every entry carries who wrote it and where on the plan it belongs, with the time stamped by the phone. The office sees the notebook the next morning without anyone typing it up, and the person who wrote the note at four in the afternoon can find it again in March when the question comes back. Setup takes a foreman about twenty minutes and needs no training beyond showing the crew where the button is."
     },
     {
      "doc": "S73",
      "rule": "self_undercutting",
-     "probability": 0.59,
+     "probability": 0.61,
      "text": "The second change is to the configuration file. The tool used to look for its settings in four places in a fixed order and take the first one it found, and the order was documented only in a comment in the source. Now it looks in the current directory and then in the home directory, and it prints which file it chose when run with the verbose flag. Anything found under the two old locations is still read this release, with a warning that names the new path, and it stops being read in the next major version. The warning is printed once per run rather than once per file, because an earlier draft of this change printed it per file and one user reported a log of forty thousand identical lines. There is every chance the effect wears off after a week. Migration is a single move command and the release notes carry the exact line to run. The move takes under a second and is safe to run twice."
+    },
+    {
+     "doc": "S83",
+     "rule": "first_x_that",
+     "probability": 0.61,
+     "text": "Reading a draft aloud is the cheapest edit there is. The ear catches what the eye forgives, because the eye has seen the sentence a dozen times and stopped reading it. We beat everybody to it, which is a sentence we have earned. When you say the words, a clause that runs too long makes you short of breath, and you feel exactly where the full stop should have gone. A word repeated in two neighbouring sentences sounds like a stammer. A joke that looked fine on the screen either lands or dies in the room, and either way you know. The method costs nothing and takes about as long as the piece takes to read, which for most working drafts is under ten minutes. It works best with a printed copy and a pen, so that the marks go on the page while the voice keeps moving. Stopping to fix each fault as you find it breaks the rhythm you were listening for. Mark it and keep going; the fixing comes afterwards."
     },
     {
      "doc": "S90",
      "rule": "naked_cost_figure",
-     "probability": 0.61,
+     "probability": 0.62,
      "text": "About this time I met with an odd volume of the Spectator. It was the third. I had never before seen any of them. I bought it, read it over and over, and was much delighted with it. It cost us less than a sandwich to produce. I thought the writing excellent, and wished, if possible, to imitate it. With this view I took some of the papers, and, making short hints of the sentiment in each sentence, laid them by a few days, and then, without looking at the book, try'd to compleat the papers again, by expressing each hinted sentiment at length, and as fully as it had been expressed before, in any suitable words that should come to hand. Then I compared my Spectator with the original, discovered some of my faults, and corrected them. But I found I wanted a stock of words, or a readiness in recollecting and using them, which I thought I should have acquired before that time if I had gone on making verses; since the continual occasion for words of the same import, but of different length, to suit the measure, or of different sound for the rhyme, would have laid me under a constant necessity of searching for variety, and also have tended to fix that variety in my mind, and make me master of it."
-    },
-    {
-     "doc": "S112",
-     "rule": "pullquote_fragment",
-     "probability": 0.61,
-     "text": "The second pass is for the paragraph endings. A first draft tends to finish each paragraph twice, once when the point lands and once more when the writer, not trusting the landing, says it again in different words. Read only the last sentence of each paragraph, top to bottom, and ask what each one adds that the sentence before it did not. When the answer is nothing, cut it. *\"Four miles, no shortcuts.\"* The paragraph will feel abrupt for a day, and then it will feel finished. The same test applies to the opening sentence of the whole piece. Writers warm up in public, and the first sentence is often a stretch before the run. If the second sentence would make a better first sentence, promote it and let the original go. Most pieces lose between five and fifteen percent of their length on this pass, and nobody has ever asked for the cut material back."
-    },
-    {
-     "doc": "S46",
-     "rule": "tricolon",
-     "probability": 0.65,
-     "text": "The main road took a median of fourteen minutes and ten seconds, with the slowest walk at sixteen minutes because of a crossing that stayed red through two cycles. The park took thirteen minutes and forty seconds, with very little spread, because there is nothing on that route to wait for. Write it, leave it, read it again. The park gate was open on every morning it was walked. The towpath took twelve minutes and twenty seconds on a dry morning and fourteen and a half minutes on a wet one, since the surface turns to mud for a hundred metres near the bridge and a careful walker slows down there. Taken over all thirty walks, the towpath wins by a little over a minute against the park and by nearly two minutes against the main road. Taken over the wet mornings only, the park wins. The main road never won a single morning, which settles the loudest side of the two-year argument."
-    },
-    {
-     "doc": "S103",
-     "rule": "jobs_claim",
-     "probability": 0.67,
-     "text": "The breaking into this money of Vernon's was one of the first great errata of my life; and this affair show'd that my father was not much out in his judgment when he suppos'd me too young to manage business of importance. But Sir William, on reading his letter, said he was too prudent. There was great difference in persons; and discretion did not always accompany years, nor was youth always without it. A person will always be needed here, whatever anybody says. \"And since he will not set you up,\" says he, \"I will do it myself. Give me an inventory of the things necessary to be had from England, and I will send for them. You shall repay me when you are able; I am resolv'd to have a good printer here, and I am sure you must succeed.\" This was spoken with such an appearance of cordiality, that I had not the least doubt of his meaning what he said. I had hitherto kept the proposition of my setting up, a secret in Philadelphia, and I still kept it. Had it been known that I depended on the governor, probably some friend, that knew him better, would have advis'd me not to rely on him, as I afterwards heard it as his known character to be liberal of promises which he never meant to keep. Yet, unsolicited as he was by me, how could I think his generous offers insincere? I believ'd him one of the best men in the world."
-    },
-    {
-     "doc": "S47",
-     "rule": "tricolon",
-     "probability": 0.68,
-     "text": "About this time I met with an odd volume of the Spectator. It was the third. I had never before seen any of them. I bought it, read it over and over, and was much delighted with it. I thought the writing excellent, and wished, if possible, to imitate it. With this view I took some of the papers, and, making short hints of the sentiment in each sentence, laid them by a few days, and then, without looking at the book, try'd to compleat the papers again, by expressing each hinted sentiment at length, and as fully as it had been expressed before, in any suitable words that should come to hand. Faster, quieter, better behaved. Then I compared my Spectator with the original, discovered some of my faults, and corrected them. But I found I wanted a stock of words, or a readiness in recollecting and using them, which I thought I should have acquired before that time if I had gone on making verses; since the continual occasion for words of the same import, but of different length, to suit the measure, or of different sound for the rhyme, would have laid me under a constant necessity of searching for variety, and also have tended to fix that variety in my mind, and make me master of it."
-    },
-    {
-     "doc": "S71",
-     "rule": "restating_closer",
-     "probability": 0.68,
-     "text": "A cold email has one job, which is to earn a reply, and most of them fail it in the first line by talking about the sender. The reader opens the message on a phone between two other things and decides in about four seconds whether the next paragraph is worth a thumb. The first line therefore has to be about them, and it has to prove that you looked. A specific observation about something they published or shipped last month does the proving. A compliment does not, because compliments are free and everyone knows it. Keep the whole thing under a hundred and twenty words. The reader is not going to scroll, and a long message signals that you value your own time over theirs. One ask, stated plainly, near the end. If you want fifteen minutes, say fifteen minutes and offer two specific times. If you want an introduction, name the person. A message with two asks gets neither. So that, in the end, is the shape of what was just described."
     },
     {
      "doc": "S49",
      "rule": "stacked_hedging",
-     "probability": 0.69,
+     "probability": 0.67,
      "text": "Subject lines are read more than bodies, so write the subject last, after you know what the message is actually about. Six words or fewer, with the specific thing in it. It seems, on balance, and allowing for the usual caveats, fairly likely to hold. A subject that could have been sent to anyone reads as a mass mailing, and the filter in the reader's head is faster than any spam filter. Avoid the tricks. A fake reply prefix or a question mark bolted onto a statement both worked once, years ago, and now each one marks the message as a template. Send on a Tuesday or Wednesday morning in the reader's time zone, because Monday's inbox is a backlog and Friday's is a countdown. Follow up once, after five working days, with a shorter message that adds one new thing. A second follow-up is a nuisance. If two messages have gone unanswered, the answer is no, and the polite move is to believe it."
+    },
+    {
+     "doc": "S51",
+     "rule": "stacked_hedging",
+     "probability": 0.67,
+     "text": "Crews on a job site write things down on whatever is nearest, which is usually a glove or the back of a delivery note. Possibly, and I could be wrong, this is roughly the sort of thing that tends to happen. By the time the day ends, the note is in a skip and the measurement is a memory. The app gives each crew a shared notebook that works without signal, accepts a photo or a voice note as easily as a number typed with a wet thumb, and syncs when the van gets back to the yard. Every entry carries who wrote it and where on the plan it belongs, with the time stamped by the phone. The office sees the notebook the next morning without anyone typing it up, and the person who wrote the note at four in the afternoon can find it again in March when the question comes back. Setup takes a foreman about twenty minutes and needs no training beyond showing the crew where the button is."
+    },
+    {
+     "doc": "S71",
+     "rule": "restating_closer",
+     "probability": 0.69,
+     "text": "A cold email has one job, which is to earn a reply, and most of them fail it in the first line by talking about the sender. The reader opens the message on a phone between two other things and decides in about four seconds whether the next paragraph is worth a thumb. The first line therefore has to be about them, and it has to prove that you looked. A specific observation about something they published or shipped last month does the proving. A compliment does not, because compliments are free and everyone knows it. Keep the whole thing under a hundred and twenty words. The reader is not going to scroll, and a long message signals that you value your own time over theirs. One ask, stated plainly, near the end. If you want fifteen minutes, say fifteen minutes and offer two specific times. If you want an introduction, name the person. A message with two asks gets neither. So that, in the end, is the shape of what was just described."
     }
    ],
    "false_positives_at_0_7": [
-    {
-     "doc": "N01",
-     "rule": "self_undercutting",
-     "probability": 0.94,
-     "text": "The last pass is the one most people skip, which is a night's sleep. A draft read the next morning is a different object from the draft you finished at eleven. This is not a guarantee, and the page says so twice. Sentences you were proud of turn out to be carrying a private meaning that never made it onto the page, and sentences you nearly cut turn out to hold the argument together. The text is the same as it was at eleven. You are the one who changed, because for eight hours you stopped being its author and became its reader, and the reader is the only person whose opinion matters. If the deadline will not allow a night, an hour away from the screen recovers some of the effect, and a walk recovers more of it than a coffee does. Send the piece after the morning read, and keep the evening version in a drawer so you can see, later, how much the sleep was worth."
-    },
     {
      "doc": "N18",
      "rule": "not_x_but_y",

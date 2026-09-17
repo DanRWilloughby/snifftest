@@ -288,7 +288,7 @@ blind read of the same 166 paragraphs by four general models.
 <!-- numbers:start -->
 | Arm | Judgment faults caught, of 80 | Clean paragraphs flagged, of 54 | Cost per 100 paragraphs | Median per paragraph |
 | --- | --- | --- | --- | --- |
-| Sniff Test, judgment model (Jev, measured) | 58 | 2 | $0.0121 | 188 ms |
+| Sniff Test, judgment model (Jev, measured) | 63 | 1 | $0.0129 | 182 ms |
 | Claude Haiku 4.5 (estimate) | 61 | 11 | about $0.34 | not measured |
 | Claude Sonnet 5 (estimate) | 63 | 2 | about $1.02 | not measured |
 | Claude Opus 5 (estimate) | 72 | 0 | about $1.70 | not measured |
@@ -298,7 +298,11 @@ blind read of the same 166 paragraphs by four general models.
 Flags count at 0.7. The panel models judged about fourteen paragraphs per
 context inside agent sessions, and Jev judged one paragraph per request. The
 Jev cost and latency are measured from provider-reported usage; the model costs
-are estimates at list price and model latency was not measured.
+are estimates at list price and model latency was not measured. The Jev row is
+the run committed under `bench/results/2026-09-17/`. The model rows were judged
+on the earlier run of the same corpus (commit e2ff9ee), before three judgment
+rules were reworded and two near misses in the seed bank were replaced; they
+are re-measured on the current corpus when `snifftest bench` runs.
 
 What that supports. On this corpus the judgment model's accuracy sits in the
 range of the mid-tier general models, with far fewer false alarms than the
