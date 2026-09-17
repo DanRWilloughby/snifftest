@@ -616,3 +616,68 @@ describe("snifftest eval", () => {
     }
   });
 });
+
+// --- review fold-ins ------------------------------------------------------
+
+describe("calibration counts only the cells the arm answered", () => {
+  /** The same hand-built set, with one cell the arm gave no opinion on. */
+  function withUnanswered(): ArmObservation {
+    const base = handBuilt();
+    return {
+      ...base,
+      cells: base.cells.map((cell) =>
+        cell.doc === "C2" && cell.rule === "r1" ? { ...cell, probability: 0, answered: false } : cell,
+      ),
+    };
+  }
+
+  const score = scoreArm(withUnanswered(), ["r1", "r2"]);
+
+  test("an unanswered cell is not a 0.0-0.1 reading", () => {
+    // Answered zeros: C2/r2 at 0.05. The unanswered C2/r1 must not join it.
+    expect(score.calibration["0.0-0.1"]).toEqual({ n: 1, defective: 0, fraction_defective: 0 });
+    const counted = Object.values(score.calibration).reduce((sum, bucket) => sum + bucket.n, 0);
+    expect(counted).toBe(7);
+  });
+
+  test("the unanswered cells are reported as their own count", () => {
+    expect(score.calibration_unanswered).toBe(1);
+  });
+
+  test("recall and false positives are unchanged by the exclusion", () => {
+    const answered = scoreArm(handBuilt(), ["r1", "r2"]);
+    expect(score.overall["0.7"]).toEqual(answered.overall["0.7"]);
+    expect(score.per_rule["r1"]).toEqual(answered.per_rule["r1"]);
+  });
+});
+
+describe("the report names the model that served the run", () => {
+  test("the markdown summary line carries it beside the seed and the date", async () => {
+    const seen: JevRequest[] = [];
+    const set = ruleset([DASH_RULE, judgmentRule("closer", "end")].join(""));
+    const outcome = await runEval({
+      ruleset: set,
+      candidates: BASES,
+      perRule: 1,
+      client: recordedClient(seen),
+    });
+
+    const report = buildReport(outcome, { runDate: "2026-09-17", threshold: 0.7 });
+    expect(report.served_model).toBe(outcome.raw?.model ?? "");
+    expect(report.served_model).toBeTruthy();
+
+    const markdown = renderMarkdown(report);
+    const summary = markdown.split("\n").find((line) => line.includes("seed value")) ?? "";
+    expect(summary).toContain(String(report.served_model));
+  });
+
+  test("a run with no network arm says so rather than inventing a model", async () => {
+    const set = ruleset(DASH_RULE);
+    const outcome = await runEval({ ruleset: set, candidates: BASES, perRule: 1 });
+    const report = buildReport(outcome, { runDate: "2026-09-17", threshold: 0.7 });
+
+    expect(report.served_model).toBeNull();
+    expect(renderMarkdown(report)).not.toContain("undefined");
+    expect(renderMarkdown(report)).toContain("no model");
+  });
+});

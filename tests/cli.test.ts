@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -324,5 +324,75 @@ describe("arguments and exit codes", () => {
     expect(help.code).toBe(EXIT.ok);
     expect(version.code).toBe(EXIT.ok);
     for (const code of ["0", "1", "2", "3"]) expect(help.out).toContain(`  ${code}  `);
+  });
+});
+
+// --- review fold-ins ------------------------------------------------------
+
+describe("inputs that are not text", () => {
+  const PLAIN = "A short paragraph that trips nothing at all, and ends where it ends.\n";
+
+  test("a binary file is skipped by name and changes nothing else about the run", async () => {
+    const dir = sandbox();
+    const binary = join(dir, "logo.txt");
+    const plain = join(dir, "plain.md");
+    writeFileSync(binary, Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x00, 0x1a, 0x0a, 0x00]));
+    writeFileSync(plain, PLAIN);
+
+    const both = await run({ argv: ["check", "--dry-run", "--rules", MIXED, binary, plain] });
+    const alone = await run({ argv: ["check", "--dry-run", "--rules", MIXED, plain] });
+
+    expect(both.err).toContain("skipped, not text");
+    expect(both.err).toContain("logo.txt");
+    expect(both.code).toBe(alone.code);
+    expect(both.out).toBe(alone.out);
+  });
+
+  test("a file that is not valid UTF-8 is skipped the same way", async () => {
+    const dir = sandbox();
+    const latin = join(dir, "latin1.md");
+    writeFileSync(latin, Buffer.from([0x41, 0x20, 0xff, 0xfe, 0x20, 0x42]));
+    writeFileSync(join(dir, "plain.md"), PLAIN);
+
+    const result = await run({ argv: ["check", "--dry-run", "--rules", MIXED, dir] });
+
+    expect(result.code).toBe(EXIT.ok);
+    expect(result.err).toContain("latin1.md");
+    expect(result.err).toContain("skipped, not text");
+  });
+});
+
+describe("a mistyped key in a project ruleset", () => {
+  const RULESET = `version: 1
+endpoint: https://api.example.invalid/v1
+rules:
+  - id: dash_present
+    kind: regex
+    builtin: dash_present
+    message: "An em dash. Say it in two sentences."
+`;
+
+  test("is named as a warning rather than silently ignored", async () => {
+    const dir = sandbox();
+    writeFileSync(join(dir, ".snifftest.yaml"), RULESET);
+
+    const result = await run({ argv: ["rules"], cwd: dir });
+
+    expect(result.code).toBe(EXIT.ok);
+    expect(result.err).toContain("endpoint");
+    expect(result.err).toContain(".snifftest.yaml");
+    expect(result.out).toContain("dash_present");
+  });
+
+  test("the warning does not reach a run that uses the file for real", async () => {
+    const dir = sandbox();
+    writeFileSync(join(dir, ".snifftest.yaml"), RULESET);
+    writeFileSync(join(dir, "plain.md"), "A paragraph with nothing in it to flag.\n");
+
+    const result = await run({ argv: ["check", "--dry-run", "plain.md"], cwd: dir });
+
+    expect(result.code).toBe(EXIT.ok);
+    expect(result.err).toContain("endpoint");
+    expect(result.out).toBe("");
   });
 });

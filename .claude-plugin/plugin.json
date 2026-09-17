@@ -1,0 +1,10 @@
+{
+  "name": "snifftest",
+  "version": "0.1.0",
+  "description": "Does the draft pass the sniff test? A prose linter for your house rules: the countable rules run locally and free, the judgment rules are a fast, cheap model call you opt into.",
+  "author": { "name": "Daniel Willoughby", "url": "https://github.com/DanRWilloughby" },
+  "homepage": "https://github.com/DanRWilloughby/snifftest",
+  "repository": "https://github.com/DanRWilloughby/snifftest",
+  "license": "MIT",
+  "keywords": ["writing", "linter", "prose", "editing", "style-guide", "local-first"]
+}

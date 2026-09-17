@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 
 import { chunkDocument, flagsFrom, mergeFlags, runJudgmentArm, runRegexArm } from "../src/engine.ts";
@@ -12,6 +12,11 @@ const here = import.meta.dir;
 function text(name: string): string {
   return readFileSync(join(here, "fixtures", "texts", name), "utf8");
 }
+
+const mixedRules = parseRuleset(
+  readFileSync(join(here, "fixtures", "rules", "mixed.yaml"), "utf8"),
+  "rules/mixed.yaml",
+);
 
 const pair = parseRuleset(
   readFileSync(join(here, "fixtures", "rules", "pair.yaml"), "utf8"),
@@ -192,6 +197,199 @@ describe("mergeFlags", () => {
       "a.md:9:a",
       "a.md:9:b",
       "b.md:1:z",
+    ]);
+  });
+});
+
+// --- review fold-in: the merge key stays reviewable text ------------------
+
+describe("the flag dedup key is plain text", () => {
+  test("merging leaves no NUL byte anywhere in the sources", () => {
+    // A NUL byte inside a template literal makes git call the whole file
+    // binary, and a file git calls binary is a file nobody can review.
+    const root = join(here, "..");
+    const scan = (directory: string): string[] => {
+      const found: string[] = [];
+      for (const entry of readdirSync(directory, { withFileTypes: true })) {
+        if (entry.name.startsWith(".") || entry.name === "node_modules") continue;
+        const path = join(directory, entry.name);
+        if (entry.isDirectory()) found.push(...scan(path));
+        else if (/\.(ts|tsx|js|mjs|json|yaml|yml|md)$/.test(entry.name)) found.push(path);
+      }
+      return found;
+    };
+
+    const guilty = [...scan(join(root, "src")), ...scan(join(root, "tests"))].filter((path) =>
+      readFileSync(path).includes(0),
+    );
+    expect(guilty).toEqual([]);
+  });
+
+  test("the same file, line and rule is still one flag, and near neighbours stay apart", () => {
+    const one = {
+      file: "a b.md",
+      line: 1,
+      rule: "c",
+      kind: "regex" as const,
+      probability: 1,
+      message: "m",
+    };
+    const twin = { ...one, message: "another wording of the same flag" };
+    const neighbour = { ...one, file: "a", rule: "b.md 1 c" };
+
+    const merged = mergeFlags([one, neighbour], [twin]);
+    expect(merged).toHaveLength(2);
+    expect(merged.map((flag) => flag.file)).toEqual(["a", "a b.md"]);
+  });
+});
+
+// --- fenced code is not prose ---------------------------------------------
+
+describe("fenced code blocks", () => {
+  const FENCED = [
+    "A paragraph of prose before the snippet.",
+    "",
+    "```yaml",
+    "one: two",
+    "three: four",
+    "five: six",
+    "```",
+    "",
+    "A paragraph of prose after it, on line nine.",
+    "",
+  ].join("\n");
+
+  test("the fence, its info string and its contents are in no chunk", () => {
+    const chunks = chunkDocument(FENCED, "d.md");
+
+    expect(chunks.map((c) => c.text)).toEqual([
+      "A paragraph of prose before the snippet.",
+      "A paragraph of prose after it, on line nine.",
+    ]);
+  });
+
+  test("prose after a fence keeps the line it is actually on", () => {
+    const chunks = chunkDocument(FENCED, "d.md");
+    expect(chunks.map((c) => c.line)).toEqual([1, 9]);
+  });
+
+  test("a snippet's colons do not trip a countable rule", () => {
+    expect(runRegexArm(chunkDocument(FENCED, "d.md"), pair)).toEqual([]);
+  });
+
+  test("the same colons in prose still trip it", () => {
+    const prose = "one: two, three: four, five: six, and that is three colons in prose.\n";
+    expect(runRegexArm(chunkDocument(prose, "d.md"), pair).map((f) => f.rule)).toEqual([
+      "colon_heavy",
+    ]);
+  });
+
+  test("a snippet is never sent to the judgment arm", async () => {
+    const seen: JevRequest[] = [];
+    const chunks = chunkDocument(FENCED, "d.md");
+    await runJudgmentArm(chunks, mixedRules, {
+      async ask(request: JevRequest): Promise<JevResult> {
+        seen.push(request);
+        return {
+          model: "jev-test",
+          nouls: {},
+          inputTokens: 1,
+          outputTokens: 0,
+          estimatedCostUsd: 0,
+          latencyMs: 1,
+          attempts: 1,
+        };
+      },
+    });
+
+    expect(seen).toHaveLength(2);
+    for (const request of seen) expect(String(request.state)).not.toContain("one: two");
+  });
+
+  test("a tilde fence, a longer closing fence and an indented fence all close properly", () => {
+    const document = [
+      "Prose one.",
+      "~~~",
+      "a: b: c: d",
+      "~~~~",
+      "Prose two.",
+      "",
+      "  ```sh",
+      "  echo a: b: c:",
+      "  ```",
+      "",
+      "Prose three, on line eleven.",
+    ].join("\n");
+
+    const chunks = chunkDocument(document, "d.md");
+    expect(chunks.map((c) => c.text)).toEqual(["Prose one.", "Prose two.", "Prose three, on line eleven."]);
+    expect(chunks.map((c) => c.line)).toEqual([1, 5, 11]);
+    expect(runRegexArm(chunks, pair)).toEqual([]);
+  });
+
+  test("a backtick fence is not closed by a tilde one, and an unclosed fence runs to the end", () => {
+    const document = ["Prose one.", "", "```", "a: b: c:", "~~~", "still code: here:", ""].join("\n");
+    const chunks = chunkDocument(document, "d.md");
+
+    expect(chunks.map((c) => c.text)).toEqual(["Prose one."]);
+    expect(runRegexArm(chunks, pair)).toEqual([]);
+  });
+
+  test("a fence between two paragraphs with no blank line still splits them cleanly", () => {
+    const document = ["Prose one.", "```", "x: y: z:", "```", "Prose two."].join("\n");
+    const chunks = chunkDocument(document, "d.md");
+
+    expect(chunks).toEqual([
+      { file: "d.md", line: 1, text: "Prose one." },
+      { file: "d.md", line: 5, text: "Prose two." },
+    ]);
+  });
+});
+
+describe("inline code spans", () => {
+  test("the countable rules ignore what is inside them", () => {
+    const document = "Set `a: b: c:` in the file, and that is the only colon-ish thing here.\n";
+    expect(runRegexArm(chunkDocument(document, "d.md"), pair)).toEqual([]);
+  });
+
+  test("an em dash inside a span is code, not prose", () => {
+    expect(runRegexArm(chunkDocument("Run `printf a — b` and stop.\n", "d.md"), pair)).toEqual([]);
+    expect(runRegexArm(chunkDocument("Run printf a — b and stop.\n", "d.md"), pair)).toHaveLength(1);
+  });
+
+  test("a span does not shift the line a later flag is reported on", () => {
+    const document = "Prose with `a: b:` in it.\nA second line — with a dash.\n";
+    const flags = runRegexArm(chunkDocument(document, "d.md"), pair);
+
+    expect(flags).toHaveLength(1);
+    expect(flags[0]?.line).toBe(2);
+  });
+
+  test("the judgment arm still sees the span, contents and all", async () => {
+    const seen: JevRequest[] = [];
+    const chunks = chunkDocument("Prose with `a: b:` in it.\n", "d.md");
+    await runJudgmentArm(chunks, mixedRules, {
+      async ask(request: JevRequest): Promise<JevResult> {
+        seen.push(request);
+        return {
+          model: "jev-test",
+          nouls: {},
+          inputTokens: 1,
+          outputTokens: 0,
+          estimatedCostUsd: 0,
+          latencyMs: 1,
+          attempts: 1,
+        };
+      },
+    });
+
+    expect(String(seen[0]?.state)).toBe("Prose with `a: b:` in it.");
+  });
+
+  test("an unmatched backtick is ordinary prose", () => {
+    const document = "A stray ` backtick: and then: two more: colons.\n";
+    expect(runRegexArm(chunkDocument(document, "d.md"), pair).map((f) => f.rule)).toEqual([
+      "colon_heavy",
     ]);
   });
 });

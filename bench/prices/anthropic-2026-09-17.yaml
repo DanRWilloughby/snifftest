@@ -1,0 +1,34 @@
+# Published list prices for the Anthropic direct row, in US dollars per million
+# tokens.
+#
+# This file exists because the Messages API returns token counts and no prices,
+# and because a price written into source code is a number with no provenance
+# and no expiry. Every table that uses these numbers cites this file, its
+# source and the date below.
+#
+# `match` is a substring of the served model id, so a dated id such as
+# `claude-sonnet-5-20260101` lands on its family. A served model that matches no
+# row here has no cost at all in the report — not a zero, which would read as
+# "this call was free".
+#
+# Re-verify on the run date and write a new dated file rather than editing this
+# one; the run that used the old numbers should keep pointing at them.
+
+version: 1
+source: >-
+  Anthropic published list prices as recorded in houston/src/producer/llm.ts
+  PRICES on 2026-09-17; re-verify against the published price list on the run
+  date before quoting these figures.
+verified_on: 2026-09-17
+currency: usd_per_million_tokens
+
+models:
+  - match: haiku-4-5
+    input: 1
+    output: 5
+  - match: sonnet-5
+    input: 3
+    output: 15
+  - match: opus-5
+    input: 5
+    output: 25
