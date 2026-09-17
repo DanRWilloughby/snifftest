@@ -15,6 +15,21 @@
  * rather than a catch: recall only ever counts the cell a paragraph was seeded
  * for.
  *
+ * ## Recall is split by rule class, never pooled as the headline
+ *
+ * The seeder throws away any countable seed the countable arm does not catch,
+ * so recall on countable rules is what the pattern defines and not a
+ * measurement of anything. Pooling it with the judgment rules moves the
+ * headline by the share of seeds that belong to each class. So every arm
+ * reports the two classes apart, each as k of n, and the pooled figure is
+ * labelled pooled where it appears at all.
+ *
+ * ## Every rate carries its k, its n and an interval
+ *
+ * Three decimal places on three trials is a precision that was never
+ * measured. A Wilson score interval at 95 percent is printed beside every
+ * rate, and a rate with fewer than ten trials prints as k of n alone.
+ *
  * ## Two false-positive rates, both reported
  *
  * `fp_rate_per_clean_cell` is the spike's figure and is comparable with the
@@ -41,7 +56,15 @@ export type ArmId = "A" | "B" | "C" | "D";
 /** The spike's sweep. A ruleset's own threshold is added to it when it differs. */
 export const THRESHOLDS: readonly number[] = [0.5, 0.7, 0.9];
 
-/** One document as an arm saw it, with what that document cost to judge. */
+/**
+ * One paragraph as an arm saw it, with what that paragraph cost to judge.
+ *
+ * The unit is a paragraph, which is the unit a request carries: one blank-line
+ * block of a Markdown file, with every judgment question about it in the same
+ * call. A file of twelve paragraphs is twelve requests, so a cost per
+ * paragraph multiplied by the paragraphs in a document is the cost of that
+ * document.
+ */
 export interface JudgedDocument {
   readonly id: string;
   readonly kind: "clean" | "seeded";
@@ -56,6 +79,13 @@ export interface JudgedDocument {
   readonly retries: number;
   /** Rules this arm asked about and got no number for. */
   readonly unanswered: number;
+  /**
+   * Whether the service said what this paragraph used.
+   *
+   * False means the tokens and the cost above are not measurements, and every
+   * total they feed prints as unmeasured rather than as zero.
+   */
+  readonly usageReported: boolean;
 }
 
 /** One (document, rule) cell: the probability an arm gave it. */
@@ -76,9 +106,77 @@ export interface ArmObservation {
   readonly cells: readonly Cell[];
 }
 
+/** A 95 percent Wilson score interval, or null when there were no trials. */
+export interface Interval {
+  readonly low: number;
+  readonly high: number;
+}
+
+/**
+ * The Wilson score interval, which is the one to use on small samples.
+ *
+ * The normal approximation gives a zero-width interval on 0 of 3 and on 3 of
+ * 3, which are exactly the cells a small eval produces most of. Wilson does
+ * not, so a per-rule row with three seeds reads as the guess it is.
+ */
+export function wilson(k: number, n: number, z = 1.96): Interval | null {
+  if (n <= 0) return null;
+  const p = k / n;
+  const denominator = 1 + (z * z) / n;
+  const centre = p + (z * z) / (2 * n);
+  const spread = z * Math.sqrt((p * (1 - p)) / n + (z * z) / (4 * n * n));
+  return {
+    low: clamp((centre - spread) / denominator),
+    high: clamp((centre + spread) / denominator),
+  };
+}
+
+/**
+ * What the run knows about its own rules, which the numbers cannot tell.
+ *
+ * Whether a class of rule was guaranteed a hit, and whether a rule could fire
+ * on the clean set at all, are facts about how the corpus was made. A scorer
+ * that does not carry them prints a recall of 1.00 for a rule that was handed
+ * its own positives and a false-positive rate over cells that were never at
+ * risk.
+ */
+export interface ScoreFacts {
+  /** Rule ids the countable arm decides on its own. */
+  readonly countable: readonly string[];
+  /** Rule ids only a reading model decides. */
+  readonly judgment: readonly string[];
+  /** Rule ids whose positives the seeder guaranteed, so their recall is not measured. */
+  readonly guaranteed: readonly string[];
+  /** Rule ids that cannot fire on a clean paragraph, and why, so they leave the denominator. */
+  readonly inertOnClean: Readonly<Record<string, string>>;
+}
+
+/** What a scorer assumes when the caller tells it nothing: nothing is free. */
+export const NO_FACTS: ScoreFacts = {
+  countable: [],
+  judgment: [],
+  guaranteed: [],
+  inertOnClean: {},
+};
+
+/** One class of rule at one threshold, as k of n with an interval. */
+export interface ClassScore {
+  readonly rules: number;
+  readonly hits: number;
+  readonly positives: number;
+  readonly recall: number | null;
+  readonly interval: Interval | null;
+  /**
+   * True when the seeder only kept positives this class was already known to
+   * catch, which makes the figure a definition rather than a measurement.
+   */
+  readonly by_construction: boolean;
+}
+
 export interface RuleScoreAtThreshold {
   readonly recall: number | null;
   readonly hits: number;
+  readonly interval: Interval | null;
   readonly fp_rate_clean: number | null;
   readonly fps: number;
 }
@@ -91,9 +189,19 @@ export interface RuleScore {
 }
 
 export interface OverallAtThreshold {
+  /** Every class together. Always labelled pooled where it is printed. */
   readonly recall: number | null;
   readonly hits: number;
   readonly positives: number;
+  readonly countable: ClassScore;
+  readonly judgment: ClassScore;
+  /** Clean paragraphs carrying at least one flag: the headline false-alarm rate. */
+  readonly fp_clean_paragraphs: number;
+  readonly clean_paragraphs: number;
+  readonly fp_paragraph_interval: Interval | null;
+  /** Clean cells belonging to a rule that could have fired at all. */
+  readonly fireable_clean_cells: number;
+  readonly fp_rate_per_fireable_clean_cell: number | null;
   readonly fp_rate_per_clean_cell: number | null;
   readonly fp_cells: number;
   readonly clean_cells: number;
@@ -127,13 +235,16 @@ export interface ArmSummary {
   readonly unanswered: number;
   readonly median_latency_ms: number;
   readonly p95_latency_ms: number;
-  readonly ms_per_document: number;
-  readonly ms_per_100_documents: number;
+  readonly ms_per_paragraph: number;
+  readonly ms_per_100_paragraphs: number;
   readonly input_tokens: number;
   readonly output_tokens: number;
-  readonly usd_total: number;
-  readonly usd_per_document: number;
-  readonly usd_per_100_documents: number;
+  /** Paragraphs whose request came back with no usage, so nothing here counts them. */
+  readonly paragraphs_without_usage: number;
+  /** Null when a request was made and the service never said what it used. */
+  readonly usd_total: number | null;
+  readonly usd_per_paragraph: number | null;
+  readonly usd_per_100_paragraphs: number | null;
 }
 
 export interface GalleryRow {
@@ -164,6 +275,7 @@ export function scoreArm(
   observation: ArmObservation,
   classes: readonly string[],
   thresholds: readonly number[] = THRESHOLDS,
+  facts: ScoreFacts = NO_FACTS,
 ): ArmScore {
   const clean = observation.documents.filter((doc) => doc.kind === "clean");
   const seeded = observation.documents.filter((doc) => doc.kind === "seeded");
@@ -171,6 +283,12 @@ export function scoreArm(
   for (const cell of observation.cells) cells.set(key(cell.doc, cell.rule), cell);
 
   const read = (doc: string, rule: string): number => cells.get(key(doc, rule))?.probability ?? 0;
+
+  // A rule this arm never gave an opinion on cannot produce a false alarm, so
+  // its cells do not belong in a false-alarm denominator.
+  const answeredRules = new Set(
+    observation.cells.filter((cell) => cell.answered).map((cell) => cell.rule),
+  );
 
   // --- per rule
   const perRule: Record<string, RuleScore> = {};
@@ -183,6 +301,7 @@ export function scoreArm(
       at[label(threshold)] = {
         recall: ratio(hits, positives.length),
         hits,
+        interval: wilson(hits, positives.length),
         fp_rate_clean: ratio(fps, clean.length),
         fps,
       };
@@ -210,11 +329,35 @@ export function scoreArm(
 
     const cleanCells = clean.length * classes.length;
     const seededOffCells = seeded.length * Math.max(0, classes.length - 1);
+    const fireable = classes.filter(
+      (rule) => answeredRules.has(rule) && facts.inertOnClean[rule] === undefined,
+    );
+
+    const classScore = (ids: readonly string[]): ClassScore => {
+      const own = seeded.filter((doc) => doc.truth !== undefined && ids.includes(doc.truth));
+      const caught = own.filter((doc) => read(doc.id, doc.truth ?? "") >= threshold).length;
+      return {
+        rules: ids.length,
+        hits: caught,
+        positives: own.length,
+        recall: ratio(caught, own.length),
+        interval: wilson(caught, own.length),
+        by_construction:
+          own.length > 0 && ids.every((rule) => facts.guaranteed.includes(rule)),
+      };
+    };
 
     overall[label(threshold)] = {
       recall: ratio(hits, seeded.length),
       hits,
       positives: seeded.length,
+      countable: classScore(facts.countable),
+      judgment: classScore(facts.judgment),
+      fp_clean_paragraphs: fpDocs,
+      clean_paragraphs: clean.length,
+      fp_paragraph_interval: wilson(fpDocs, clean.length),
+      fireable_clean_cells: clean.length * fireable.length,
+      fp_rate_per_fireable_clean_cell: ratio(fpCells, clean.length * fireable.length),
       fp_rate_per_clean_cell: ratio(fpCells, cleanCells),
       fp_cells: fpCells,
       clean_cells: cleanCells,
@@ -291,10 +434,11 @@ export function scoreAll(
   observations: readonly ArmObservation[],
   classes: readonly string[],
   thresholds: readonly number[] = THRESHOLDS,
+  facts: ScoreFacts = NO_FACTS,
 ): Record<string, ArmScore> {
   const out: Record<string, ArmScore> = {};
   for (const observation of observations) {
-    out[observation.arm] = scoreArm(observation, classes, thresholds);
+    out[observation.arm] = scoreArm(observation, classes, thresholds, facts);
   }
   return out;
 }
@@ -314,8 +458,12 @@ function summarise(documents: readonly JudgedDocument[]): ArmSummary {
     documents.reduce((sum, doc) => sum + pick(doc), 0);
 
   const count = Math.max(1, documents.length);
-  const usd = total((doc) => doc.costUsd);
   const ms = total((doc) => doc.latencyMs);
+  // A paid request whose usage never came back makes every total below a
+  // guess, and a guess printed as a dollar figure is the thing this file is
+  // written not to do.
+  const missing = documents.filter((doc) => doc.requests > 0 && !doc.usageReported).length;
+  const usd = missing > 0 ? null : total((doc) => doc.costUsd);
 
   return {
     documents: documents.length,
@@ -326,13 +474,14 @@ function summarise(documents: readonly JudgedDocument[]): ArmSummary {
     unanswered: total((doc) => doc.unanswered),
     median_latency_ms: median(latencies),
     p95_latency_ms: p95(latencies),
-    ms_per_document: ms / count,
-    ms_per_100_documents: (ms / count) * 100,
+    ms_per_paragraph: ms / count,
+    ms_per_100_paragraphs: (ms / count) * 100,
     input_tokens: total((doc) => doc.inputTokens),
     output_tokens: total((doc) => doc.outputTokens),
+    paragraphs_without_usage: missing,
     usd_total: usd,
-    usd_per_document: usd / count,
-    usd_per_100_documents: (usd / count) * 100,
+    usd_per_paragraph: usd === null ? null : usd / count,
+    usd_per_100_paragraphs: usd === null ? null : (usd / count) * 100,
   };
 }
 
@@ -352,6 +501,10 @@ function p95(sorted: readonly number[]): number {
 /** `pct` from score.py: four decimal places, and null rather than a divide by zero. */
 function ratio(n: number, d: number): number | null {
   return d === 0 ? null : Math.round((n / d) * 10000) / 10000;
+}
+
+function clamp(value: number): number {
+  return Math.round(Math.min(1, Math.max(0, value)) * 10000) / 10000;
 }
 
 function label(threshold: number): string {

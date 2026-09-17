@@ -68,6 +68,7 @@ import {
 } from "./engine.ts";
 import { buildReport, writeReport } from "./eval/report.ts";
 import { type RunEvalOptions, runEval } from "./eval/run.ts";
+import { TwinError, compareTwins, readManifest } from "./eval/twins.ts";
 import { DEFAULT_PER_RULE, DEFAULT_SEED, SeedError, type BaseDocument, seedCorpus } from "./eval/seed.ts";
 import {
   type FetchLike,
@@ -160,6 +161,8 @@ interface Options {
   readonly seed?: number;
   readonly perRule?: number;
   readonly outDir?: string;
+  /** `--twins <dir>`: measure what an injected sentence moves, instead of seeding. */
+  readonly twins?: string;
   /** `bench` only. */
   readonly panelPath?: string;
   readonly repeats?: number;
@@ -231,6 +234,8 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
     deps.writeError(`${names.join(", ")} sat this run out: ${reason}.`);
   }
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
+
+  if (options.twins !== undefined) return await evaluateTwins(deps, options, ruleset, options.twins);
 
   const files = collectFiles(options.paths, deps.cwd);
   const chunks = readDrafts(deps, files).flatMap((draft) =>
@@ -525,6 +530,95 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
   return EXIT.ok;
 }
 
+/**
+ * The injection bar, measured rather than asserted.
+ *
+ * `examples/CORPUS.md` claims a number: an added sentence written to the
+ * checker must not move any probability by more than the bar. This is the
+ * command that checks it. Every reading is printed, including the ones well
+ * under the bar, because a bar with only its failures shown is a bar nobody
+ * can audit.
+ */
+async function evaluateTwins(
+  deps: CliDeps,
+  options: Options,
+  ruleset: Ruleset,
+  directory: string,
+): Promise<number> {
+  const judgmentRules = ruleset.rules.filter(isJudgmentRule);
+  if (judgmentRules.length === 0) {
+    deps.writeError("this ruleset has no judgment rules, so there is nothing an injection could move.");
+    return EXIT.failure;
+  }
+
+  let manifest;
+  try {
+    manifest = readManifest(directory, deps.cwd);
+  } catch (error) {
+    if (error instanceof TwinError) {
+      deps.writeError(messageOf(error));
+      return EXIT.failure;
+    }
+    throw error;
+  }
+
+  const key = deps.env[KEY_ENV];
+  if (key === undefined || key.trim() === "") {
+    deps.writeError(`${KEY_ENV} is not set, so no paragraph can be asked about.`);
+    return EXIT.failure;
+  }
+
+  const consent = await requestConsent({
+    env: deps.env,
+    homedir: deps.homedir,
+    assumeYes: options.assumeYes,
+    isTty: deps.isTty,
+    ruleIds: judgmentRules.map((rule) => rule.id),
+    fileCount: manifest.pairs.length * 2,
+    say: deps.writeError,
+    ...(deps.prompt === undefined ? {} : { prompt: deps.prompt }),
+  });
+  if (!consent.granted) return EXIT.consent;
+
+  const run = await compareTwins({
+    pairs: manifest.pairs,
+    root: manifest.root,
+    rules: judgmentRules,
+    client: (deps.createClient ?? createJevClient)({ apiKey: key }),
+  });
+
+  if (options.format === "json") {
+    deps.write(JSON.stringify({ tool: "snifftest eval --twins", ...run }, null, 2));
+  } else {
+    deps.write(`The bar is ${run.bar}: no probability may move further than that.`);
+    deps.write("");
+    for (const row of run.readings) {
+      const moved = row.delta === null ? "unanswered" : row.delta.toFixed(3);
+      const note = row.injected ? "  (the paragraph the sentence was added to)" : row.over_bar ? "  OVER THE BAR" : "";
+      deps.write(
+        `${row.pair} paragraph ${row.paragraph} ${row.rule.padEnd(20)} ` +
+          `${format(row.original)} to ${format(row.adversarial)}, moved ${moved}${note}`,
+      );
+    }
+    deps.write("");
+    deps.write(
+      run.findings.length === 0
+        ? `Nothing moved further than ${run.bar} outside the paragraph each sentence was added to.`
+        : `${run.findings.length} readings moved further than ${run.bar}.`,
+    );
+    if (run.unanswered > 0) deps.write(`${run.unanswered} readings came back unanswered.`);
+  }
+
+  for (const row of run.unusable) deps.writeError(`${row.pair} could not be compared: ${row.reason}`);
+  if (run.unusable.length > 0) return EXIT.failure;
+  return run.findings.length > 0 ? EXIT.flags : EXIT.ok;
+}
+
+/** A probability, or the word for not having one. */
+function format(value: number | null): string {
+  return value === null ? "n/a" : value.toFixed(2);
+}
+
 function evalSummary(
   report: ReturnType<typeof buildReport>,
   markdownPath: string,
@@ -539,11 +633,17 @@ function evalSummary(
 
   for (const arm of Object.values(report.arms)) {
     const overall = arm.overall[at];
+    const judgment = overall?.judgment;
+    const cost =
+      arm.summary.usd_per_100_paragraphs === null
+        ? "cost unmeasured"
+        : `$${arm.summary.usd_per_100_paragraphs.toFixed(4)} per 100 paragraphs`;
     lines.push(
       `arm ${arm.arm} ${arm.label.replace(/^[ABC] /, "").padEnd(34)} ` +
-        `recall ${fixed(overall?.recall)}  fp/cell ${fixed(overall?.fp_rate_per_clean_cell)}  ` +
-        `median ${arm.summary.median_latency_ms.toFixed(0)} ms  ` +
-        `$${arm.summary.usd_per_100_documents.toFixed(4)} per 100 documents`,
+        `judgment ${judgment === undefined || judgment.positives === 0 ? "n/a" : `${judgment.hits} of ${judgment.positives}`}  ` +
+        `countable ${countedOf(overall?.countable)}  ` +
+        `false alarms ${overall === undefined ? "n/a" : `${overall.fp_clean_paragraphs} of ${overall.clean_paragraphs} paragraphs`}  ` +
+        `median ${arm.summary.median_latency_ms.toFixed(0)} ms  ${cost}`,
     );
   }
 
@@ -552,8 +652,14 @@ function evalSummary(
   return lines;
 }
 
+/** A rate to two places, or n/a. Used by the bench summary, which prints rates. */
 function fixed(value: number | null | undefined): string {
-  return value === null || value === undefined ? "  n/a" : value.toFixed(3);
+  return value === null || value === undefined ? " n/a" : value.toFixed(2);
+}
+
+/** k of n, or n/a. A summary line never prints a rate without its counts. */
+function countedOf(score: { hits: number; positives: number } | undefined): string {
+  return score === undefined || score.positives === 0 ? "n/a" : `${score.hits} of ${score.positives}`;
 }
 
 // --- bench ----------------------------------------------------------------
@@ -1015,6 +1121,7 @@ function parseArgs(argv: readonly string[]): Options {
   let endOfOptions = false;
   let seed: number | undefined;
   let perRule: number | undefined;
+  let twins: string | undefined;
   let outDir: string | undefined;
   let panelPath: string | undefined;
   let modelsPath: string | undefined;
@@ -1054,6 +1161,9 @@ function parseArgs(argv: readonly string[]): Options {
       case "--seed":
         seed = wholeNumber(valueFor(argv, ++i, "--seed"), "--seed", 0);
         break;
+      case "--twins":
+        twins = valueFor(argv, ++i, "--twins");
+        break;
       case "--per-rule":
         perRule = wholeNumber(valueFor(argv, ++i, "--per-rule"), "--per-rule", 1);
         break;
@@ -1083,7 +1193,7 @@ function parseArgs(argv: readonly string[]): Options {
     }
   }
 
-  if ((first === "check" || first === "eval") && paths.length === 0) {
+  if ((first === "check" || (first === "eval" && twins === undefined)) && paths.length === 0) {
     throw new UsageError(`snifftest ${first} needs at least one file or directory.`);
   }
 
@@ -1097,6 +1207,7 @@ function parseArgs(argv: readonly string[]): Options {
     assumeYes,
     ...(seed === undefined ? {} : { seed }),
     ...(perRule === undefined ? {} : { perRule }),
+    ...(twins === undefined ? {} : { twins }),
     ...(outDir === undefined ? {} : { outDir }),
     ...(panelPath === undefined ? {} : { panelPath }),
     ...(modelsPath === undefined ? {} : { modelsPath }),
@@ -1318,6 +1429,7 @@ function helpLines(): string[] {
     "Options for eval",
     `  --seed <n>          the value every choice is derived from (default ${DEFAULT_SEED})`,
     `  --per-rule <n>      seeded paragraphs per rule (default ${DEFAULT_PER_RULE})`,
+    "  --twins <dir>       compare each adversarial file with its clean original instead",
     "  --out <dir>         where the report is written (default bench/results/<today>)",
     "",
     "Options for bench",

@@ -174,6 +174,7 @@ describe("runJudgmentArm", () => {
           inputTokens: 50,
           outputTokens: 0,
           estimatedCostUsd: 50 * 0.042e-6,
+          usageReported: true,
           latencyMs: 7,
           attempts: 2,
         };
@@ -361,6 +362,7 @@ describe("fenced code blocks", () => {
           inputTokens: 1,
           outputTokens: 0,
           estimatedCostUsd: 0,
+          usageReported: true,
           latencyMs: 1,
           attempts: 1,
         };
@@ -655,6 +657,7 @@ describe("inline code spans", () => {
           inputTokens: 1,
           outputTokens: 0,
           estimatedCostUsd: 0,
+          usageReported: true,
           latencyMs: 1,
           attempts: 1,
         };

@@ -82,6 +82,24 @@ export function isNoJudgment(probability: number): boolean {
 /** US dollars per input token. Output tokens are free on this endpoint. */
 export const INPUT_TOKEN_PRICE_USD = 0.042e-6;
 
+/**
+ * Where every cost figure in this repo comes from.
+ *
+ * Token counts are whatever the service reported for the request, never an
+ * estimate from the text. The price is the constant above, and `source` is
+ * null because no dated published price has been recorded for this endpoint.
+ * A report prints this beside its cost column so a reader can see that the
+ * usage is measured and the price is not sourced, rather than reading a
+ * dollar figure as a fact.
+ */
+export const PRICE_BASIS = {
+  usage: "provider-reported" as const,
+  usd_per_input_token: INPUT_TOKEN_PRICE_USD,
+  usd_per_output_token: 0,
+  source: null,
+  verified_on: null,
+};
+
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_ATTEMPTS = 4;
 const BACKOFF_BASE_MS = 1000;
@@ -130,6 +148,14 @@ export interface JevResult {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly estimatedCostUsd: number;
+  /**
+   * Whether the service reported usage at all.
+   *
+   * A reply with no usage object gives zero tokens and a cost of zero, and a
+   * zero here is a claim about a request that was certainly paid for. The flag
+   * lets a report print the cost as unmeasured instead of as free.
+   */
+  readonly usageReported: boolean;
   readonly latencyMs: number;
   /** How many tries it took, so a caller can report retries instead of hiding them. */
   readonly attempts: number;
@@ -363,6 +389,7 @@ function readAnswer(parsed: unknown): Answer {
     inputTokens,
     outputTokens: countOf(usage?.["output_tokens"]),
     estimatedCostUsd: estimatedCostUsd(inputTokens),
+    usageReported: usage !== null,
   };
 }
 
