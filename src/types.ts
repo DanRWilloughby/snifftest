@@ -19,6 +19,12 @@ export type SeedPosition = "any" | "start" | "end";
 
 export const SEED_POSITIONS: readonly SeedPosition[] = ["any", "start", "end"];
 
+export function isSeedPosition(value: unknown): value is SeedPosition {
+  // SAFETY: `includes` on a `readonly SeedPosition[]` will not take an arbitrary
+  // string, so the list is widened to its own supertype to ask the question.
+  return typeof value === "string" && (SEED_POSITIONS as readonly string[]).includes(value);
+}
+
 export interface SpliceSeed {
   readonly splice: readonly string[];
   /** Absent means `any`; a rule about openers or closers needs the other two. */
@@ -115,6 +121,21 @@ export interface Flag {
   /** 1 for a countable rule; the returned probability for a judgment rule. */
   readonly probability: number;
   readonly message: string;
+}
+
+/**
+ * A parsed JSON value narrowed to an object, or `null` when it is anything else.
+ *
+ * Anything that reads JSON off a wire or off disk needs the same three checks
+ * before it can look up a key, so they live here once. That keeps the one cast
+ * that expresses them in one place, where it can be read and argued with.
+ */
+export function asRecord(value: unknown): Record<string, unknown> | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  // SAFETY: the checks above rule out every JSON value that is not a plain
+  // object, and a plain object whose keys are not known is exactly a
+  // `Record<string, unknown>`. There is no narrowing form that expresses this.
+  return value as Record<string, unknown>;
 }
 
 export function isRegexRule(rule: Rule): rule is RegexRule {

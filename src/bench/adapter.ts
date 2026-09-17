@@ -195,10 +195,7 @@ function messageOf(error: unknown): string {
 
 // --- reading the wire -----------------------------------------------------
 
-export function asRecord(value: unknown): Record<string, unknown> | null {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
-}
+export { asRecord } from "../types.ts";
 
 export function countOf(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;

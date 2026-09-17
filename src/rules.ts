@@ -14,6 +14,7 @@ import {
   type Seed,
   type SeedPosition,
   SEED_POSITIONS,
+  isSeedPosition,
 } from "./types.ts";
 import { type YamlValue, parseYaml } from "./yaml.ts";
 
@@ -364,14 +365,12 @@ function positionField(
   where: string,
 ): { position?: SeedPosition } {
   if (value === undefined || value === null) return {};
-  if (typeof value !== "string" || !(SEED_POSITIONS as readonly string[]).includes(value)) {
+  if (!isSeedPosition(value)) {
     throw new RulesetError(
       `${where}: seed.position must be one of ${SEED_POSITIONS.join(", ")}, not "${String(value)}"`,
     );
   }
-  // SAFETY: the membership check on the line above proves the narrowing that
-  // `includes` on a readonly string[] does not carry across.
-  return { position: value as SeedPosition };
+  return { position: value };
 }
 
 function stringList(value: YamlValue | undefined, name: string, where: string): readonly string[] {
