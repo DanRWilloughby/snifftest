@@ -7,6 +7,10 @@
     100
   ],
   "recommended": "e",
+  "locked": {
+    "concept": "e",
+    "motion": "rig"
+  },
   "transform": "translate(tx ty) translate(px py) rotate(r) scale(sx sy) translate(-px -py); opacity = o. Lerp every field between two states to tween.",
   "parts": [
     "nose",
