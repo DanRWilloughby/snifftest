@@ -1,0 +1,27 @@
+{
+  "id": "gen-reasoning-2",
+  "provider": "OpenAI",
+  "model": "openai/gpt-5",
+  "object": "chat.completion",
+  "created": 1789000001,
+  "choices": [
+    {
+      "index": 0,
+      "finish_reason": "length",
+      "native_finish_reason": "length",
+      "message": {
+        "role": "assistant",
+        "content": "{\"restating_closer\": {\"flag\": true, \"p\": 0.9",
+        "reasoning": null
+      }
+    }
+  ],
+  "usage": {
+    "prompt_tokens": 640,
+    "completion_tokens": 900,
+    "total_tokens": 1540,
+    "completion_tokens_details": {
+      "reasoning_tokens": 884
+    }
+  }
+}

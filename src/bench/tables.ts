@@ -18,12 +18,19 @@
  *
  * Failures and retries are printed beside the table, not in a footnote. A bench
  * whose failures are invisible is a bench whose clean rows cannot be trusted.
+ *
+ * And the rows were not sent identical requests, so the tables say what each
+ * row was sent. A reasoning model's internal tokens come out of the same
+ * completion budget as its answer, so the deep rows carry budgets of their own;
+ * printing those budgets is the difference between a declared handicap and a
+ * hidden one.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import type { ArmScore } from "../eval/score.ts";
+import type { ReasoningSetting } from "./panel.ts";
 import type { BenchModelResult, BenchOutcome } from "./run.ts";
 
 /** One arm carried over from `snifftest eval`, so both halves share a corpus. */
@@ -66,6 +73,8 @@ export interface BenchModelRow {
   readonly served_model: string | null;
   readonly json_mode: boolean;
   readonly note: string | null;
+  /** What this row's requests carried, so a reader can see the rows differ. */
+  readonly request: { readonly max_tokens: number; readonly reasoning: ReasoningSetting | null };
   readonly prices: {
     readonly input_usd_per_token: number;
     readonly output_usd_per_token: number;
@@ -75,6 +84,7 @@ export interface BenchModelRow {
   readonly failures: number;
   readonly retries: number;
   readonly parse_failures: number;
+  readonly truncated: number;
   readonly unanswered_cells: number;
   readonly latency: { readonly median_ms: number; readonly p95_ms: number; readonly samples: number };
   readonly cost: {
@@ -165,6 +175,7 @@ function toRow(model: BenchModelResult): BenchModelRow {
     served_model: model.servedModel,
     json_mode: model.jsonMode,
     note: model.note ?? null,
+    request: { max_tokens: model.request.maxTokens, reasoning: model.request.reasoning },
     prices:
       model.prices === null
         ? null
@@ -177,6 +188,7 @@ function toRow(model: BenchModelResult): BenchModelRow {
     failures: model.failures,
     retries: model.retries,
     parse_failures: model.parseFailures,
+    truncated: model.truncated,
     unanswered_cells: model.unansweredCells,
     latency: {
       median_ms: model.latency.medianMs,
@@ -206,7 +218,9 @@ export function renderBenchMarkdown(report: BenchReport): string {
   lines.push(
     `${report.corpus.seeded} seeded paragraphs and ${report.corpus.clean} clean ones, seed ` +
       `${report.corpus.seed}, ${report.corpus.per_rule} per rule. Every model was sent the same ` +
-      `rule wording and the same paragraph, one call per paragraph, temperature 0. ` +
+      `rule wording and the same paragraph, one call per paragraph, temperature 0. The rows ` +
+      `differ in one respect, the completion budget and reasoning each was given, and that is ` +
+      `printed in full under "The run". ` +
       `Accuracy is from the first repeat; latency is the median and p95 over ${report.repeats} ` +
       `repeat${report.repeats === 1 ? "" : "s"}; cost is from returned token usage.`,
   );
@@ -286,16 +300,26 @@ export function renderBenchMarkdown(report: BenchReport): string {
   );
   lines.push("");
 
-  lines.push("| Model | Slug served | JSON mode | Calls | Failed | Parse failures | p95 ms |");
-  lines.push("|---|---|---|---|---|---|---|");
+  lines.push(
+    "| Model | Slug served | JSON mode | Calls | Failed | Parse failures | Truncated | p95 ms |",
+  );
+  lines.push("|---|---|---|---|---|---|---|---|");
   for (const model of report.models) {
     lines.push(
       `| ${model.label} | ${model.served_model ?? model.slug ?? (model.note ?? "-")} | ` +
         `${model.json_mode ? "yes" : "no"} | ${model.calls} | ${model.failures} | ` +
-        `${model.parse_failures} | ${Math.round(model.latency.p95_ms)} |`,
+        `${model.parse_failures} | ${model.truncated} | ${Math.round(model.latency.p95_ms)} |`,
     );
   }
   lines.push("");
+  lines.push(
+    "A truncated reply stopped at its completion budget before it was a whole JSON object. It " +
+      "counts as unanswered exactly as a malformed reply does, and it is listed apart from one " +
+      "because it says something about the budget rather than about the model.",
+  );
+  lines.push("");
+
+  lines.push(...requestSettings(report));
 
   const failures = report.models.flatMap((model) =>
     model.failure_detail.map((failure) => `- \`${model.id}\` ${failure.doc} repeat ${failure.repeat}: ${failure.reason}`),
@@ -320,6 +344,37 @@ export function renderBenchMarkdown(report: BenchReport): string {
   lines.push("");
 
   return lines.join("\n");
+}
+
+/**
+ * What each row was sent, printed rather than left for a reader to assume.
+ *
+ * The rows were not sent identical requests, and a comparison that let a reader
+ * believe otherwise would be the dishonest one. A reasoning model spends its
+ * internal tokens out of the same completion budget as its answer, so a deep
+ * row on a budget sized for a fast row runs out mid-thought and reads as a
+ * failure that is really the run's doing.
+ */
+function requestSettings(report: BenchReport): string[] {
+  const lines = ["What each row was sent:", ""];
+  lines.push("| Model | Completion budget | Reasoning |");
+  lines.push("|---|---|---|");
+  for (const model of report.models) {
+    lines.push(
+      `| ${model.label} | ${model.request.max_tokens} tokens | ${reasoningWords(model.request.reasoning)} |`,
+    );
+  }
+  lines.push("");
+  return lines;
+}
+
+function reasoningWords(setting: ReasoningSetting | null): string {
+  if (setting === null) return "not requested";
+  const parts: string[] = [];
+  if (setting.effort !== undefined) parts.push(`effort ${setting.effort}`);
+  if (setting.maxTokens !== undefined) parts.push(`up to ${setting.maxTokens} tokens`);
+  if (setting.exclude === true) parts.push("kept out of the reply");
+  return parts.length === 0 ? "requested, with the provider's defaults" : parts.join(", ");
 }
 
 // --- writing --------------------------------------------------------------

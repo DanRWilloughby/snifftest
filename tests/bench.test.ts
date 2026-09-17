@@ -19,6 +19,7 @@ import {
   readOpenRouterCatalog,
 } from "../src/bench/openrouter.ts";
 import {
+  DEFAULT_MAX_TOKENS,
   PanelError,
   type CatalogEntry,
   type PanelEntry,
@@ -41,6 +42,8 @@ import { type JudgmentRule, type Ruleset, isJudgmentRule } from "../src/types.ts
 
 const repoRoot = resolve(import.meta.dir, "..");
 const MODELS_FIXTURE = join(repoRoot, "tests/fixtures/bench/openrouter-models.json");
+const REASONING_FIXTURE = join(repoRoot, "tests/fixtures/bench/reasoning-reply.json");
+const TRUNCATED_FIXTURE = join(repoRoot, "tests/fixtures/bench/reasoning-truncated.json");
 
 const temporary: string[] = [];
 
@@ -156,6 +159,7 @@ function entry(overrides: Partial<PanelEntry> = {}): PanelEntry {
     tier: "mid",
     provider: "openrouter",
     match: "^anthropic/claude-sonnet-5",
+    maxTokens: DEFAULT_MAX_TOKENS,
     ...overrides,
   };
 }
@@ -172,11 +176,18 @@ function okResponse(text: string, usage = { prompt_tokens: 120, completion_token
     JSON.stringify({
       id: "gen-1",
       model: "anthropic/claude-sonnet-5",
-      choices: [{ message: { role: "assistant", content: text } }],
+      choices: [{ finish_reason: "stop", message: { role: "assistant", content: text } }],
       usage,
     }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
+}
+
+function fixtureResponse(path: string): Response {
+  return new Response(readFileSync(path, "utf8"), {
+    status: 200,
+    headers: { "content-type": "application/json" },
+  });
 }
 
 // --- the panel file -------------------------------------------------------
@@ -211,6 +222,54 @@ models:
     match: "^y$"
 `;
     expect(() => parsePanel(twice, "panel.yaml")).toThrow(/a/);
+  });
+});
+
+// --- the settings that keep a reasoning row from being starved ------------
+
+describe("a row's own completion budget and reasoning setting", () => {
+  test("a row that declares neither gets the default budget and asks for no reasoning", () => {
+    const panel = parsePanel(PANEL_YAML, "panel.yaml");
+    expect(panel.models[0]?.maxTokens).toBe(DEFAULT_MAX_TOKENS);
+    expect(panel.models[0]?.reasoning).toBeUndefined();
+  });
+
+  test("a deep row declares a budget and an effort, and both are read", () => {
+    const panel = parsePanel(
+      `${PANEL_YAML}  - id: deep\n    provider: openrouter\n    match: "^openai/gpt-5$"\n` +
+        `    max_tokens: 4000\n    reasoning:\n      effort: low\n      exclude: true\n`,
+      "panel.yaml",
+    );
+    const deep = panel.models.find((model) => model.id === "deep");
+    expect(deep?.maxTokens).toBe(4000);
+    expect(deep?.reasoning).toEqual({ effort: "low", exclude: true });
+  });
+
+  test("the shipped panel gives the deep OpenAI row room to think and then answer", () => {
+    const panel = parsePanel(readFileSync(join(repoRoot, "bench/panel.yaml"), "utf8"), "bench/panel.yaml");
+    const deep = panel.models.find((model) => model.id === "openai-deep");
+    // The row the starved budget hurt most. Without this it spends the budget
+    // reasoning and lands in the table as a parse failure.
+    expect(deep?.maxTokens).toBeGreaterThan(DEFAULT_MAX_TOKENS);
+    expect(deep?.reasoning?.effort).toBeDefined();
+  });
+
+  test("a setting the provider would not understand is refused when the file is read", () => {
+    const withBadEffort = `${PANEL_YAML}  - id: x\n    provider: openrouter\n    match: "^x$"\n    reasoning:\n      effort: enormous\n`;
+    expect(() => parsePanel(withBadEffort, "panel.yaml")).toThrow(/effort/);
+
+    const both = `${PANEL_YAML}  - id: x\n    provider: openrouter\n    match: "^x$"\n    reasoning:\n      effort: low\n      max_tokens: 2000\n`;
+    expect(() => parsePanel(both, "panel.yaml")).toThrow(/alternatives/);
+
+    const fractional = `${PANEL_YAML}  - id: x\n    provider: openrouter\n    match: "^x$"\n    max_tokens: 0\n`;
+    expect(() => parsePanel(fractional, "panel.yaml")).toThrow(/whole number/);
+  });
+
+  test("a reasoning setting on the direct row is refused rather than quietly dropped", () => {
+    // The Anthropic adapter has no extended thinking wired into it. Accepting
+    // the setting here would print a footnote the request never carried.
+    const direct = `${PANEL_YAML}  - id: direct\n    provider: anthropic\n    match: "^claude-sonnet-5$"\n    reasoning:\n      effort: high\n`;
+    expect(() => parsePanel(direct, "panel.yaml")).toThrow(/extended thinking/);
   });
 });
 
@@ -361,6 +420,7 @@ describe("the OpenRouter adapter", () => {
       system: buildSystemPrompt(JUDGMENT),
       user: userMessage(DOCUMENTS[1]?.text ?? ""),
       jsonMode: true,
+      maxTokens: DEFAULT_MAX_TOKENS,
     };
     const answer: ModelReply = await adapter.call(call);
 
@@ -388,7 +448,13 @@ describe("the OpenRouter adapter", () => {
       },
     });
 
-    await adapter.call({ slug: "deepseek/deepseek-chat-v3", system: "s", user: "u", jsonMode: false });
+    await adapter.call({
+      slug: "deepseek/deepseek-chat-v3",
+      system: "s",
+      user: "u",
+      jsonMode: false,
+      maxTokens: DEFAULT_MAX_TOKENS,
+    });
     expect(body["response_format"]).toBeUndefined();
   });
 
@@ -426,7 +492,13 @@ describe("the OpenRouter adapter", () => {
         return okResponse(reply({ restating_closer: 0.5, naked_cost_figure: 0.5 }));
       },
     });
-    const recovered = await flaky.call({ slug: "m", system: "s", user: "u", jsonMode: false });
+    const recovered = await flaky.call({
+      slug: "m",
+      system: "s",
+      user: "u",
+      jsonMode: false,
+      maxTokens: DEFAULT_MAX_TOKENS,
+    });
     expect(calls).toBe(3);
     expect(recovered.attempts).toBe(3);
 
@@ -444,7 +516,13 @@ describe("the OpenRouter adapter", () => {
 
     let message = "";
     try {
-      await refused.call({ slug: "m", system: "s", user: "u", jsonMode: false });
+      await refused.call({
+        slug: "m",
+        system: "s",
+        user: "u",
+        jsonMode: false,
+        maxTokens: DEFAULT_MAX_TOKENS,
+      });
     } catch (error) {
       message = error instanceof Error ? error.message : String(error);
     }
@@ -455,6 +533,144 @@ describe("the OpenRouter adapter", () => {
     expect(message).not.toContain(other);
     expect(message).not.toContain(key.slice(0, 16));
     expect(message).not.toContain(other.slice(0, 16));
+  });
+});
+
+describe("the OpenRouter adapter on a reasoning row", () => {
+  test("sends the row's own budget and the provider's reasoning field", async () => {
+    let body: Record<string, unknown> = {};
+    const adapter = createOpenRouterAdapter({
+      apiKey: "or-test-key-0123456789abcdef",
+      fetch: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return fixtureResponse(REASONING_FIXTURE);
+      },
+    });
+
+    await adapter.call({
+      slug: "openai/gpt-5",
+      system: "s",
+      user: "u",
+      jsonMode: true,
+      maxTokens: 4000,
+      reasoning: { effort: "low", exclude: true },
+    });
+
+    expect(body["max_tokens"]).toBe(4000);
+    // Snake case, because it is the provider's field and not ours.
+    expect(body["reasoning"]).toEqual({ effort: "low", exclude: true });
+    // The one thing that stays the same for every row, deep or fast.
+    expect(body["temperature"]).toBe(0);
+  });
+
+  test("a reasoning budget rides in the same field the provider documents", async () => {
+    let body: Record<string, unknown> = {};
+    const adapter = createOpenRouterAdapter({
+      apiKey: "or-test-key-0123456789abcdef",
+      fetch: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return fixtureResponse(REASONING_FIXTURE);
+      },
+    });
+
+    await adapter.call({
+      slug: "openai/gpt-5",
+      system: "s",
+      user: "u",
+      jsonMode: false,
+      maxTokens: 4000,
+      reasoning: { maxTokens: 2048 },
+    });
+    expect(body["reasoning"]).toEqual({ max_tokens: 2048 });
+  });
+
+  test("a row that asks for no reasoning sends no reasoning field at all", async () => {
+    let body: Record<string, unknown> = {};
+    const adapter = createOpenRouterAdapter({
+      apiKey: "or-test-key-0123456789abcdef",
+      fetch: async (_url, init) => {
+        body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+        return okResponse(reply({ restating_closer: 0.3 }));
+      },
+    });
+
+    await adapter.call({ slug: "m", system: "s", user: "u", jsonMode: false, maxTokens: 900 });
+    expect(body["reasoning"]).toBeUndefined();
+    expect(body["max_tokens"]).toBe(900);
+  });
+
+  test("the reasoning the provider billed for is reported and paid for", async () => {
+    const adapter = createOpenRouterAdapter({
+      apiKey: "or-test-key-0123456789abcdef",
+      fetch: async () => fixtureResponse(REASONING_FIXTURE),
+    });
+
+    const answer = await adapter.call({
+      slug: "openai/gpt-5",
+      system: "s",
+      user: "u",
+      jsonMode: true,
+      maxTokens: 4000,
+      reasoning: { effort: "low" },
+    });
+
+    expect(answer.reasoningTokens).toBe(768);
+    // The fixture folds the reasoning into completion_tokens, which is what
+    // OpenRouter documents, so the billed output is that total and not a sum.
+    expect(answer.outputTokens).toBe(812);
+    expect(answer.finishReason).toBe("stop");
+    expect(answer.truncated).toBe(false);
+  });
+
+  test("reasoning reported alongside the total is added to it, never dropped", async () => {
+    // A provider that reports the reasoning next to completion_tokens rather
+    // than inside it would otherwise have its deepest call priced as its
+    // cheapest, which would make the hardest-thinking row look the cheapest.
+    const adapter = createOpenRouterAdapter({
+      apiKey: "or-test-key-0123456789abcdef",
+      fetch: async () =>
+        new Response(
+          JSON.stringify({
+            model: "openai/gpt-5",
+            choices: [{ finish_reason: "stop", message: { content: reply({ restating_closer: 0.5 }) } }],
+            usage: {
+              prompt_tokens: 100,
+              completion_tokens: 120,
+              completion_tokens_details: { reasoning_tokens: 800 },
+            },
+          }),
+          { status: 200 },
+        ),
+    });
+
+    const answer = await adapter.call({
+      slug: "openai/gpt-5",
+      system: "s",
+      user: "u",
+      jsonMode: false,
+      maxTokens: 4000,
+    });
+    expect(answer.reasoningTokens).toBe(800);
+    expect(answer.outputTokens).toBe(920);
+  });
+
+  test("a reply cut off at the budget says so, and is not called malformed", async () => {
+    const adapter = createOpenRouterAdapter({
+      apiKey: "or-test-key-0123456789abcdef",
+      fetch: async () => fixtureResponse(TRUNCATED_FIXTURE),
+    });
+
+    const answer = await adapter.call({
+      slug: "openai/gpt-5",
+      system: "s",
+      user: "u",
+      jsonMode: true,
+      maxTokens: 900,
+    });
+
+    expect(answer.finishReason).toBe("length");
+    expect(answer.truncated).toBe(true);
+    expect(answer.reasoningTokens).toBe(884);
   });
 });
 
@@ -478,7 +694,13 @@ describe("the Anthropic direct adapter, the overhead control", () => {
       },
     });
 
-    const answer = await adapter.call({ slug: "claude-sonnet-5", system: "s", user: "u", jsonMode: false });
+    const answer = await adapter.call({
+      slug: "claude-sonnet-5",
+      system: "s",
+      user: "u",
+      jsonMode: false,
+      maxTokens: DEFAULT_MAX_TOKENS,
+    });
 
     expect(seen[0]?.url).toBe(ANTHROPIC_MESSAGES_ENDPOINT);
     const headers = seen[0]?.init.headers as Record<string, string>;
@@ -537,14 +759,18 @@ function stubAdapter(
   };
 }
 
-function modelReply(text: string, latencyMs: number): ModelReply {
+function modelReply(text: string, latencyMs: number, over: Partial<ModelReply> = {}): ModelReply {
   return {
     servedModel: "served-model-1",
     text,
     inputTokens: 100,
     outputTokens: 20,
+    reasoningTokens: 0,
+    finishReason: "stop",
+    truncated: false,
     latencyMs,
     attempts: 1,
+    ...over,
   };
 }
 
@@ -647,6 +873,96 @@ describe("arm D over the panel", () => {
     expect(model?.score?.per_rule["colon_heavy"]).toBeDefined();
   });
 
+  test("a reply cut off at the budget is counted apart from a torn one", async () => {
+    const adapter = stubAdapter("openrouter", (_call, nth) =>
+      nth === 1
+        ? modelReply('{"restating_closer": {"flag": true, "p": 0.9', 50, {
+            truncated: true,
+            finishReason: "length",
+            reasoningTokens: 884,
+          })
+        : modelReply(reply({ restating_closer: 0.9, naked_cost_figure: 0.9 }), 50),
+    );
+
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [FAST],
+      adapters: { openrouter: adapter },
+      repeats: 1,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+
+    const model = outcome.models[0];
+    expect(model?.truncated).toBe(1);
+    // The reply was cut off, not malformed, so the parse-failure count is clean.
+    expect(model?.parseFailures).toBe(0);
+    // Both still cost the run the same cells.
+    expect(model?.failures).toBe(1);
+    expect(model?.unansweredCells).toBe(JUDGMENT_IDS.length);
+    expect(model?.failureDetail[0]?.reason).toContain("budget");
+
+    const record = outcome.raw[0]?.records.find((row) => row.doc === "C00");
+    expect(record?.truncated).toBe(true);
+    expect(record?.finish_reason).toBe("length");
+    expect(record?.usage.reasoning_tokens).toBe(884);
+  });
+
+  test("the request each row was sent travels into the raw output", async () => {
+    const deep: ResolvedModel = {
+      ...DEEP,
+      entry: entry({
+        id: "deep",
+        label: "Deep",
+        tier: "deep",
+        match: "^b$",
+        maxTokens: 4000,
+        reasoning: { effort: "low" },
+      }),
+    };
+
+    const seen: ModelCall[] = [];
+    const adapter: ModelAdapter = {
+      provider: "openrouter",
+      listModels: async () => [],
+      call: async (call) => {
+        seen.push(call);
+        return modelReply(reply({ restating_closer: 0.9, naked_cost_figure: 0.9 }), 30);
+      },
+    };
+
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [FAST, deep],
+      adapters: { openrouter: adapter },
+      repeats: 1,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+
+    expect(seen.find((call) => call.slug === "model-deep")?.maxTokens).toBe(4000);
+    expect(seen.find((call) => call.slug === "model-deep")?.reasoning).toEqual({ effort: "low" });
+    expect(seen.find((call) => call.slug === "model-fast")?.maxTokens).toBe(DEFAULT_MAX_TOKENS);
+    expect(seen.find((call) => call.slug === "model-fast")?.reasoning).toBeUndefined();
+
+    expect(outcome.models.find((model) => model.id === "deep")?.request).toEqual({
+      maxTokens: 4000,
+      reasoning: { effort: "low" },
+    });
+    expect(outcome.raw.find((run) => run.model_id === "deep")?.request).toEqual({
+      max_tokens: 4000,
+      reasoning: { effort: "low" },
+    });
+    expect(outcome.raw.find((run) => run.model_id === "fast")?.request).toEqual({
+      max_tokens: DEFAULT_MAX_TOKENS,
+      reasoning: null,
+    });
+  });
+
   test("cost comes from returned usage, and stays unknown when the price is", async () => {
     const adapter = stubAdapter("openrouter", () =>
       modelReply(reply({ restating_closer: 0.8, naked_cost_figure: 0.8 }), 40),
@@ -738,6 +1054,50 @@ describe("the comparison tables", () => {
     expect(markdown).toContain("bench/panel.yaml");
     // One table per rule, keyed by the rule id.
     for (const id of CLASSES) expect(markdown).toContain(`### ${id}`);
+  });
+
+  test("the tables print what each row was sent, so no reader assumes they matched", async () => {
+    const deep: ResolvedModel = {
+      ...DEEP,
+      entry: entry({
+        id: "deep",
+        label: "Deep",
+        tier: "deep",
+        match: "^b$",
+        maxTokens: 4000,
+        reasoning: { effort: "low" },
+      }),
+    };
+    const adapter = stubAdapter("openrouter", () =>
+      modelReply(reply({ restating_closer: 0.9, naked_cost_figure: 0.9 }), 60),
+    );
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [FAST, deep],
+      adapters: { openrouter: adapter },
+      repeats: 1,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+
+    const report = buildBenchReport(outcome, {
+      runDate: "2026-09-17",
+      threshold: 0.7,
+      repeats: 1,
+      panelFile: "bench/panel.yaml",
+      priceSources: [],
+      corpus: { clean: 1, seeded: 2, seed: 1, perRule: 1 },
+    });
+    const markdown = renderBenchMarkdown(report);
+
+    expect(markdown).toContain("| Model | Completion budget | Reasoning |");
+    expect(markdown).toContain(`| Fast | ${DEFAULT_MAX_TOKENS} tokens | not requested |`);
+    expect(markdown).toContain("| Deep | 4000 tokens | effort low |");
+    // The run table separates a budget failure from a bad answer.
+    expect(markdown).toContain("| Truncated |");
+    expect(report.models[1]?.request).toEqual({ max_tokens: 4000, reasoning: { effort: "low" } });
   });
 
   test("joins the eval arms so the headline table comes from one corpus and one run", async () => {

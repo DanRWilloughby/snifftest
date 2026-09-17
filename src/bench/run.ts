@@ -28,6 +28,16 @@
  * A model the provider did not list is never called and never scored: it is a
  * row that says so. A torn reply is a counted failure and a set of unanswered
  * cells. A model with no published price has no cost, not a zero.
+ *
+ * ## The rows were not sent identical requests
+ *
+ * They cannot be. A reasoning model spends its internal tokens out of the same
+ * completion budget as its answer, so one budget for every row hands the deep
+ * rows a smaller answer and cuts some of them off before the JSON. Each row
+ * therefore carries the budget and the reasoning setting its panel entry
+ * declares, both of them recorded here and printed under the tables. A reply
+ * that stopped at the budget is counted as truncated rather than as a torn
+ * reply, because the first is the run's doing and the second is the model's.
  */
 
 import { runRegexArm } from "../engine.ts";
@@ -35,7 +45,7 @@ import type { ArmObservation, ArmScore, Cell, JudgedDocument } from "../eval/sco
 import { scoreArm, thresholdsWith } from "../eval/score.ts";
 import { type Chunk, type Ruleset, isJudgmentRule, isRegexRule } from "../types.ts";
 import type { ModelAdapter, ModelCall, ModelReply } from "./adapter.ts";
-import type { Provider, ResolvedModel } from "./panel.ts";
+import type { Provider, ReasoningSetting, ResolvedModel } from "./panel.ts";
 import { ReplyError, buildSystemPrompt, parseReply, userMessage } from "./prompt.ts";
 
 export type { ModelAdapter, ModelCall, ModelReply };
@@ -71,6 +81,12 @@ export interface BenchCost {
   readonly outputTokens: number;
 }
 
+/** What a row was actually sent, so the tables can say the rows differ and why. */
+export interface RequestSettings {
+  readonly maxTokens: number;
+  readonly reasoning: ReasoningSetting | null;
+}
+
 export interface BenchModelResult {
   readonly id: string;
   readonly label: string;
@@ -82,11 +98,21 @@ export interface BenchModelResult {
   readonly jsonMode: boolean;
   readonly prices: ResolvedModel["prices"];
   readonly note?: string;
+  /** The budget and reasoning setting this row's requests carried. */
+  readonly request: RequestSettings;
   readonly calls: number;
   readonly retries: number;
   readonly failures: number;
   /** Replies that were not one JSON object of rule ids. */
   readonly parseFailures: number;
+  /**
+   * Replies that stopped at the completion budget before they were whole.
+   *
+   * Counted apart from a parse failure because the two say different things: a
+   * malformed reply is the model answering badly, and a truncated one is the
+   * run not giving it room to answer at all. Both leave the cells unanswered.
+   */
+  readonly truncated: number;
   /** Judgment cells across every repeat that came back with no usable number. */
   readonly unansweredCells: number;
   readonly latency: BenchLatency;
@@ -103,7 +129,14 @@ export interface RawBenchRecord {
   readonly reply: string | null;
   readonly readings: Record<string, { flag: boolean; p: number }>;
   readonly unanswered: readonly string[];
-  readonly usage: { readonly input_tokens: number; readonly output_tokens: number };
+  readonly usage: {
+    readonly input_tokens: number;
+    readonly output_tokens: number;
+    readonly reasoning_tokens: number;
+  };
+  /** The provider's own word for why it stopped, verbatim. */
+  readonly finish_reason: string | null;
+  readonly truncated: boolean;
   readonly latency_ms: number;
   readonly attempts: number;
   readonly error: string | null;
@@ -119,6 +152,8 @@ export interface RawBenchRun {
   readonly run_date: string;
   readonly repeat: number;
   readonly json_mode: boolean;
+  /** Exactly what this row's requests asked for, beside the answers they got. */
+  readonly request: { readonly max_tokens: number; readonly reasoning: ReasoningSetting | null };
   readonly prices: ResolvedModel["prices"];
   readonly question_ids: readonly string[];
   /** The prompt every model in this run was sent, verbatim. */
@@ -187,7 +222,7 @@ export async function runBench(options: RunBenchOptions): Promise<BenchOutcome> 
         const state = states.get(model.entry.id);
         if (state === undefined || state.adapter === undefined) continue;
 
-        const record = await askOne(state, model, doc, {
+        const record = await askOne(state, state.adapter, model, doc, {
           system: systemPrompt,
           questionIds,
           repeat,
@@ -216,6 +251,10 @@ export async function runBench(options: RunBenchOptions): Promise<BenchOutcome> 
         run_date: options.runDate,
         repeat,
         json_mode: model.jsonMode,
+        request: {
+          max_tokens: model.entry.maxTokens,
+          reasoning: model.entry.reasoning ?? null,
+        },
         prices: model.prices,
         question_ids: questionIds,
         system_prompt: systemPrompt,
@@ -256,6 +295,7 @@ interface ModelState {
   retries: number;
   failures: number;
   parseFailures: number;
+  truncated: number;
   unansweredCells: number;
   latencies: number[];
   inputTokens: number;
@@ -276,6 +316,7 @@ function newState(model: ResolvedModel, adapter: ModelAdapter | undefined): Mode
     retries: 0,
     failures: 0,
     parseFailures: 0,
+    truncated: 0,
     unansweredCells: 0,
     latencies: [],
     inputTokens: 0,
@@ -295,28 +336,33 @@ interface AskContext {
 
 async function askOne(
   state: ModelState,
+  adapter: ModelAdapter,
   model: ResolvedModel,
   doc: BenchDocument,
   context: AskContext,
 ): Promise<RawBenchRecord> {
+  const settings = settingsOf(model);
   const call: ModelCall = {
     slug: model.slug ?? model.entry.id,
     system: context.system,
     user: userMessage(doc.text),
     jsonMode: model.jsonMode,
+    maxTokens: settings.maxTokens,
+    ...(settings.reasoning === null ? {} : { reasoning: settings.reasoning }),
   };
 
+  const readings: Record<string, { flag: boolean; p: number }> = {};
   const blank = {
     doc: doc.id,
     kind: doc.kind,
     truth: doc.truth ?? null,
-    readings: {} as Record<string, { flag: boolean; p: number }>,
+    readings,
     unanswered: context.questionIds,
   };
 
   let answer: ModelReply;
   try {
-    answer = await (state.adapter as ModelAdapter).call(call);
+    answer = await adapter.call(call);
   } catch (error) {
     state.calls += 1;
     state.failures += 1;
@@ -326,7 +372,9 @@ async function askOne(
     return {
       ...blank,
       reply: null,
-      usage: { input_tokens: 0, output_tokens: 0 },
+      usage: { input_tokens: 0, output_tokens: 0, reasoning_tokens: 0 },
+      finish_reason: null,
+      truncated: false,
       latency_ms: 0,
       attempts: 0,
       error: reason,
@@ -341,7 +389,11 @@ async function askOne(
   state.usageCalls += 1;
   state.servedModel = answer.servedModel;
 
-  const usage = { input_tokens: answer.inputTokens, output_tokens: answer.outputTokens };
+  const usage = {
+    input_tokens: answer.inputTokens,
+    output_tokens: answer.outputTokens,
+    reasoning_tokens: answer.reasoningTokens,
+  };
 
   try {
     const parsed = parseReply(answer.text, context.questionIds);
@@ -361,13 +413,22 @@ async function askOne(
       readings: { ...parsed.readings },
       unanswered: parsed.missing,
       usage,
+      finish_reason: answer.finishReason,
+      truncated: answer.truncated,
       latency_ms: answer.latencyMs,
       attempts: answer.attempts,
       error: null,
     };
   } catch (error) {
-    const reason = error instanceof ReplyError ? error.message : messageOf(error);
-    state.parseFailures += 1;
+    // A reply that stopped at the budget is counted apart from a torn one. Both
+    // leave the cells unanswered, and only one of them is about the model.
+    const reason = answer.truncated
+      ? `the reply stopped at the ${call.maxTokens}-token budget before it was a whole JSON object`
+      : error instanceof ReplyError
+        ? error.message
+        : messageOf(error);
+    if (answer.truncated) state.truncated += 1;
+    else state.parseFailures += 1;
     state.failures += 1;
     state.unansweredCells += context.questionIds.length;
     state.failureDetail.push({ doc: doc.id, repeat: context.repeat, reason });
@@ -375,11 +436,21 @@ async function askOne(
       ...blank,
       reply: answer.text,
       usage,
+      finish_reason: answer.finishReason,
+      truncated: answer.truncated,
       latency_ms: answer.latencyMs,
       attempts: answer.attempts,
       error: reason,
     };
   }
+}
+
+/** What a row's requests carry, from its panel entry. */
+function settingsOf(model: ResolvedModel): RequestSettings {
+  return {
+    maxTokens: model.entry.maxTokens,
+    reasoning: model.entry.reasoning ?? null,
+  };
 }
 
 /** Build the first repeat's observation, the one accuracy is scored from. */
@@ -448,10 +519,12 @@ function summarise(
     jsonMode: model.jsonMode,
     prices: model.prices,
     ...(model.note === undefined ? {} : { note: model.note }),
+    request: settingsOf(model),
     calls: 0,
     retries: 0,
     failures: 0,
     parseFailures: 0,
+    truncated: 0,
     unansweredCells: 0,
     latency: { medianMs: 0, p95Ms: 0, samples: 0 },
     cost: {
@@ -492,6 +565,7 @@ function summarise(
     retries: state.retries,
     failures: state.failures,
     parseFailures: state.parseFailures,
+    truncated: state.truncated,
     unansweredCells: state.unansweredCells,
     latency: { medianMs: median(sorted), p95Ms: p95(sorted), samples: sorted.length },
     cost: {
