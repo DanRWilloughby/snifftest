@@ -598,25 +598,7 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
     client = (deps.createClient ?? createJevClient)({ apiKey: key });
   }
 
-  let bank: SeedBank | undefined;
-  const wantsBank = (options.seedVersion ?? 2) === 2;
-  if (wantsBank) {
-    const path = options.bankPath ?? packagedBankPath();
-    try {
-      bank = readBank(path, deps.cwd);
-    } catch (error) {
-      if (!(error instanceof BankError)) throw error;
-      // A named bank that will not read is an error; a missing packaged one is
-      // a fact about the installation, and the run says which faults it used.
-      if (options.bankPath !== undefined) {
-        deps.writeError(messageOf(error));
-        return EXIT.failure;
-      }
-      deps.writeError(
-        "no seed bank ships with this install, so the faults come from the ruleset's own lists.",
-      );
-    }
-  }
+  const bank = loadSeedBank(deps, options);
 
   const runOptions: RunEvalOptions = {
     ruleset,
@@ -657,7 +639,45 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
   for (const failure of outcome.failures) {
     deps.writeError(`request failed on ${failure.doc}: ${failure.reason}`);
   }
+
+  // A run that asked for a judgment arm and got nothing usable back has
+  // measured nothing. Its tables would print a recall of zero for every
+  // judgment rule, which reads as a rule that never fires rather than a
+  // service that never answered, so the exit code says so instead.
+  const judgment = outcome.judgment;
+  if (judgment !== undefined && judgment.answered === 0) {
+    deps.writeError(
+      `the judgment arm sent ${judgment.sent} paragraphs and got no usable answer to any of ` +
+        `them${judgment.stopped === null ? "" : ` (${judgment.stopped})`}, so nothing about the ` +
+        "judgment rules was measured. The tables hold the countable arms only.",
+    );
+    return EXIT.failure;
+  }
   return EXIT.ok;
+}
+
+/**
+ * The bank of faults, or the ruleset's own lists.
+ *
+ * `eval` and a bare `bench` both seed a corpus and must seed it the same way,
+ * or a bench row and an eval row describe two different corpora under one
+ * table. A named bank that will not read is the caller's mistake; a missing
+ * packaged one is a fact about the installation, and the run says which faults
+ * it used instead.
+ */
+function loadSeedBank(deps: CliDeps, options: Options): SeedBank | undefined {
+  if ((options.seedVersion ?? 2) !== 2) return undefined;
+  const path = options.bankPath ?? packagedBankPath();
+  try {
+    return readBank(path, deps.cwd);
+  } catch (error) {
+    if (!(error instanceof BankError)) throw error;
+    if (options.bankPath !== undefined) throw new UsageError(messageOf(error));
+    deps.writeError(
+      "no seed bank ships with this install, so the faults come from the ruleset's own lists.",
+    );
+    return undefined;
+  }
 }
 
 /**
@@ -1121,7 +1141,10 @@ function benchCorpus(deps: CliDeps, options: Options, ruleset: Ruleset): BenchCo
     }
   }
 
+  const bank = loadSeedBank(deps, options);
   const seeded = seedCorpus(candidates, ruleset, {
+    ...(options.seedVersion === undefined ? {} : { seedVersion: options.seedVersion }),
+    ...(bank === undefined ? {} : { bank }),
     ...(options.seed === undefined ? {} : { seed: options.seed }),
     ...(options.perRule === undefined ? {} : { perRule: options.perRule }),
   });
@@ -1129,6 +1152,10 @@ function benchCorpus(deps: CliDeps, options: Options, ruleset: Ruleset): BenchCo
   return {
     documents: [
       ...seeded.clean.map((doc) => ({ id: doc.id, kind: "clean" as const, text: doc.text })),
+      // The near misses are clean paragraphs, and the hardest ones in the
+      // corpus. A bench that left them out would measure every arm on the easy
+      // half of the false-alarm question.
+      ...seeded.negatives.map((doc) => ({ id: doc.id, kind: "clean" as const, text: doc.text })),
       ...seeded.seeded.map((doc) => ({
         id: doc.id,
         kind: "seeded" as const,
@@ -1137,7 +1164,7 @@ function benchCorpus(deps: CliDeps, options: Options, ruleset: Ruleset): BenchCo
       })),
     ],
     counts: {
-      clean: seeded.clean.length,
+      clean: seeded.clean.length + seeded.negatives.length,
       seeded: seeded.seeded.length,
       seed: seeded.seedValue,
       perRule: seeded.perRule,
@@ -1150,6 +1177,10 @@ function fromEvalDirectory(deps: CliDeps, options: Options, ruleset: Ruleset): B
   const clean = readJson(join(dir, "inputs", "clean.json"));
   const seeded = readJson(join(dir, "inputs", "seeded.json"));
   const scores = readJson(join(dir, "scores.json"));
+  // Older results directories have no negatives file. They are still joinable;
+  // the bench simply sees the corpus that run saw.
+  const negativesPath = join(dir, "inputs", "negatives.json");
+  const negatives = existsSync(negativesPath) ? readJson(negativesPath) : {};
 
   const classes = scores["classes"];
   const ours = ruleset.rules.map((rule) => rule.id);
@@ -1162,6 +1193,7 @@ function fromEvalDirectory(deps: CliDeps, options: Options, ruleset: Ruleset): B
 
   const documents: BenchDocument[] = [
     ...paragraphsOf(clean).map((doc) => ({ id: doc.id, kind: "clean" as const, text: doc.text })),
+    ...paragraphsOf(negatives).map((doc) => ({ id: doc.id, kind: "clean" as const, text: doc.text })),
     ...paragraphsOf(seeded).map((doc) => ({
       id: doc.id,
       kind: "seeded" as const,
@@ -1204,6 +1236,7 @@ function joinedArms(scores: Record<string, unknown>): JoinedArm[] {
       arm: id,
       label: typeof arm["label"] === "string" ? arm["label"] : id,
       recall: ratioOf(overall?.["recall"]),
+      judgmentRecall: ratioOf(asRecord(overall?.["judgment"])?.["recall"]),
       fpPerCleanCell: ratioOf(overall?.["fp_rate_per_clean_cell"]),
       fpCleanParagraphs: ratioOf(overall?.["fp_clean_paragraphs"]),
       cleanParagraphs: ratioOf(overall?.["clean_paragraphs"]),
@@ -1707,8 +1740,10 @@ function helpLines(): string[] {
     "                      relative paths and the ruleset are found there, not here",
     "  --threshold <0-1>   the probability at or above which a judgment counts as a flag",
     "  --format text|json  how to print the flags (default text)",
-    "  --only <tags>       run only the rules carrying one of these tags",
-    "  --skip <tags>       never run a rule carrying one of these tags",
+    "  --only <tags>       ask about only the judgment rules carrying one of these tags;",
+    "                      the countable rules cost nothing and keep running, and a tag",
+    "                      no rule carries is an error rather than an empty run",
+    "  --skip <tags>       never run a rule carrying one of these tags, countable or not",
     "  --dry-run           make no network request of any kind, whatever the command;",
     "                      for check that means the countable rules and nothing else",
     "  --no-cache          ask about every paragraph again, instead of reusing an answer",

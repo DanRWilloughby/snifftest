@@ -28,7 +28,7 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 import { PRICE_BASIS } from "../jev.ts";
-import type { EvalOutcome, RawRun } from "./run.ts";
+import type { EvalOutcome, JudgmentRun, RawRun } from "./run.ts";
 import type { ArmScore, ClassScore, Interval } from "./score.ts";
 import type { SeededDocument } from "./seed.ts";
 
@@ -48,7 +48,14 @@ export interface EvalReport {
   readonly per_rule: number;
   /** 1 is the ruleset's own splice lists; 2 is the seed bank. */
   readonly seed_version: number;
-  /** Near misses planted in clean paragraphs, and whether any arm flagged them. */
+  /**
+   * Near misses planted in clean paragraphs, and every rule that flagged one.
+   *
+   * A near miss is planted next to one rule but it is a whole paragraph, and
+   * any rule in the file may fire on it. An entry reads `arm label: rule`, so
+   * a paragraph flagged by a rule it was not planted for is visible instead of
+   * being filtered out of its own table.
+   */
   readonly hard_negatives: readonly {
     readonly id: string;
     readonly rule: string;
@@ -82,6 +89,8 @@ export interface EvalReport {
    * Printed beside the cost column so a reader can weigh it.
    */
   readonly cost_basis: typeof PRICE_BASIS;
+  /** What the judgment arm did, when there was one. Absent on a dry run. */
+  readonly judgment?: JudgmentRun;
 }
 
 export function buildReport(outcome: EvalOutcome, options: ReportOptions): EvalReport {
@@ -98,11 +107,11 @@ export function buildReport(outcome: EvalOutcome, options: ReportOptions): EvalR
       id: row.id,
       rule: row.rule,
       why: row.why,
-      flagged_by: Object.values(outcome.scores)
-        .filter((arm) =>
-          arm.false_positives_at_0_7.some((flag) => flag.doc === row.id && flag.rule === row.rule),
-        )
-        .map((arm) => arm.label),
+      flagged_by: Object.values(outcome.scores).flatMap((arm) =>
+        arm.false_positives_at_0_7
+          .filter((flag) => flag.doc === row.id)
+          .map((flag) => `${arm.label}: ${flag.rule}`),
+      ),
     })),
     thresholds: outcome.thresholds,
     ruleset_sources: options.rulesetSources ?? [],
@@ -119,7 +128,8 @@ export function buildReport(outcome: EvalOutcome, options: ReportOptions): EvalR
       })),
       skipped: seeding.skipped.map((row) => ({ rule: row.rule, reason: row.reason })),
     },
-    served_model: outcome.raw?.model ?? null,
+    served_model: outcome.raw?.served_model ?? null,
+    ...(outcome.judgment === undefined ? {} : { judgment: outcome.judgment }),
     classes: outcome.classes,
     arms: outcome.scores,
     seeding: seeding.seeded,
@@ -183,10 +193,19 @@ export function renderMarkdown(report: EvalReport): string {
       "itself defines, and the seeder throws away any it does not catch, so that column is a " +
       "count and not a measurement of skill. Judgment rules are the ones a model answers, and " +
       "only that column carries a recall figure. The false-alarm rate is per clean paragraph, " +
-      "which is the unit a reader meets: a rate of 0.04 on an eight-paragraph post is about a " +
-      "one-in-three chance of at least one false flag somewhere in it.",
+      `which is the unit a reader meets${postOdds(arms, at)}.`,
   );
   lines.push("");
+  const tuning = tuningDisclosure(report);
+  if (tuning !== null) {
+    lines.push(tuning);
+    lines.push("");
+  }
+  const judgment = judgmentNote(report.judgment);
+  if (judgment !== null) {
+    lines.push(judgment);
+    lines.push("");
+  }
   lines.push("Pooled and per-cell figures, which are the flattering ones, are below.");
   lines.push("");
   lines.push("| Arm | Pooled recall | FP per fireable clean cell | FP per clean cell | FP per negative cell |");
@@ -251,8 +270,8 @@ export function renderMarkdown(report: EvalReport): string {
     lines.push("");
     lines.push(
       `Every cell is k of n. A rate is printed beside it only where n is ${RATE_FLOOR} or more, ` +
-        "because a rate over three seeds is one of four possible numbers and reads as a " +
-        "measurement it is not.",
+        `because a rate over ${report.per_rule} seeds is one of ${report.per_rule + 1} possible ` +
+        "numbers and reads as a measurement it is not.",
     );
     lines.push("");
 
@@ -393,6 +412,14 @@ export interface WrittenReport {
   readonly markdown: string;
   readonly cleanInputs: string;
   readonly seededInputs: string;
+  /**
+   * The near misses, in full.
+   *
+   * They are the hardest clean paragraphs in the corpus and the ones a bench
+   * arm most needs to see, and without a file of their own the only copy lives
+   * inside a scores file as a reason string.
+   */
+  readonly negativeInputs: string;
   readonly raw?: string;
 }
 
@@ -422,6 +449,7 @@ export function writeReport(
   const markdown = join(outDir, "tables.md");
   const cleanInputs = join(outDir, "inputs", "clean.json");
   const seededInputs = join(outDir, "inputs", "seeded.json");
+  const negativeInputs = join(outDir, "inputs", "negatives.json");
 
   write(json, `${JSON.stringify(report, null, 1)}\n`);
   write(markdown, renderMarkdown(report));
@@ -453,12 +481,25 @@ export function writeReport(
     )}\n`,
   );
 
+  write(
+    negativeInputs,
+    `${JSON.stringify(
+      {
+        run_date: report.run_date,
+        seed: report.seed,
+        paragraphs: outcome.seeding.negatives,
+      },
+      null,
+      1,
+    )}\n`,
+  );
+
   const raw = outcome.raw;
-  if (raw === undefined) return { json, markdown, cleanInputs, seededInputs };
+  if (raw === undefined) return { json, markdown, cleanInputs, seededInputs, negativeInputs };
 
   const rawPath = join(outDir, "raw", "eval-jev.json");
   write(rawPath, `${JSON.stringify(withDate(raw, report.run_date), null, 1)}\n`);
-  return { json, markdown, cleanInputs, seededInputs, raw: rawPath };
+  return { json, markdown, cleanInputs, seededInputs, negativeInputs, raw: rawPath };
 }
 
 function withDate(raw: RawRun, runDate: string): RawRun & { run_date: string } {
@@ -474,6 +515,80 @@ function write(path: string, body: string): void {
 
 /** Below this many trials a rate is not printed at all, only k of n. */
 const RATE_FLOOR = 10;
+
+/**
+ * How long a post the false-alarm sentence talks about.
+ *
+ * The sentence used to print a fixed rate and a fixed one-in-three whatever
+ * the run measured, which is the kind of hard-coded number this file exists to
+ * refuse. It is computed from the arm with the highest rate instead, and left
+ * out when no arm flagged a clean paragraph at all.
+ */
+const POST_PARAGRAPHS = 8;
+
+function postOdds(arms: readonly ArmScore[], at: string): string {
+  let worst: { label: string; rate: number } | null = null;
+  for (const arm of arms) {
+    const overall = arm.overall[at];
+    if (overall === undefined || overall.clean_paragraphs === 0) continue;
+    const rate = ratioOf(overall.fp_clean_paragraphs, overall.clean_paragraphs);
+    if (rate === null || rate <= 0) continue;
+    if (worst === null || rate > worst.rate) worst = { label: arm.label, rate };
+  }
+  if (worst === null) return ", and no arm flagged a clean paragraph in this run";
+  const any = 1 - (1 - worst.rate) ** POST_PARAGRAPHS;
+  return (
+    `. Arm ${worst.label}'s rate of ${worst.rate.toFixed(2)} is about a ` +
+    `${(any * 100).toFixed(0)} in 100 chance of at least one false flag somewhere in a ` +
+    `${POST_PARAGRAPHS} paragraph post`
+  );
+}
+
+/**
+ * Rules whose wording was revised after seeing this seed set miss faults.
+ *
+ * A number measured on the seeds that prompted the rewrite is not the number a
+ * stranger's prose would give, and a reader of the table has to be told so in
+ * the table rather than in a notes file they may never open. Adding a rule here
+ * is part of rewording it.
+ */
+const TUNED_RULES: readonly { readonly rule: string; readonly when: string }[] = [
+  { rule: "self_undercutting", when: "2026-09-17" },
+  { rule: "first_x_that", when: "2026-09-17" },
+];
+
+function tuningDisclosure(report: EvalReport): string | null {
+  const measured = TUNED_RULES.filter((entry) => report.classes.includes(entry.rule));
+  if (measured.length === 0) return null;
+  const names = measured.map((entry) => `${entry.rule} (${entry.when})`).join(", ");
+  return (
+    `Tuning disclosure. ${measured.length} of the rules in this table were reworded after a ` +
+    `run on these same seeds showed them missing faults, and then measured again on these ` +
+    `same seeds: ${names}. Their figures are the best case, not a reading of unseen prose. ` +
+    "The rest of the ruleset has not been tuned against this corpus."
+  );
+}
+
+/** One sentence on what the judgment arm actually managed, or nothing. */
+function judgmentNote(run: JudgmentRun | undefined): string | null {
+  if (run === undefined) return null;
+  const parts: string[] = [
+    `The judgment arm sent ${run.sent} of ${run.sent + run.notSent} prose paragraphs and got ` +
+      `${run.answered} usable answers back`,
+  ];
+  if (run.structure > 0) {
+    parts.push(
+      `${run.structure} blocks were structure rather than prose and were never sent, which is ` +
+        "what an ordinary check does with them",
+    );
+  }
+  if (run.stopped !== null) {
+    parts.push(
+      `it stopped early and left ${run.notSent} paragraphs unasked: ${run.stopped}`,
+    );
+  }
+  return `${parts.join("; ")}.`;
+}
 
 /** A measured ratio, or `n/a`. Never a zero standing in for "not measured". */
 function num(value: number | null | undefined): string {

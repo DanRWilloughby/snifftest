@@ -16,7 +16,7 @@
         { "text": "Everyone described the delay as bad luck. The calendar had said so in June.", "hosts": [] }
       ],
       "hard_negatives": [
-        { "text": "This is not a guarantee, and the page says so twice.", "why": "a plain negation with nothing put in its place" },
+        { "text": "The lock on the side door does not turn all the way.", "why": "a plain negation with nothing put in its place" },
         { "text": "It is not finished, and two of the checks still fail on the second run.", "why": "a denial followed by a separate fact rather than a relabelling" },
         { "text": "We publish on Tuesdays rather than Fridays so that the weekend stays quiet.", "why": "a comparison inside a sentence that carries its own information" }
       ]
@@ -92,7 +92,7 @@
         { "text": "In essence, everything written above adds up to precisely this.", "hosts": [] }
       ],
       "hard_negatives": [
-        { "text": "The upshot is that the second run costs four pounds more, which is why nobody does it twice.", "why": "a closing sentence carrying a number the paragraph had not given" },
+        { "text": "The upshot is that the second run reads the whole file again, which is why nobody does it twice.", "why": "a closing sentence carrying a mechanism the paragraph had not given" },
         { "text": "The mechanism is the damp, which reaches the plaster before it reaches anything anyone can see.", "why": "a closer naming a mechanism rather than repeating" },
         { "text": "None of that holds if the file was written on a Friday.", "why": "a closing condition the paragraph had not yet made" }
       ]
