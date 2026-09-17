@@ -297,6 +297,8 @@ rules:
     # A page meant to sell has to make its offer. A page meant to document
     # has to state its limits, which is why this rule sits out by default.
     what: |
+      Judge sentence by sentence. One sentence is enough to trip this rule,
+      however confident and specific the rest of the paragraph is.
       A line that talks the reader out of the thing being offered. It says
       the thing may not work, that the writer does not claim it works, that
       there is no guarantee, or that it may not be for them. On a page meant
@@ -316,7 +318,7 @@ rules:
       - "This may not work for you, and we are not saying it will."
       - "There is no guarantee any of this helps."
     criteria:
-      true: "The paragraph contains a line telling the reader not to count on the thing working, with no specific limit named."
+      true: "At least one sentence, anywhere in the paragraph, tells the reader not to count on the thing working, with no specific limit named. One such sentence is enough."
       false: "Limits are named precisely, or no self-undercutting line appears."
     message: "The copy is talking the reader out of it. Name the limit and drop the shrug."
     seed:
@@ -332,6 +334,8 @@ rules:
     # A first claim is a marketing habit; a technical note may need the word
     # for a sequence, which `not_for` covers.
     what: |
+      Judge sentence by sentence. One sentence is enough to trip this rule,
+      wherever it sits in the paragraph.
       A claim that the writer, or their team, product, or company, is the
       first to do something. "The first tool that", "the first team to", "we
       were the first to".
@@ -347,7 +351,7 @@ rules:
       - "This is the first tool that reads a draft the way an editor does."
       - "We are the first team to run this check on every save."
     criteria:
-      true: "The paragraph claims the writer, or their product, team, or company, was first to do something."
+      true: "At least one sentence, anywhere in the paragraph, claims the writer, or their product, team, or company, was first to do something. One such sentence is enough."
       false: "No first claim is made about the writer or their own work."
     message: '"The first X that." Someone will check.'
     seed:

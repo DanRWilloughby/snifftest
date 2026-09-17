@@ -1,0 +1,151 @@
+{
+ "run_date": "2026-09-17",
+ "seed": 1,
+ "paragraphs": [
+  {
+   "id": "C00",
+   "file": "examples/corpus/cold-email.md",
+   "line": 1,
+   "text": "A cold email has one job, which is to earn a reply, and most of them fail it in the first line by talking about the sender. The reader opens the message on a phone between two other things and decides in about four seconds whether the next paragraph is worth a thumb. The first line therefore has to be about them, and it has to prove that you looked. A specific observation about something they published or shipped last month does the proving. A compliment does not, because compliments are free and everyone knows it. Keep the whole thing under a hundred and twenty words. The reader is not going to scroll, and a long message signals that you value your own time over theirs. One ask, stated plainly, near the end. If you want fifteen minutes, say fifteen minutes and offer two specific times. If you want an introduction, name the person. A message with two asks gets neither."
+  },
+  {
+   "id": "C01",
+   "file": "examples/corpus/cold-email.md",
+   "line": 3,
+   "text": "Subject lines are read more than bodies, so write the subject last, after you know what the message is actually about. Six words or fewer, with the specific thing in it. A subject that could have been sent to anyone reads as a mass mailing, and the filter in the reader's head is faster than any spam filter. Avoid the tricks. A fake reply prefix or a question mark bolted onto a statement both worked once, years ago, and now each one marks the message as a template. Send on a Tuesday or Wednesday morning in the reader's time zone, because Monday's inbox is a backlog and Friday's is a countdown. Follow up once, after five working days, with a shorter message that adds one new thing. A second follow-up is a nuisance. If two messages have gone unanswered, the answer is no, and the polite move is to believe it."
+  },
+  {
+   "id": "C02",
+   "file": "examples/corpus/cold-email.md",
+   "line": 5,
+   "text": "Measure it. Keep a plain spreadsheet with the date, the recipient's role, the first line you used, and whether a reply came inside a week. After thirty messages the sheet will tell you which opening lines earn replies and which do not, and the answer will surprise you at least once. Most people find that the messages they were proudest of did worst, because pride shows, and the plain ones did best. Reply rates for a well-aimed cold email sit somewhere between one in ten and one in four, depending on the industry and on how well the list was built. Below one in twenty, the list is wrong and no amount of rewriting will fix it. Above one in three, you are probably emailing people who already know you, which is a different and easier game. Keep the sheet for a year, because the seasons matter more than anyone expects, and a line that dies in August may come back in October."
+  },
+  {
+   "id": "C03",
+   "file": "examples/corpus/editing-by-ear.md",
+   "line": 1,
+   "text": "Reading a draft aloud is the cheapest edit there is. The ear catches what the eye forgives, because the eye has seen the sentence a dozen times and stopped reading it. When you say the words, a clause that runs too long makes you short of breath, and you feel exactly where the full stop should have gone. A word repeated in two neighbouring sentences sounds like a stammer. A joke that looked fine on the screen either lands or dies in the room, and either way you know. The method costs nothing and takes about as long as the piece takes to read, which for most working drafts is under ten minutes. It works best with a printed copy and a pen, so that the marks go on the page while the voice keeps moving. Stopping to fix each fault as you find it breaks the rhythm you were listening for. Mark it and keep going; the fixing comes afterwards."
+  },
+  {
+   "id": "C04",
+   "file": "examples/corpus/editing-by-ear.md",
+   "line": 3,
+   "text": "The second pass is for the paragraph endings. A first draft tends to finish each paragraph twice, once when the point lands and once more when the writer, not trusting the landing, says it again in different words. Read only the last sentence of each paragraph, top to bottom, and ask what each one adds that the sentence before it did not. When the answer is nothing, cut it. The paragraph will feel abrupt for a day, and then it will feel finished. The same test applies to the opening sentence of the whole piece. Writers warm up in public, and the first sentence is often a stretch before the run. If the second sentence would make a better first sentence, promote it and let the original go. Most pieces lose between five and fifteen percent of their length on this pass, and nobody has ever asked for the cut material back."
+  },
+  {
+   "id": "C05",
+   "file": "examples/corpus/editing-by-ear.md",
+   "line": 5,
+   "text": "The last pass is the one most people skip, which is a night's sleep. A draft read the next morning is a different object from the draft you finished at eleven. Sentences you were proud of turn out to be carrying a private meaning that never made it onto the page, and sentences you nearly cut turn out to hold the argument together. The text is the same as it was at eleven. You are the one who changed, because for eight hours you stopped being its author and became its reader, and the reader is the only person whose opinion matters. If the deadline will not allow a night, an hour away from the screen recovers some of the effect, and a walk recovers more of it than a coffee does. Send the piece after the morning read, and keep the evening version in a drawer so you can see, later, how much the sleep was worth."
+  },
+  {
+   "id": "C06",
+   "file": "examples/corpus/field-notes-app.md",
+   "line": 1,
+   "text": "Crews on a job site write things down on whatever is nearest, which is usually a glove or the back of a delivery note. By the time the day ends, the note is in a skip and the measurement is a memory. The app gives each crew a shared notebook that works without signal, accepts a photo or a voice note as easily as a number typed with a wet thumb, and syncs when the van gets back to the yard. Every entry carries who wrote it and where on the plan it belongs, with the time stamped by the phone. The office sees the notebook the next morning without anyone typing it up, and the person who wrote the note at four in the afternoon can find it again in March when the question comes back. Setup takes a foreman about twenty minutes and needs no training beyond showing the crew where the button is."
+  },
+  {
+   "id": "C07",
+   "file": "examples/corpus/field-notes-app.md",
+   "line": 3,
+   "text": "The price is twelve dollars per crew per month, with no charge for the office seats that only read. A crew of five who lose one measurement a week to a wet note spend more than that in a single return trip to the site. There is a free tier for a single crew, which stays free for as long as the crew stays single. Annual billing takes two months off the total. Most teams start on the free tier for a job or two and move up when the second crew asks for it, which tends to happen inside the first month. The invoice is a single line, and it can be addressed to the client's project code when a job is billed through. Cancelling is a button on the settings page and it works on the day you press it, with an export of every notebook as a folder of dated text files and photos so that nothing you wrote is held hostage to the subscription."
+  },
+  {
+   "id": "C08",
+   "file": "examples/corpus/field-notes-app.md",
+   "line": 5,
+   "text": "The app runs on any phone sold in the last six years and on a browser at the office. It does not draw plans, and it does not try to. The plan is a picture you upload once per job, and a note pins to a spot on that picture. Offline storage holds about three months of a busy crew's notes before the oldest entries are moved to the server, from where they can still be read whenever there is signal. Photos are kept at full size for ninety days and at screen size after that, unless the account asks for full-size retention, which costs extra because storage does. Support is by email and is answered by the two people who built the thing, usually the same working day, and the answer is a fix or a plain reason why not. Bugs found by customers are listed on a public page with the date they were reported and the version that fixed them."
+  },
+  {
+   "id": "C09",
+   "file": "examples/corpus/franklin-the-printer.md",
+   "line": 1,
+   "text": "The breaking into this money of Vernon's was one of the first great errata of my life; and this affair show'd that my father was not much out in his judgment when he suppos'd me too young to manage business of importance. But Sir William, on reading his letter, said he was too prudent. There was great difference in persons; and discretion did not always accompany years, nor was youth always without it. \"And since he will not set you up,\" says he, \"I will do it myself. Give me an inventory of the things necessary to be had from England, and I will send for them. You shall repay me when you are able; I am resolv'd to have a good printer here, and I am sure you must succeed.\" This was spoken with such an appearance of cordiality, that I had not the least doubt of his meaning what he said. I had hitherto kept the proposition of my setting up, a secret in Philadelphia, and I still kept it. Had it been known that I depended on the governor, probably some friend, that knew him better, would have advis'd me not to rely on him, as I afterwards heard it as his known character to be liberal of promises which he never meant to keep. Yet, unsolicited as he was by me, how could I think his generous offers insincere? I believ'd him one of the best men in the world."
+  },
+  {
+   "id": "C10",
+   "file": "examples/corpus/franklin-the-printer.md",
+   "line": 3,
+   "text": "In 1732 I first publish'd my Almanack, under the name of Richard Saunders; it was continu'd by me about twenty-five years, commonly call'd Poor Richard's Almanac. I endeavour'd to make it both entertaining and useful, and it accordingly came to be in such demand, that I reap'd considerable profit from it, vending annually near ten thousand. And observing that it was generally read, scarce any neighborhood in the province being without it, I consider'd it as a proper vehicle for conveying instruction among the common people, who bought scarcely any other books; I therefore filled all the little spaces that occurr'd between the remarkable days in the calendar with proverbial sentences, chiefly such as inculcated industry and frugality, as the means of procuring wealth, and thereby securing virtue; it being more difficult for a man in want, to act always honestly, as, to use here one of those proverbs, it is hard for an empty sack to stand upright."
+  },
+  {
+   "id": "C11",
+   "file": "examples/corpus/franklin-the-socratic-method.md",
+   "line": 1,
+   "text": "While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in the Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method. I was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter. And being then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them in difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved."
+  },
+  {
+   "id": "C12",
+   "file": "examples/corpus/franklin-the-socratic-method.md",
+   "line": 3,
+   "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up. He retained a great deal of his old enthusiasms and lov'd argumentation. We therefore had many disputations. I used to work him so with my Socratic method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led to the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new sect. He was to preach the doctrines, and I was to confound all opponents. When he came to explain with me upon the doctrines, I found several conundrums which I objected to, unless I might have my way a little too, and introduce some of mine."
+  },
+  {
+   "id": "C13",
+   "file": "examples/corpus/franklin-the-spectator.md",
+   "line": 1,
+   "text": "About this time I met with an odd volume of the Spectator. It was the third. I had never before seen any of them. I bought it, read it over and over, and was much delighted with it. I thought the writing excellent, and wished, if possible, to imitate it. With this view I took some of the papers, and, making short hints of the sentiment in each sentence, laid them by a few days, and then, without looking at the book, try'd to compleat the papers again, by expressing each hinted sentiment at length, and as fully as it had been expressed before, in any suitable words that should come to hand. Then I compared my Spectator with the original, discovered some of my faults, and corrected them. But I found I wanted a stock of words, or a readiness in recollecting and using them, which I thought I should have acquired before that time if I had gone on making verses; since the continual occasion for words of the same import, but of different length, to suit the measure, or of different sound for the rhyme, would have laid me under a constant necessity of searching for variety, and also have tended to fix that variety in my mind, and make me master of it."
+  },
+  {
+   "id": "C14",
+   "file": "examples/corpus/on-checklists.md",
+   "line": 1,
+   "text": "A checklist in a workshop is a memory that does not get tired. The person using it may have done the job five hundred times, and that is exactly the problem, because the five hundredth time is the one where the hands know the sequence and the mind is somewhere else. The list leaves the skill where it was and catches the one step the skill skipped because a phone rang at the wrong moment. The best lists are short, under ten items, and they name only the steps that are easy to miss and expensive to get wrong. A list that includes every obvious step gets skimmed, and a skimmed list catches nothing. Write each item as a state you can see or touch rather than as an instruction, so that \"guard bolt torqued and marked\" stands in for \"tighten the guard\", and the item can be answered by looking. A glance settles it, and a glance is all a busy bench will give."
+  },
+  {
+   "id": "C15",
+   "file": "examples/corpus/on-checklists.md",
+   "line": 3,
+   "text": "Pilots have used lists like this since the nineteen thirties, when a new bomber proved too complex for even the best crews to fly from memory, and the surgical version, introduced in the two thousands, cut complications in a large multi-country trial by about a third. Those are the famous cases. The unfamous cases are everywhere a small shop repeats a job. A bakery that lists the six things to check before the ovens go on at four in the morning stops losing a batch a month to a thermostat left on the wrong setting. A bike shop that lists the four things to check before a repaired bike goes back over the counter stops getting the same bike back on Thursday. Both shops keep the list on the wall by the door. Neither list took more than an afternoon to write, and both were written after the mistake, which is the usual order and the wrong one."
+  },
+  {
+   "id": "C16",
+   "file": "examples/corpus/on-checklists.md",
+   "line": 5,
+   "text": "The list has to be owned by the people who use it, or it dies within a month. A list handed down from an office is followed for a week and then kept in a drawer, because the person at the bench can see which items are theatre. A list the bench wrote itself gets edited, which is the sign that it is alive. Put the date of the last edit at the top and the name of whoever changed it, and review it whenever something goes wrong that the list should have caught. If the list keeps growing, it is collecting fear rather than steps, and it needs the same edit a draft needs. Ten items that get read beat forty that get skimmed. Cut until it fits on one side of a card. Hang it where the job happens and keep a pen on a string next to it, so that the edits happen at the bench."
+  },
+  {
+   "id": "C17",
+   "file": "examples/corpus/release-note.md",
+   "line": 1,
+   "text": "Version 2.4 changes how the tool treats a file it cannot read. Until now an unreadable file stopped the whole run with a stack trace, which meant one bad symlink in a large tree hid every real finding in the other thousand files. From this release an unreadable file is reported on its own line, the run continues, and the exit code at the end says that findings were produced and that at least one file was skipped. The two facts are reported separately because they mean different things to a script. If you were relying on the old behaviour to fail a build when a file could not be read, pass the strict flag and the run stops on the first skip, as before. The flag is documented on the exit codes page. The change was requested in the issue tracker eleven times over two years, which is nine more than the next most requested change, and it should have been made sooner."
+  },
+  {
+   "id": "C18",
+   "file": "examples/corpus/release-note.md",
+   "line": 3,
+   "text": "The second change is to the configuration file. The tool used to look for its settings in four places in a fixed order and take the first one it found, and the order was documented only in a comment in the source. Now it looks in the current directory and then in the home directory, and it prints which file it chose when run with the verbose flag. Anything found under the two old locations is still read this release, with a warning that names the new path, and it stops being read in the next major version. The warning is printed once per run rather than once per file, because an earlier draft of this change printed it per file and one user reported a log of forty thousand identical lines. Migration is a single move command and the release notes carry the exact line to run. The move takes under a second and is safe to run twice."
+  },
+  {
+   "id": "C19",
+   "file": "examples/corpus/release-note.md",
+   "line": 5,
+   "text": "Two smaller things. Output in the machine-readable format is now sorted by file and then by line, so two runs over the same tree produce the same bytes and a diff between them shows only what changed. The version of the tool is written into the first line of that output, so a report saved last year can be read against the ruleset that produced it. Both were small changes and both had been on the list since the first release. The bug fixes include one where a file ending without a newline lost its last line from the count. That one had been there since the first release too. The full list of changes, including nine bug fixes, is in the changelog file in the repository, and each entry links to the pull request that made it, so that anyone who wants to know why a behaviour changed can read the discussion rather than guessing from the diff."
+  },
+  {
+   "id": "C20",
+   "file": "examples/corpus/station-routes.md",
+   "line": 1,
+   "text": "There are three ways to walk from the house to the station, and for two years the household has argued about which is quickest without anyone timing them. This month I timed them. Each route was walked ten times at a normal pace, at the same time of the morning, over four weeks, with a stopwatch started at the front door and stopped at the ticket barrier. The route along the main road is the one the map recommends and it was walked first each day. The route through the park was walked second. The route along the canal towpath, which the map does not know about because the towpath is not a road, was walked third. The order was rotated each week so that no route always had the freshest legs. Rain fell on six of the thirty mornings, spread across all three routes, and those times are included. Nobody ran, and nobody was allowed to jog for a train."
+  },
+  {
+   "id": "C21",
+   "file": "examples/corpus/station-routes.md",
+   "line": 3,
+   "text": "The main road took a median of fourteen minutes and ten seconds, with the slowest walk at sixteen minutes because of a crossing that stayed red through two cycles. The park took thirteen minutes and forty seconds, with very little spread, because there is nothing on that route to wait for. The park gate was open on every morning it was walked. The towpath took twelve minutes and twenty seconds on a dry morning and fourteen and a half minutes on a wet one, since the surface turns to mud for a hundred metres near the bridge and a careful walker slows down there. Taken over all thirty walks, the towpath wins by a little over a minute against the park and by nearly two minutes against the main road. Taken over the wet mornings only, the park wins. The main road never won a single morning, which settles the loudest side of the two-year argument."
+  },
+  {
+   "id": "C22",
+   "file": "examples/corpus/station-routes.md",
+   "line": 5,
+   "text": "What the numbers do not settle is which route to take, because the fastest route on paper is also the one where a wrong step ends in the canal. The park route is a minute slower and has a bench and a reliable coffee cart at the far gate, neither of which was timed. The recommendation is the towpath in dry weather when the train is tight and the park on every other day. The household has adopted it, with the usual grumbling. The sheet with all thirty times, the weather for each morning, and the notes on what caused each delay is attached, so that anyone who disagrees with the recommendation can make a different one from the same data. Times will drift in winter when the towpath lights go off at the bridge, and the plan is to time the three again in January. The main road remains available for people who enjoy waiting at crossings."
+  },
+  {
+   "id": "C23",
+   "file": "examples/corpus/strunk-introduction.md",
+   "line": 1,
+   "text": "This book aims to give in brief space the principal requirements of plain English style. It aims to lighten the task of instructor and student by concentrating attention (in Chapters II and III) on a few essentials, the rules of usage and principles of composition most commonly violated. In accordance with this plan it lays down three rules for the use of the comma, instead of a score or more, and one for the use of the semicolon, in the belief that these four rules provide for all the internal punctuation that is required by nineteen sentences out of twenty. Similarly, it gives in Chapter III only those principles of the paragraph and the sentence which are of the widest application. The book thus covers only a small portion of the field of English style. The experience of its writer has been that once past the essentials, students profit most by individual instruction based on the problems of their own work, and that each instructor has his own body of theory, which he may prefer to that offered by any textbook."
+  }
+ ],
+ "dropped": []
+}

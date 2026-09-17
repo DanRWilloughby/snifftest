@@ -1,0 +1,1661 @@
+{
+ "run_date": "2026-09-17",
+ "seed": 1,
+ "per_rule": 8,
+ "skipped": [
+  {
+   "rule": "banned_words",
+   "reason": "no paragraph could be seeded (rule \"banned_words\": the rule has no words, so no defect of this kind can be made)"
+  }
+ ],
+ "paragraphs": [
+  {
+   "id": "S01",
+   "base_id": "C19",
+   "base_file": "examples/corpus/release-note.md",
+   "rule": "dash_present",
+   "transform": "insert_em_dash",
+   "edit": {
+    "kind": "replace",
+    "find": "it, so",
+    "replace": "it — so"
+   },
+   "words": 160,
+   "text": "Two smaller things. Output in the machine-readable format is now sorted by file and then by line, so two runs over the same tree produce the same bytes and a diff between them shows only what changed. The version of the tool is written into the first line of that output, so a report saved last year can be read against the ruleset that produced it. Both were small changes and both had been on the list since the first release. The bug fixes include one where a file ending without a newline lost its last line from the count. That one had been there since the first release too. The full list of changes, including nine bug fixes, is in the changelog file in the repository, and each entry links to the pull request that made it — so that anyone who wants to know why a behaviour changed can read the discussion rather than guessing from the diff."
+  },
+  {
+   "id": "S02",
+   "base_id": "C15",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "dash_present",
+   "transform": "insert_em_dash",
+   "edit": {
+    "kind": "replace",
+    "find": "mistake, which",
+    "replace": "mistake — which"
+   },
+   "words": 159,
+   "text": "Pilots have used lists like this since the nineteen thirties, when a new bomber proved too complex for even the best crews to fly from memory, and the surgical version, introduced in the two thousands, cut complications in a large multi-country trial by about a third. Those are the famous cases. The unfamous cases are everywhere a small shop repeats a job. A bakery that lists the six things to check before the ovens go on at four in the morning stops losing a batch a month to a thermostat left on the wrong setting. A bike shop that lists the four things to check before a repaired bike goes back over the counter stops getting the same bike back on Thursday. Both shops keep the list on the wall by the door. Neither list took more than an afternoon to write, and both were written after the mistake — which is the usual order and the wrong one."
+  },
+  {
+   "id": "S03",
+   "base_id": "C20",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "dash_present",
+   "transform": "insert_em_dash",
+   "edit": {
+    "kind": "replace",
+    "find": "ran, and",
+    "replace": "ran — and"
+   },
+   "words": 162,
+   "text": "There are three ways to walk from the house to the station, and for two years the household has argued about which is quickest without anyone timing them. This month I timed them. Each route was walked ten times at a normal pace, at the same time of the morning, over four weeks, with a stopwatch started at the front door and stopped at the ticket barrier. The route along the main road is the one the map recommends and it was walked first each day. The route through the park was walked second. The route along the canal towpath, which the map does not know about because the towpath is not a road, was walked third. The order was rotated each week so that no route always had the freshest legs. Rain fell on six of the thirty mornings, spread across all three routes, and those times are included. Nobody ran — and nobody was allowed to jog for a train."
+  },
+  {
+   "id": "S04",
+   "base_id": "C05",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "dash_present",
+   "transform": "insert_em_dash",
+   "edit": {
+    "kind": "replace",
+    "find": "later, how",
+    "replace": "later — how"
+   },
+   "words": 159,
+   "text": "The last pass is the one most people skip, which is a night's sleep. A draft read the next morning is a different object from the draft you finished at eleven. Sentences you were proud of turn out to be carrying a private meaning that never made it onto the page, and sentences you nearly cut turn out to hold the argument together. The text is the same as it was at eleven. You are the one who changed, because for eight hours you stopped being its author and became its reader, and the reader is the only person whose opinion matters. If the deadline will not allow a night, an hour away from the screen recovers some of the effect, and a walk recovers more of it than a coffee does. Send the piece after the morning read, and keep the evening version in a drawer so you can see, later — how much the sleep was worth."
+  },
+  {
+   "id": "S05",
+   "base_id": "C00",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "dash_present",
+   "transform": "insert_em_dash",
+   "edit": {
+    "kind": "replace",
+    "find": "introduction, name",
+    "replace": "introduction — name"
+   },
+   "words": 162,
+   "text": "A cold email has one job, which is to earn a reply, and most of them fail it in the first line by talking about the sender. The reader opens the message on a phone between two other things and decides in about four seconds whether the next paragraph is worth a thumb. The first line therefore has to be about them, and it has to prove that you looked. A specific observation about something they published or shipped last month does the proving. A compliment does not, because compliments are free and everyone knows it. Keep the whole thing under a hundred and twenty words. The reader is not going to scroll, and a long message signals that you value your own time over theirs. One ask, stated plainly, near the end. If you want fifteen minutes, say fifteen minutes and offer two specific times. If you want an introduction — name the person. A message with two asks gets neither."
+  },
+  {
+   "id": "S06",
+   "base_id": "C09",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "dash_present",
+   "transform": "insert_em_dash",
+   "edit": {
+    "kind": "replace",
+    "find": "me, how",
+    "replace": "me — how"
+   },
+   "words": 245,
+   "text": "The breaking into this money of Vernon's was one of the first great errata of my life; and this affair show'd that my father was not much out in his judgment when he suppos'd me too young to manage business of importance. But Sir William, on reading his letter, said he was too prudent. There was great difference in persons; and discretion did not always accompany years, nor was youth always without it. \"And since he will not set you up,\" says he, \"I will do it myself. Give me an inventory of the things necessary to be had from England, and I will send for them. You shall repay me when you are able; I am resolv'd to have a good printer here, and I am sure you must succeed.\" This was spoken with such an appearance of cordiality, that I had not the least doubt of his meaning what he said. I had hitherto kept the proposition of my setting up, a secret in Philadelphia, and I still kept it. Had it been known that I depended on the governor, probably some friend, that knew him better, would have advis'd me not to rely on him, as I afterwards heard it as his known character to be liberal of promises which he never meant to keep. Yet, unsolicited as he was by me — how could I think his generous offers insincere? I believ'd him one of the best men in the world."
+  },
+  {
+   "id": "S07",
+   "base_id": "C21",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "dash_present",
+   "transform": "insert_em_dash",
+   "edit": {
+    "kind": "replace",
+    "find": "morning, which",
+    "replace": "morning — which"
+   },
+   "words": 157,
+   "text": "The main road took a median of fourteen minutes and ten seconds, with the slowest walk at sixteen minutes because of a crossing that stayed red through two cycles. The park took thirteen minutes and forty seconds, with very little spread, because there is nothing on that route to wait for. The park gate was open on every morning it was walked. The towpath took twelve minutes and twenty seconds on a dry morning and fourteen and a half minutes on a wet one, since the surface turns to mud for a hundred metres near the bridge and a careful walker slows down there. Taken over all thirty walks, the towpath wins by a little over a minute against the park and by nearly two minutes against the main road. Taken over the wet mornings only, the park wins. The main road never won a single morning — which settles the loudest side of the two-year argument."
+  },
+  {
+   "id": "S08",
+   "base_id": "C01",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "dash_present",
+   "transform": "insert_em_dash",
+   "edit": {
+    "kind": "replace",
+    "find": "no, and",
+    "replace": "no — and"
+   },
+   "words": 152,
+   "text": "Subject lines are read more than bodies, so write the subject last, after you know what the message is actually about. Six words or fewer, with the specific thing in it. A subject that could have been sent to anyone reads as a mass mailing, and the filter in the reader's head is faster than any spam filter. Avoid the tricks. A fake reply prefix or a question mark bolted onto a statement both worked once, years ago, and now each one marks the message as a template. Send on a Tuesday or Wednesday morning in the reader's time zone, because Monday's inbox is a backlog and Friday's is a countdown. Follow up once, after five working days, with a shorter message that adds one new thing. A second follow-up is a nuisance. If two messages have gone unanswered, the answer is no — and the polite move is to believe it."
+  },
+  {
+   "id": "S09",
+   "base_id": "C04",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "colon_heavy",
+   "transform": "add_colons",
+   "edit": {
+    "kind": "replace",
+    "find": "public, and | sentence, promote | pass, and",
+    "replace": "public: and | sentence: promote | pass: and"
+   },
+   "words": 152,
+   "text": "The second pass is for the paragraph endings. A first draft tends to finish each paragraph twice, once when the point lands and once more when the writer, not trusting the landing, says it again in different words. Read only the last sentence of each paragraph, top to bottom, and ask what each one adds that the sentence before it did not. When the answer is nothing, cut it. The paragraph will feel abrupt for a day, and then it will feel finished. The same test applies to the opening sentence of the whole piece. Writers warm up in public: and the first sentence is often a stretch before the run. If the second sentence would make a better first sentence: promote it and let the original go. Most pieces lose between five and fifteen percent of their length on this pass: and nobody has ever asked for the cut material back."
+  },
+  {
+   "id": "S10",
+   "base_id": "C16",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "colon_heavy",
+   "transform": "add_colons",
+   "edit": {
+    "kind": "replace",
+    "find": "growing, it | steps, and | it, so",
+    "replace": "growing: it | steps: and | it: so"
+   },
+   "words": 159,
+   "text": "The list has to be owned by the people who use it, or it dies within a month. A list handed down from an office is followed for a week and then kept in a drawer, because the person at the bench can see which items are theatre. A list the bench wrote itself gets edited, which is the sign that it is alive. Put the date of the last edit at the top and the name of whoever changed it, and review it whenever something goes wrong that the list should have caught. If the list keeps growing: it is collecting fear rather than steps: and it needs the same edit a draft needs. Ten items that get read beat forty that get skimmed. Cut until it fits on one side of a card. Hang it where the job happens and keep a pen on a string next to it: so that the edits happen at the bench."
+  },
+  {
+   "id": "S11",
+   "base_id": "C14",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "colon_heavy",
+   "transform": "add_colons",
+   "edit": {
+    "kind": "replace",
+    "find": "instruction, so | guard\", and | it, and",
+    "replace": "instruction: so | guard\": and | it: and"
+   },
+   "words": 165,
+   "text": "A checklist in a workshop is a memory that does not get tired. The person using it may have done the job five hundred times, and that is exactly the problem, because the five hundredth time is the one where the hands know the sequence and the mind is somewhere else. The list leaves the skill where it was and catches the one step the skill skipped because a phone rang at the wrong moment. The best lists are short, under ten items, and they name only the steps that are easy to miss and expensive to get wrong. A list that includes every obvious step gets skimmed, and a skimmed list catches nothing. Write each item as a state you can see or touch rather than as an instruction: so that \"guard bolt torqued and marked\" stands in for \"tighten the guard\": and the item can be answered by looking. A glance settles it: and a glance is all a busy bench will give."
+  },
+  {
+   "id": "S12",
+   "base_id": "C15",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "colon_heavy",
+   "transform": "add_colons",
+   "edit": {
+    "kind": "replace",
+    "find": "thousands, cut | write, and | mistake, which",
+    "replace": "thousands: cut | write: and | mistake: which"
+   },
+   "words": 158,
+   "text": "Pilots have used lists like this since the nineteen thirties, when a new bomber proved too complex for even the best crews to fly from memory, and the surgical version, introduced in the two thousands: cut complications in a large multi-country trial by about a third. Those are the famous cases. The unfamous cases are everywhere a small shop repeats a job. A bakery that lists the six things to check before the ovens go on at four in the morning stops losing a batch a month to a thermostat left on the wrong setting. A bike shop that lists the four things to check before a repaired bike goes back over the counter stops getting the same bike back on Thursday. Both shops keep the list on the wall by the door. Neither list took more than an afternoon to write: and both were written after the mistake: which is the usual order and the wrong one."
+  },
+  {
+   "id": "S13",
+   "base_id": "C12",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "colon_heavy",
+   "transform": "add_colons",
+   "edit": {
+    "kind": "replace",
+    "find": "doctrines, I | to, unless | too, and",
+    "replace": "doctrines: I | to: unless | too: and"
+   },
+   "words": 188,
+   "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up. He retained a great deal of his old enthusiasms and lov'd argumentation. We therefore had many disputations. I used to work him so with my Socratic method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led to the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new sect. He was to preach the doctrines, and I was to confound all opponents. When he came to explain with me upon the doctrines: I found several conundrums which I objected to: unless I might have my way a little too: and introduce some of mine."
+  },
+  {
+   "id": "S14",
+   "base_id": "C09",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "colon_heavy",
+   "transform": "add_colons",
+   "edit": {
+    "kind": "replace",
+    "find": "him, as | Yet, unsolicited | me, how",
+    "replace": "him: as | Yet: unsolicited | me: how"
+   },
+   "words": 244,
+   "text": "The breaking into this money of Vernon's was one of the first great errata of my life; and this affair show'd that my father was not much out in his judgment when he suppos'd me too young to manage business of importance. But Sir William, on reading his letter, said he was too prudent. There was great difference in persons; and discretion did not always accompany years, nor was youth always without it. \"And since he will not set you up,\" says he, \"I will do it myself. Give me an inventory of the things necessary to be had from England, and I will send for them. You shall repay me when you are able; I am resolv'd to have a good printer here, and I am sure you must succeed.\" This was spoken with such an appearance of cordiality, that I had not the least doubt of his meaning what he said. I had hitherto kept the proposition of my setting up, a secret in Philadelphia, and I still kept it. Had it been known that I depended on the governor, probably some friend, that knew him better, would have advis'd me not to rely on him: as I afterwards heard it as his known character to be liberal of promises which he never meant to keep. Yet: unsolicited as he was by me: how could I think his generous offers insincere? I believ'd him one of the best men in the world."
+  },
+  {
+   "id": "S15",
+   "base_id": "C07",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "colon_heavy",
+   "transform": "add_colons",
+   "edit": {
+    "kind": "replace",
+    "find": "it, which | line, and | it, with",
+    "replace": "it: which | line: and | it: with"
+   },
+   "words": 168,
+   "text": "The price is twelve dollars per crew per month, with no charge for the office seats that only read. A crew of five who lose one measurement a week to a wet note spend more than that in a single return trip to the site. There is a free tier for a single crew, which stays free for as long as the crew stays single. Annual billing takes two months off the total. Most teams start on the free tier for a job or two and move up when the second crew asks for it: which tends to happen inside the first month. The invoice is a single line: and it can be addressed to the client's project code when a job is billed through. Cancelling is a button on the settings page and it works on the day you press it: with an export of every notebook as a folder of dated text files and photos so that nothing you wrote is held hostage to the subscription."
+  },
+  {
+   "id": "S16",
+   "base_id": "C03",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "colon_heavy",
+   "transform": "add_colons",
+   "edit": {
+    "kind": "replace",
+    "find": "room, and | read, which | pen, so",
+    "replace": "room: and | read: which | pen: so"
+   },
+   "words": 161,
+   "text": "Reading a draft aloud is the cheapest edit there is. The ear catches what the eye forgives, because the eye has seen the sentence a dozen times and stopped reading it. When you say the words, a clause that runs too long makes you short of breath, and you feel exactly where the full stop should have gone. A word repeated in two neighbouring sentences sounds like a stammer. A joke that looked fine on the screen either lands or dies in the room: and either way you know. The method costs nothing and takes about as long as the piece takes to read: which for most working drafts is under ten minutes. It works best with a printed copy and a pen: so that the marks go on the page while the voice keeps moving. Stopping to fix each fault as you find it breaks the rhythm you were listening for. Mark it and keep going; the fixing comes afterwards."
+  },
+  {
+   "id": "S17",
+   "base_id": "C12",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "sentence_rhythm",
+   "transform": "equalize_sentences",
+   "edit": {
+    "kind": "rewrite",
+    "note": "re-flowed into 8 sentences of about 23 words, word order unchanged"
+   },
+   "words": 188,
+   "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up He retained. A great deal of his old enthusiasms and lov'd argumentation We therefore had many disputations I used to work him so with my Socratic. Method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led. To the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most. Common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my. Abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new. Sect He was to preach the doctrines, and I was to confound all opponents When he came to explain with me upon the. Doctrines, I found several conundrums which I objected to, unless I might have my way a little too, and introduce some of mine."
+  },
+  {
+   "id": "S18",
+   "base_id": "C03",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "sentence_rhythm",
+   "transform": "equalize_sentences",
+   "edit": {
+    "kind": "rewrite",
+    "note": "re-flowed into 9 sentences of about 17 words, word order unchanged"
+   },
+   "words": 161,
+   "text": "Reading a draft aloud is the cheapest edit there is The ear catches what the eye forgives, because. The eye has seen the sentence a dozen times and stopped reading it When you say the words,. A clause that runs too long makes you short of breath, and you feel exactly where the full. Stop should have gone A word repeated in two neighbouring sentences sounds like a stammer A joke that. Looked fine on the screen either lands or dies in the room, and either way you know The. Method costs nothing and takes about as long as the piece takes to read, which for most working. Drafts is under ten minutes It works best with a printed copy and a pen, so that the. Marks go on the page while the voice keeps moving Stopping to fix each fault as you find. It breaks the rhythm you were listening for Mark it and keep going; the fixing comes afterwards."
+  },
+  {
+   "id": "S19",
+   "base_id": "C05",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "sentence_rhythm",
+   "transform": "equalize_sentences",
+   "edit": {
+    "kind": "rewrite",
+    "note": "re-flowed into 7 sentences of about 22 words, word order unchanged"
+   },
+   "words": 158,
+   "text": "The last pass is the one most people skip, which is a night's sleep A draft read the next morning is a different. Object from the draft you finished at eleven Sentences you were proud of turn out to be carrying a private meaning that never. Made it onto the page, and sentences you nearly cut turn out to hold the argument together The text is the same as. It was at eleven You are the one who changed, because for eight hours you stopped being its author and became its reader,. And the reader is the only person whose opinion matters If the deadline will not allow a night, an hour away from. The screen recovers some of the effect, and a walk recovers more of it than a coffee does Send the piece after. The morning read, and keep the evening version in a drawer so you can see, later, how much the sleep was worth."
+  },
+  {
+   "id": "S20",
+   "base_id": "C11",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "sentence_rhythm",
+   "transform": "equalize_sentences",
+   "edit": {
+    "kind": "rewrite",
+    "note": "re-flowed into 8 sentences of about 22 words, word order unchanged"
+   },
+   "words": 183,
+   "text": "While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of. Which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in. The Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method I. Was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter And being. Then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for. Myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew. Very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them. In difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved."
+  },
+  {
+   "id": "S21",
+   "base_id": "C16",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "sentence_rhythm",
+   "transform": "equalize_sentences",
+   "edit": {
+    "kind": "rewrite",
+    "note": "re-flowed into 8 sentences of about 19 words, word order unchanged"
+   },
+   "words": 159,
+   "text": "The list has to be owned by the people who use it, or it dies within a month A list. Handed down from an office is followed for a week and then kept in a drawer, because the person at. The bench can see which items are theatre A list the bench wrote itself gets edited, which is the sign. That it is alive Put the date of the last edit at the top and the name of whoever changed. It, and review it whenever something goes wrong that the list should have caught If the list keeps growing, it. Is collecting fear rather than steps, and it needs the same edit a draft needs Ten items that get read. Beat forty that get skimmed Cut until it fits on one side of a card Hang it where the job. Happens and keep a pen on a string next to it, so that the edits happen at the bench."
+  },
+  {
+   "id": "S22",
+   "base_id": "C23",
+   "base_file": "examples/corpus/strunk-introduction.md",
+   "rule": "sentence_rhythm",
+   "transform": "equalize_sentences",
+   "edit": {
+    "kind": "rewrite",
+    "note": "re-flowed into 8 sentences of about 22 words, word order unchanged"
+   },
+   "words": 181,
+   "text": "This book aims to give in brief space the principal requirements of plain English style It aims to lighten the task of instructor. And student by concentrating attention (in Chapters II and III) on a few essentials, the rules of usage and principles of composition most. Commonly violated In accordance with this plan it lays down three rules for the use of the comma, instead of a score or. More, and one for the use of the semicolon, in the belief that these four rules provide for all the internal punctuation that. Is required by nineteen sentences out of twenty Similarly, it gives in Chapter III only those principles of the paragraph and the sentence. Which are of the widest application The book thus covers only a small portion of the field of English style The experience. Of its writer has been that once past the essentials, students profit most by individual instruction based on the problems of their. Own work, and that each instructor has his own body of theory, which he may prefer to that offered by any textbook."
+  },
+  {
+   "id": "S23",
+   "base_id": "C13",
+   "base_file": "examples/corpus/franklin-the-spectator.md",
+   "rule": "sentence_rhythm",
+   "transform": "equalize_sentences",
+   "edit": {
+    "kind": "rewrite",
+    "note": "re-flowed into 9 sentences of about 24 words, word order unchanged"
+   },
+   "words": 217,
+   "text": "About this time I met with an odd volume of the Spectator It was the third I had never before seen any of them I. Bought it, read it over and over, and was much delighted with it I thought the writing excellent, and wished, if possible, to imitate. It With this view I took some of the papers, and, making short hints of the sentiment in each sentence, laid them by a. Few days, and then, without looking at the book, try'd to compleat the papers again, by expressing each hinted sentiment at length, and as. Fully as it had been expressed before, in any suitable words that should come to hand Then I compared my Spectator with the original,. Discovered some of my faults, and corrected them But I found I wanted a stock of words, or a readiness in recollecting and using. Them, which I thought I should have acquired before that time if I had gone on making verses; since the continual occasion for words. Of the same import, but of different length, to suit the measure, or of different sound for the rhyme, would have laid me under. A constant necessity of searching for variety, and also have tended to fix that variety in my mind, and make me master of it."
+  },
+  {
+   "id": "S24",
+   "base_id": "C01",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "sentence_rhythm",
+   "transform": "equalize_sentences",
+   "edit": {
+    "kind": "rewrite",
+    "note": "re-flowed into 9 sentences of about 16 words, word order unchanged"
+   },
+   "words": 151,
+   "text": "Subject lines are read more than bodies, so write the subject last, after you know what the. Message is actually about Six words or fewer, with the specific thing in it A subject that. Could have been sent to anyone reads as a mass mailing, and the filter in the reader's. Head is faster than any spam filter Avoid the tricks A fake reply prefix or a question. Mark bolted onto a statement both worked once, years ago, and now each one marks the message. As a template Send on a Tuesday or Wednesday morning in the reader's time zone, because Monday's. Inbox is a backlog and Friday's is a countdown Follow up once, after five working days, with. A shorter message that adds one new thing A second follow-up is a nuisance If two. Messages have gone unanswered, the answer is no, and the polite move is to believe it."
+  },
+  {
+   "id": "S25",
+   "base_id": "C08",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "slop_vocab",
+   "transform": "insert_slop_word",
+   "edit": {
+    "kind": "splice",
+    "sentence": "One word keeps coming up here, delve.",
+    "position": "any",
+    "after_sentences": 2
+   },
+   "words": 170,
+   "text": "The app runs on any phone sold in the last six years and on a browser at the office. It does not draw plans, and it does not try to. One word keeps coming up here, delve. The plan is a picture you upload once per job, and a note pins to a spot on that picture. Offline storage holds about three months of a busy crew's notes before the oldest entries are moved to the server, from where they can still be read whenever there is signal. Photos are kept at full size for ninety days and at screen size after that, unless the account asks for full-size retention, which costs extra because storage does. Support is by email and is answered by the two people who built the thing, usually the same working day, and the answer is a fix or a plain reason why not. Bugs found by customers are listed on a public page with the date they were reported and the version that fixed them."
+  },
+  {
+   "id": "S26",
+   "base_id": "C14",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "slop_vocab",
+   "transform": "insert_slop_word",
+   "edit": {
+    "kind": "splice",
+    "sentence": "One word keeps coming up here, tapestry.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 172,
+   "text": "A checklist in a workshop is a memory that does not get tired. The person using it may have done the job five hundred times, and that is exactly the problem, because the five hundredth time is the one where the hands know the sequence and the mind is somewhere else. The list leaves the skill where it was and catches the one step the skill skipped because a phone rang at the wrong moment. The best lists are short, under ten items, and they name only the steps that are easy to miss and expensive to get wrong. One word keeps coming up here, tapestry. A list that includes every obvious step gets skimmed, and a skimmed list catches nothing. Write each item as a state you can see or touch rather than as an instruction, so that \"guard bolt torqued and marked\" stands in for \"tighten the guard\", and the item can be answered by looking. A glance settles it, and a glance is all a busy bench will give."
+  },
+  {
+   "id": "S27",
+   "base_id": "C11",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "slop_vocab",
+   "transform": "insert_slop_word",
+   "edit": {
+    "kind": "splice",
+    "sentence": "One word keeps coming up here, testament.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 190,
+   "text": "While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in the Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method. One word keeps coming up here, testament. I was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter. And being then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them in difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved."
+  },
+  {
+   "id": "S28",
+   "base_id": "C20",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "slop_vocab",
+   "transform": "insert_slop_word",
+   "edit": {
+    "kind": "splice",
+    "sentence": "One word keeps coming up here, testament.",
+    "position": "any",
+    "after_sentences": 7
+   },
+   "words": 168,
+   "text": "There are three ways to walk from the house to the station, and for two years the household has argued about which is quickest without anyone timing them. This month I timed them. Each route was walked ten times at a normal pace, at the same time of the morning, over four weeks, with a stopwatch started at the front door and stopped at the ticket barrier. The route along the main road is the one the map recommends and it was walked first each day. The route through the park was walked second. The route along the canal towpath, which the map does not know about because the towpath is not a road, was walked third. The order was rotated each week so that no route always had the freshest legs. One word keeps coming up here, testament. Rain fell on six of the thirty mornings, spread across all three routes, and those times are included. Nobody ran, and nobody was allowed to jog for a train."
+  },
+  {
+   "id": "S29",
+   "base_id": "C12",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "slop_vocab",
+   "transform": "insert_slop_word",
+   "edit": {
+    "kind": "splice",
+    "sentence": "One word keeps coming up here, tapestry.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 195,
+   "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up. He retained a great deal of his old enthusiasms and lov'd argumentation. We therefore had many disputations. I used to work him so with my Socratic method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led to the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new sect. One word keeps coming up here, tapestry. He was to preach the doctrines, and I was to confound all opponents. When he came to explain with me upon the doctrines, I found several conundrums which I objected to, unless I might have my way a little too, and introduce some of mine."
+  },
+  {
+   "id": "S30",
+   "base_id": "C04",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "slop_vocab",
+   "transform": "insert_slop_word",
+   "edit": {
+    "kind": "splice",
+    "sentence": "One word keeps coming up here, pivotal.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 159,
+   "text": "The second pass is for the paragraph endings. A first draft tends to finish each paragraph twice, once when the point lands and once more when the writer, not trusting the landing, says it again in different words. Read only the last sentence of each paragraph, top to bottom, and ask what each one adds that the sentence before it did not. When the answer is nothing, cut it. One word keeps coming up here, pivotal. The paragraph will feel abrupt for a day, and then it will feel finished. The same test applies to the opening sentence of the whole piece. Writers warm up in public, and the first sentence is often a stretch before the run. If the second sentence would make a better first sentence, promote it and let the original go. Most pieces lose between five and fifteen percent of their length on this pass, and nobody has ever asked for the cut material back."
+  },
+  {
+   "id": "S31",
+   "base_id": "C03",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "slop_vocab",
+   "transform": "insert_slop_word",
+   "edit": {
+    "kind": "splice",
+    "sentence": "One word keeps coming up here, tapestry.",
+    "position": "any",
+    "after_sentences": 6
+   },
+   "words": 168,
+   "text": "Reading a draft aloud is the cheapest edit there is. The ear catches what the eye forgives, because the eye has seen the sentence a dozen times and stopped reading it. When you say the words, a clause that runs too long makes you short of breath, and you feel exactly where the full stop should have gone. A word repeated in two neighbouring sentences sounds like a stammer. A joke that looked fine on the screen either lands or dies in the room, and either way you know. The method costs nothing and takes about as long as the piece takes to read, which for most working drafts is under ten minutes. One word keeps coming up here, tapestry. It works best with a printed copy and a pen, so that the marks go on the page while the voice keeps moving. Stopping to fix each fault as you find it breaks the rhythm you were listening for. Mark it and keep going; the fixing comes afterwards."
+  },
+  {
+   "id": "S32",
+   "base_id": "C18",
+   "base_file": "examples/corpus/release-note.md",
+   "rule": "slop_vocab",
+   "transform": "insert_slop_word",
+   "edit": {
+    "kind": "splice",
+    "sentence": "One word keeps coming up here, realm.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 167,
+   "text": "The second change is to the configuration file. One word keeps coming up here, realm. The tool used to look for its settings in four places in a fixed order and take the first one it found, and the order was documented only in a comment in the source. Now it looks in the current directory and then in the home directory, and it prints which file it chose when run with the verbose flag. Anything found under the two old locations is still read this release, with a warning that names the new path, and it stops being read in the next major version. The warning is printed once per run rather than once per file, because an earlier draft of this change printed it per file and one user reported a log of forty thousand identical lines. Migration is a single move command and the release notes carry the exact line to run. The move takes under a second and is safe to run twice."
+  },
+  {
+   "id": "S33",
+   "base_id": "C08",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "not_x_but_y",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "The shop never lost its customers. It stopped answering the door.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 174,
+   "text": "The app runs on any phone sold in the last six years and on a browser at the office. It does not draw plans, and it does not try to. The plan is a picture you upload once per job, and a note pins to a spot on that picture. Offline storage holds about three months of a busy crew's notes before the oldest entries are moved to the server, from where they can still be read whenever there is signal. The shop never lost its customers. It stopped answering the door. Photos are kept at full size for ninety days and at screen size after that, unless the account asks for full-size retention, which costs extra because storage does. Support is by email and is answered by the two people who built the thing, usually the same working day, and the answer is a fix or a plain reason why not. Bugs found by customers are listed on a public page with the date they were reported and the version that fixed them."
+  },
+  {
+   "id": "S34",
+   "base_id": "C04",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "not_x_but_y",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "What we called a draft was closer to a promise we had already made.",
+    "position": "any",
+    "after_sentences": 7
+   },
+   "words": 166,
+   "text": "The second pass is for the paragraph endings. A first draft tends to finish each paragraph twice, once when the point lands and once more when the writer, not trusting the landing, says it again in different words. Read only the last sentence of each paragraph, top to bottom, and ask what each one adds that the sentence before it did not. When the answer is nothing, cut it. The paragraph will feel abrupt for a day, and then it will feel finished. The same test applies to the opening sentence of the whole piece. Writers warm up in public, and the first sentence is often a stretch before the run. What we called a draft was closer to a promise we had already made. If the second sentence would make a better first sentence, promote it and let the original go. Most pieces lose between five and fifteen percent of their length on this pass, and nobody has ever asked for the cut material back."
+  },
+  {
+   "id": "S35",
+   "base_id": "C05",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "not_x_but_y",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Nobody has a scheduling problem here. What everyone has is a saying-no problem.",
+    "position": "any",
+    "after_sentences": 2
+   },
+   "words": 171,
+   "text": "The last pass is the one most people skip, which is a night's sleep. A draft read the next morning is a different object from the draft you finished at eleven. Nobody has a scheduling problem here. What everyone has is a saying-no problem. Sentences you were proud of turn out to be carrying a private meaning that never made it onto the page, and sentences you nearly cut turn out to hold the argument together. The text is the same as it was at eleven. You are the one who changed, because for eight hours you stopped being its author and became its reader, and the reader is the only person whose opinion matters. If the deadline will not allow a night, an hour away from the screen recovers some of the effect, and a walk recovers more of it than a coffee does. Send the piece after the morning read, and keep the evening version in a drawer so you can see, later, how much the sleep was worth."
+  },
+  {
+   "id": "S36",
+   "base_id": "C02",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "not_x_but_y",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Everyone described the delay as bad luck. The calendar had said so in June.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 177,
+   "text": "Measure it. Keep a plain spreadsheet with the date, the recipient's role, the first line you used, and whether a reply came inside a week. After thirty messages the sheet will tell you which opening lines earn replies and which do not, and the answer will surprise you at least once. Most people find that the messages they were proudest of did worst, because pride shows, and the plain ones did best. Everyone described the delay as bad luck. The calendar had said so in June. Reply rates for a well-aimed cold email sit somewhere between one in ten and one in four, depending on the industry and on how well the list was built. Below one in twenty, the list is wrong and no amount of rewriting will fix it. Above one in three, you are probably emailing people who already know you, which is a different and easier game. Keep the sheet for a year, because the seasons matter more than anyone expects, and a line that dies in August may come back in October."
+  },
+  {
+   "id": "S37",
+   "base_id": "C19",
+   "base_file": "examples/corpus/release-note.md",
+   "rule": "not_x_but_y",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Whether this counts as an argument is doubtful. It reads more like a mood.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 173,
+   "text": "Two smaller things. Whether this counts as an argument is doubtful. It reads more like a mood. Output in the machine-readable format is now sorted by file and then by line, so two runs over the same tree produce the same bytes and a diff between them shows only what changed. The version of the tool is written into the first line of that output, so a report saved last year can be read against the ruleset that produced it. Both were small changes and both had been on the list since the first release. The bug fixes include one where a file ending without a newline lost its last line from the count. That one had been there since the first release too. The full list of changes, including nine bug fixes, is in the changelog file in the repository, and each entry links to the pull request that made it, so that anyone who wants to know why a behaviour changed can read the discussion rather than guessing from the diff."
+  },
+  {
+   "id": "S38",
+   "base_id": "C12",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "not_x_but_y",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "You did not forget the step. You decided it did not apply to you.",
+    "position": "any",
+    "after_sentences": 2
+   },
+   "words": 202,
+   "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up. He retained a great deal of his old enthusiasms and lov'd argumentation. You did not forget the step. You decided it did not apply to you. We therefore had many disputations. I used to work him so with my Socratic method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led to the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new sect. He was to preach the doctrines, and I was to confound all opponents. When he came to explain with me upon the doctrines, I found several conundrums which I objected to, unless I might have my way a little too, and introduce some of mine."
+  },
+  {
+   "id": "S39",
+   "base_id": "C03",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "not_x_but_y",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Calling Tuesday an outage would be generous. Somebody chose to turn it off.",
+    "position": "any",
+    "after_sentences": 5
+   },
+   "words": 174,
+   "text": "Reading a draft aloud is the cheapest edit there is. The ear catches what the eye forgives, because the eye has seen the sentence a dozen times and stopped reading it. When you say the words, a clause that runs too long makes you short of breath, and you feel exactly where the full stop should have gone. A word repeated in two neighbouring sentences sounds like a stammer. A joke that looked fine on the screen either lands or dies in the room, and either way you know. Calling Tuesday an outage would be generous. Somebody chose to turn it off. The method costs nothing and takes about as long as the piece takes to read, which for most working drafts is under ten minutes. It works best with a printed copy and a pen, so that the marks go on the page while the voice keeps moving. Stopping to fix each fault as you find it breaks the rhythm you were listening for. Mark it and keep going; the fixing comes afterwards."
+  },
+  {
+   "id": "S40",
+   "base_id": "C10",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "not_x_but_y",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "The route was fine. The walking was the part nobody costed.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 170,
+   "text": "In 1732 I first publish'd my Almanack, under the name of Richard Saunders; it was continu'd by me about twenty-five years, commonly call'd Poor Richard's Almanac. The route was fine. The walking was the part nobody costed. I endeavour'd to make it both entertaining and useful, and it accordingly came to be in such demand, that I reap'd considerable profit from it, vending annually near ten thousand. And observing that it was generally read, scarce any neighborhood in the province being without it, I consider'd it as a proper vehicle for conveying instruction among the common people, who bought scarcely any other books; I therefore filled all the little spaces that occurr'd between the remarkable days in the calendar with proverbial sentences, chiefly such as inculcated industry and frugality, as the means of procuring wealth, and thereby securing virtue; it being more difficult for a man in want, to act always honestly, as, to use here one of those proverbs, it is hard for an empty sack to stand upright."
+  },
+  {
+   "id": "S41",
+   "base_id": "C18",
+   "base_file": "examples/corpus/release-note.md",
+   "rule": "tricolon",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Honest work, honest hours, honest pay.",
+    "position": "any",
+    "after_sentences": 2
+   },
+   "words": 166,
+   "text": "The second change is to the configuration file. The tool used to look for its settings in four places in a fixed order and take the first one it found, and the order was documented only in a comment in the source. Honest work, honest hours, honest pay. Now it looks in the current directory and then in the home directory, and it prints which file it chose when run with the verbose flag. Anything found under the two old locations is still read this release, with a warning that names the new path, and it stops being read in the next major version. The warning is printed once per run rather than once per file, because an earlier draft of this change printed it per file and one user reported a log of forty thousand identical lines. Migration is a single move command and the release notes carry the exact line to run. The move takes under a second and is safe to run twice."
+  },
+  {
+   "id": "S42",
+   "base_id": "C19",
+   "base_file": "examples/corpus/release-note.md",
+   "rule": "tricolon",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "The room was warm, the light was low, the afternoon was gone.",
+    "position": "any",
+    "after_sentences": 3
+   },
+   "words": 171,
+   "text": "Two smaller things. Output in the machine-readable format is now sorted by file and then by line, so two runs over the same tree produce the same bytes and a diff between them shows only what changed. The version of the tool is written into the first line of that output, so a report saved last year can be read against the ruleset that produced it. The room was warm, the light was low, the afternoon was gone. Both were small changes and both had been on the list since the first release. The bug fixes include one where a file ending without a newline lost its last line from the count. That one had been there since the first release too. The full list of changes, including nine bug fixes, is in the changelog file in the repository, and each entry links to the pull request that made it, so that anyone who wants to know why a behaviour changed can read the discussion rather than guessing from the diff."
+  },
+  {
+   "id": "S43",
+   "base_id": "C01",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "tricolon",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Count them, name them, forget them.",
+    "position": "any",
+    "after_sentences": 5
+   },
+   "words": 157,
+   "text": "Subject lines are read more than bodies, so write the subject last, after you know what the message is actually about. Six words or fewer, with the specific thing in it. A subject that could have been sent to anyone reads as a mass mailing, and the filter in the reader's head is faster than any spam filter. Avoid the tricks. A fake reply prefix or a question mark bolted onto a statement both worked once, years ago, and now each one marks the message as a template. Count them, name them, forget them. Send on a Tuesday or Wednesday morning in the reader's time zone, because Monday's inbox is a backlog and Friday's is a countdown. Follow up once, after five working days, with a shorter message that adds one new thing. A second follow-up is a nuisance. If two messages have gone unanswered, the answer is no, and the polite move is to believe it."
+  },
+  {
+   "id": "S44",
+   "base_id": "C12",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "tricolon",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Look up, look down, look at the door.",
+    "position": "any",
+    "after_sentences": 3
+   },
+   "words": 196,
+   "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up. He retained a great deal of his old enthusiasms and lov'd argumentation. We therefore had many disputations. Look up, look down, look at the door. I used to work him so with my Socratic method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led to the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new sect. He was to preach the doctrines, and I was to confound all opponents. When he came to explain with me upon the doctrines, I found several conundrums which I objected to, unless I might have my way a little too, and introduce some of mine."
+  },
+  {
+   "id": "S45",
+   "base_id": "C15",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "tricolon",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Hot, loud, and entirely beside the point.",
+    "position": "any",
+    "after_sentences": 2
+   },
+   "words": 165,
+   "text": "Pilots have used lists like this since the nineteen thirties, when a new bomber proved too complex for even the best crews to fly from memory, and the surgical version, introduced in the two thousands, cut complications in a large multi-country trial by about a third. Those are the famous cases. Hot, loud, and entirely beside the point. The unfamous cases are everywhere a small shop repeats a job. A bakery that lists the six things to check before the ovens go on at four in the morning stops losing a batch a month to a thermostat left on the wrong setting. A bike shop that lists the four things to check before a repaired bike goes back over the counter stops getting the same bike back on Thursday. Both shops keep the list on the wall by the door. Neither list took more than an afternoon to write, and both were written after the mistake, which is the usual order and the wrong one."
+  },
+  {
+   "id": "S46",
+   "base_id": "C21",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "tricolon",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Write it, leave it, read it again.",
+    "position": "any",
+    "after_sentences": 2
+   },
+   "words": 163,
+   "text": "The main road took a median of fourteen minutes and ten seconds, with the slowest walk at sixteen minutes because of a crossing that stayed red through two cycles. The park took thirteen minutes and forty seconds, with very little spread, because there is nothing on that route to wait for. Write it, leave it, read it again. The park gate was open on every morning it was walked. The towpath took twelve minutes and twenty seconds on a dry morning and fourteen and a half minutes on a wet one, since the surface turns to mud for a hundred metres near the bridge and a careful walker slows down there. Taken over all thirty walks, the towpath wins by a little over a minute against the park and by nearly two minutes against the main road. Taken over the wet mornings only, the park wins. The main road never won a single morning, which settles the loudest side of the two-year argument."
+  },
+  {
+   "id": "S47",
+   "base_id": "C13",
+   "base_file": "examples/corpus/franklin-the-spectator.md",
+   "rule": "tricolon",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Faster, quieter, better behaved.",
+    "position": "any",
+    "after_sentences": 6
+   },
+   "words": 221,
+   "text": "About this time I met with an odd volume of the Spectator. It was the third. I had never before seen any of them. I bought it, read it over and over, and was much delighted with it. I thought the writing excellent, and wished, if possible, to imitate it. With this view I took some of the papers, and, making short hints of the sentiment in each sentence, laid them by a few days, and then, without looking at the book, try'd to compleat the papers again, by expressing each hinted sentiment at length, and as fully as it had been expressed before, in any suitable words that should come to hand. Faster, quieter, better behaved. Then I compared my Spectator with the original, discovered some of my faults, and corrected them. But I found I wanted a stock of words, or a readiness in recollecting and using them, which I thought I should have acquired before that time if I had gone on making verses; since the continual occasion for words of the same import, but of different length, to suit the measure, or of different sound for the rhyme, would have laid me under a constant necessity of searching for variety, and also have tended to fix that variety in my mind, and make me master of it."
+  },
+  {
+   "id": "S48",
+   "base_id": "C10",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "tricolon",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "It arrived late, arrived wet, and arrived anyway.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 167,
+   "text": "In 1732 I first publish'd my Almanack, under the name of Richard Saunders; it was continu'd by me about twenty-five years, commonly call'd Poor Richard's Almanac. It arrived late, arrived wet, and arrived anyway. I endeavour'd to make it both entertaining and useful, and it accordingly came to be in such demand, that I reap'd considerable profit from it, vending annually near ten thousand. And observing that it was generally read, scarce any neighborhood in the province being without it, I consider'd it as a proper vehicle for conveying instruction among the common people, who bought scarcely any other books; I therefore filled all the little spaces that occurr'd between the remarkable days in the calendar with proverbial sentences, chiefly such as inculcated industry and frugality, as the means of procuring wealth, and thereby securing virtue; it being more difficult for a man in want, to act always honestly, as, to use here one of those proverbs, it is hard for an empty sack to stand upright."
+  },
+  {
+   "id": "S49",
+   "base_id": "C01",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "stacked_hedging",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "It seems, on balance, and allowing for the usual caveats, fairly likely to hold.",
+    "position": "any",
+    "after_sentences": 2
+   },
+   "words": 165,
+   "text": "Subject lines are read more than bodies, so write the subject last, after you know what the message is actually about. Six words or fewer, with the specific thing in it. It seems, on balance, and allowing for the usual caveats, fairly likely to hold. A subject that could have been sent to anyone reads as a mass mailing, and the filter in the reader's head is faster than any spam filter. Avoid the tricks. A fake reply prefix or a question mark bolted onto a statement both worked once, years ago, and now each one marks the message as a template. Send on a Tuesday or Wednesday morning in the reader's time zone, because Monday's inbox is a backlog and Friday's is a countdown. Follow up once, after five working days, with a shorter message that adds one new thing. A second follow-up is a nuisance. If two messages have gone unanswered, the answer is no, and the polite move is to believe it."
+  },
+  {
+   "id": "S50",
+   "base_id": "C13",
+   "base_file": "examples/corpus/franklin-the-spectator.md",
+   "rule": "stacked_hedging",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Arguably it may possibly be somewhat cheaper, depending.",
+    "position": "any",
+    "after_sentences": 3
+   },
+   "words": 225,
+   "text": "About this time I met with an odd volume of the Spectator. It was the third. I had never before seen any of them. Arguably it may possibly be somewhat cheaper, depending. I bought it, read it over and over, and was much delighted with it. I thought the writing excellent, and wished, if possible, to imitate it. With this view I took some of the papers, and, making short hints of the sentiment in each sentence, laid them by a few days, and then, without looking at the book, try'd to compleat the papers again, by expressing each hinted sentiment at length, and as fully as it had been expressed before, in any suitable words that should come to hand. Then I compared my Spectator with the original, discovered some of my faults, and corrected them. But I found I wanted a stock of words, or a readiness in recollecting and using them, which I thought I should have acquired before that time if I had gone on making verses; since the continual occasion for words of the same import, but of different length, to suit the measure, or of different sound for the rhyme, would have laid me under a constant necessity of searching for variety, and also have tended to fix that variety in my mind, and make me master of it."
+  },
+  {
+   "id": "S51",
+   "base_id": "C06",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "stacked_hedging",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Possibly, and I could be wrong, this is roughly the sort of thing that tends to happen.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 173,
+   "text": "Crews on a job site write things down on whatever is nearest, which is usually a glove or the back of a delivery note. Possibly, and I could be wrong, this is roughly the sort of thing that tends to happen. By the time the day ends, the note is in a skip and the measurement is a memory. The app gives each crew a shared notebook that works without signal, accepts a photo or a voice note as easily as a number typed with a wet thumb, and syncs when the van gets back to the yard. Every entry carries who wrote it and where on the plan it belongs, with the time stamped by the phone. The office sees the notebook the next morning without anyone typing it up, and the person who wrote the note at four in the afternoon can find it again in March when the question comes back. Setup takes a foreman about twenty minutes and needs no training beyond showing the crew where the button is."
+  },
+  {
+   "id": "S52",
+   "base_id": "C08",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "stacked_hedging",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "It may well be, more or less, that the second run was probably the faster one.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 179,
+   "text": "The app runs on any phone sold in the last six years and on a browser at the office. It does not draw plans, and it does not try to. The plan is a picture you upload once per job, and a note pins to a spot on that picture. Offline storage holds about three months of a busy crew's notes before the oldest entries are moved to the server, from where they can still be read whenever there is signal. It may well be, more or less, that the second run was probably the faster one. Photos are kept at full size for ninety days and at screen size after that, unless the account asks for full-size retention, which costs extra because storage does. Support is by email and is answered by the two people who built the thing, usually the same working day, and the answer is a fix or a plain reason why not. Bugs found by customers are listed on a public page with the date they were reported and the version that fixed them."
+  },
+  {
+   "id": "S53",
+   "base_id": "C14",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "stacked_hedging",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Perhaps, conceivably, in certain cases, the shorter route is a little quicker.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 177,
+   "text": "A checklist in a workshop is a memory that does not get tired. Perhaps, conceivably, in certain cases, the shorter route is a little quicker. The person using it may have done the job five hundred times, and that is exactly the problem, because the five hundredth time is the one where the hands know the sequence and the mind is somewhere else. The list leaves the skill where it was and catches the one step the skill skipped because a phone rang at the wrong moment. The best lists are short, under ten items, and they name only the steps that are easy to miss and expensive to get wrong. A list that includes every obvious step gets skimmed, and a skimmed list catches nothing. Write each item as a state you can see or touch rather than as an instruction, so that \"guard bolt torqued and marked\" stands in for \"tighten the guard\", and the item can be answered by looking. A glance settles it, and a glance is all a busy bench will give."
+  },
+  {
+   "id": "S54",
+   "base_id": "C00",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "stacked_hedging",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "One could perhaps argue, tentatively, that the wording may be a little strong.",
+    "position": "any",
+    "after_sentences": 5
+   },
+   "words": 174,
+   "text": "A cold email has one job, which is to earn a reply, and most of them fail it in the first line by talking about the sender. The reader opens the message on a phone between two other things and decides in about four seconds whether the next paragraph is worth a thumb. The first line therefore has to be about them, and it has to prove that you looked. A specific observation about something they published or shipped last month does the proving. A compliment does not, because compliments are free and everyone knows it. One could perhaps argue, tentatively, that the wording may be a little strong. Keep the whole thing under a hundred and twenty words. The reader is not going to scroll, and a long message signals that you value your own time over theirs. One ask, stated plainly, near the end. If you want fifteen minutes, say fifteen minutes and offer two specific times. If you want an introduction, name the person. A message with two asks gets neither."
+  },
+  {
+   "id": "S55",
+   "base_id": "C16",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "stacked_hedging",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "It could be said, loosely, that the meeting may have had a purpose of some kind.",
+    "position": "any",
+    "after_sentences": 6
+   },
+   "words": 175,
+   "text": "The list has to be owned by the people who use it, or it dies within a month. A list handed down from an office is followed for a week and then kept in a drawer, because the person at the bench can see which items are theatre. A list the bench wrote itself gets edited, which is the sign that it is alive. Put the date of the last edit at the top and the name of whoever changed it, and review it whenever something goes wrong that the list should have caught. If the list keeps growing, it is collecting fear rather than steps, and it needs the same edit a draft needs. Ten items that get read beat forty that get skimmed. It could be said, loosely, that the meeting may have had a purpose of some kind. Cut until it fits on one side of a card. Hang it where the job happens and keep a pen on a string next to it, so that the edits happen at the bench."
+  },
+  {
+   "id": "S56",
+   "base_id": "C02",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "stacked_hedging",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "I suspect it might, in a manner of speaking, sort of explain the gap.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 177,
+   "text": "Measure it. Keep a plain spreadsheet with the date, the recipient's role, the first line you used, and whether a reply came inside a week. After thirty messages the sheet will tell you which opening lines earn replies and which do not, and the answer will surprise you at least once. Most people find that the messages they were proudest of did worst, because pride shows, and the plain ones did best. I suspect it might, in a manner of speaking, sort of explain the gap. Reply rates for a well-aimed cold email sit somewhere between one in ten and one in four, depending on the industry and on how well the list was built. Below one in twenty, the list is wrong and no amount of rewriting will fix it. Above one in three, you are probably emailing people who already know you, which is a different and easier game. Keep the sheet for a year, because the seasons matter more than anyone expects, and a line that dies in August may come back in October."
+  },
+  {
+   "id": "S57",
+   "base_id": "C03",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "rhetorical_opener",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "And who exactly decided that the door should be locked at five?",
+    "position": "start",
+    "after_sentences": 0
+   },
+   "words": 173,
+   "text": "And who exactly decided that the door should be locked at five? Reading a draft aloud is the cheapest edit there is. The ear catches what the eye forgives, because the eye has seen the sentence a dozen times and stopped reading it. When you say the words, a clause that runs too long makes you short of breath, and you feel exactly where the full stop should have gone. A word repeated in two neighbouring sentences sounds like a stammer. A joke that looked fine on the screen either lands or dies in the room, and either way you know. The method costs nothing and takes about as long as the piece takes to read, which for most working drafts is under ten minutes. It works best with a printed copy and a pen, so that the marks go on the page while the voice keeps moving. Stopping to fix each fault as you find it breaks the rhythm you were listening for. Mark it and keep going; the fixing comes afterwards."
+  },
+  {
+   "id": "S58",
+   "base_id": "C09",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "rhetorical_opener",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "What would it take to make the second run cheaper than the first?",
+    "position": "start",
+    "after_sentences": 0
+   },
+   "words": 257,
+   "text": "What would it take to make the second run cheaper than the first? The breaking into this money of Vernon's was one of the first great errata of my life; and this affair show'd that my father was not much out in his judgment when he suppos'd me too young to manage business of importance. But Sir William, on reading his letter, said he was too prudent. There was great difference in persons; and discretion did not always accompany years, nor was youth always without it. \"And since he will not set you up,\" says he, \"I will do it myself. Give me an inventory of the things necessary to be had from England, and I will send for them. You shall repay me when you are able; I am resolv'd to have a good printer here, and I am sure you must succeed.\" This was spoken with such an appearance of cordiality, that I had not the least doubt of his meaning what he said. I had hitherto kept the proposition of my setting up, a secret in Philadelphia, and I still kept it. Had it been known that I depended on the governor, probably some friend, that knew him better, would have advis'd me not to rely on him, as I afterwards heard it as his known character to be liberal of promises which he never meant to keep. Yet, unsolicited as he was by me, how could I think his generous offers insincere? I believ'd him one of the best men in the world."
+  },
+  {
+   "id": "S59",
+   "base_id": "C15",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "rhetorical_opener",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "So what does a reader actually do with a page like this?",
+    "position": "start",
+    "after_sentences": 0
+   },
+   "words": 170,
+   "text": "So what does a reader actually do with a page like this? Pilots have used lists like this since the nineteen thirties, when a new bomber proved too complex for even the best crews to fly from memory, and the surgical version, introduced in the two thousands, cut complications in a large multi-country trial by about a third. Those are the famous cases. The unfamous cases are everywhere a small shop repeats a job. A bakery that lists the six things to check before the ovens go on at four in the morning stops losing a batch a month to a thermostat left on the wrong setting. A bike shop that lists the four things to check before a repaired bike goes back over the counter stops getting the same bike back on Thursday. Both shops keep the list on the wall by the door. Neither list took more than an afternoon to write, and both were written after the mistake, which is the usual order and the wrong one."
+  },
+  {
+   "id": "S60",
+   "base_id": "C11",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "rhetorical_opener",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Could the whole thing have been a single sentence?",
+    "position": "start",
+    "after_sentences": 0
+   },
+   "words": 192,
+   "text": "Could the whole thing have been a single sentence? While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in the Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method. I was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter. And being then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them in difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved."
+  },
+  {
+   "id": "S61",
+   "base_id": "C10",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "rhetorical_opener",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "What is a rule worth on the day everybody is tired?",
+    "position": "start",
+    "after_sentences": 0
+   },
+   "words": 170,
+   "text": "What is a rule worth on the day everybody is tired? In 1732 I first publish'd my Almanack, under the name of Richard Saunders; it was continu'd by me about twenty-five years, commonly call'd Poor Richard's Almanac. I endeavour'd to make it both entertaining and useful, and it accordingly came to be in such demand, that I reap'd considerable profit from it, vending annually near ten thousand. And observing that it was generally read, scarce any neighborhood in the province being without it, I consider'd it as a proper vehicle for conveying instruction among the common people, who bought scarcely any other books; I therefore filled all the little spaces that occurr'd between the remarkable days in the calendar with proverbial sentences, chiefly such as inculcated industry and frugality, as the means of procuring wealth, and thereby securing virtue; it being more difficult for a man in want, to act always honestly, as, to use here one of those proverbs, it is hard for an empty sack to stand upright."
+  },
+  {
+   "id": "S62",
+   "base_id": "C08",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "rhetorical_opener",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Why does the same mistake survive four rounds of review?",
+    "position": "start",
+    "after_sentences": 0
+   },
+   "words": 173,
+   "text": "Why does the same mistake survive four rounds of review? The app runs on any phone sold in the last six years and on a browser at the office. It does not draw plans, and it does not try to. The plan is a picture you upload once per job, and a note pins to a spot on that picture. Offline storage holds about three months of a busy crew's notes before the oldest entries are moved to the server, from where they can still be read whenever there is signal. Photos are kept at full size for ninety days and at screen size after that, unless the account asks for full-size retention, which costs extra because storage does. Support is by email and is answered by the two people who built the thing, usually the same working day, and the answer is a fix or a plain reason why not. Bugs found by customers are listed on a public page with the date they were reported and the version that fixed them."
+  },
+  {
+   "id": "S63",
+   "base_id": "C21",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "rhetorical_opener",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Where does the time actually go on a morning like that?",
+    "position": "start",
+    "after_sentences": 0
+   },
+   "words": 167,
+   "text": "Where does the time actually go on a morning like that? The main road took a median of fourteen minutes and ten seconds, with the slowest walk at sixteen minutes because of a crossing that stayed red through two cycles. The park took thirteen minutes and forty seconds, with very little spread, because there is nothing on that route to wait for. The park gate was open on every morning it was walked. The towpath took twelve minutes and twenty seconds on a dry morning and fourteen and a half minutes on a wet one, since the surface turns to mud for a hundred metres near the bridge and a careful walker slows down there. Taken over all thirty walks, the towpath wins by a little over a minute against the park and by nearly two minutes against the main road. Taken over the wet mornings only, the park wins. The main road never won a single morning, which settles the loudest side of the two-year argument."
+  },
+  {
+   "id": "S64",
+   "base_id": "C00",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "rhetorical_opener",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "But what happens to the route when the bridge is out?",
+    "position": "start",
+    "after_sentences": 0
+   },
+   "words": 172,
+   "text": "But what happens to the route when the bridge is out? A cold email has one job, which is to earn a reply, and most of them fail it in the first line by talking about the sender. The reader opens the message on a phone between two other things and decides in about four seconds whether the next paragraph is worth a thumb. The first line therefore has to be about them, and it has to prove that you looked. A specific observation about something they published or shipped last month does the proving. A compliment does not, because compliments are free and everyone knows it. Keep the whole thing under a hundred and twenty words. The reader is not going to scroll, and a long message signals that you value your own time over theirs. One ask, stated plainly, near the end. If you want fifteen minutes, say fifteen minutes and offer two specific times. If you want an introduction, name the person. A message with two asks gets neither."
+  },
+  {
+   "id": "S65",
+   "base_id": "C07",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "restating_closer",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Taken as a whole, then, the above is the point being made.",
+    "position": "end",
+    "after_sentences": 7
+   },
+   "words": 180,
+   "text": "The price is twelve dollars per crew per month, with no charge for the office seats that only read. A crew of five who lose one measurement a week to a wet note spend more than that in a single return trip to the site. There is a free tier for a single crew, which stays free for as long as the crew stays single. Annual billing takes two months off the total. Most teams start on the free tier for a job or two and move up when the second crew asks for it, which tends to happen inside the first month. The invoice is a single line, and it can be addressed to the client's project code when a job is billed through. Cancelling is a button on the settings page and it works on the day you press it, with an export of every notebook as a folder of dated text files and photos so that nothing you wrote is held hostage to the subscription. Taken as a whole, then, the above is the point being made."
+  },
+  {
+   "id": "S66",
+   "base_id": "C23",
+   "base_file": "examples/corpus/strunk-introduction.md",
+   "rule": "restating_closer",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "In short, that is what this paragraph has been saying all along.",
+    "position": "end",
+    "after_sentences": 6
+   },
+   "words": 193,
+   "text": "This book aims to give in brief space the principal requirements of plain English style. It aims to lighten the task of instructor and student by concentrating attention (in Chapters II and III) on a few essentials, the rules of usage and principles of composition most commonly violated. In accordance with this plan it lays down three rules for the use of the comma, instead of a score or more, and one for the use of the semicolon, in the belief that these four rules provide for all the internal punctuation that is required by nineteen sentences out of twenty. Similarly, it gives in Chapter III only those principles of the paragraph and the sentence which are of the widest application. The book thus covers only a small portion of the field of English style. The experience of its writer has been that once past the essentials, students profit most by individual instruction based on the problems of their own work, and that each instructor has his own body of theory, which he may prefer to that offered by any textbook. In short, that is what this paragraph has been saying all along."
+  },
+  {
+   "id": "S67",
+   "base_id": "C09",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "restating_closer",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "In essence, everything written above adds up to precisely this.",
+    "position": "end",
+    "after_sentences": 10
+   },
+   "words": 254,
+   "text": "The breaking into this money of Vernon's was one of the first great errata of my life; and this affair show'd that my father was not much out in his judgment when he suppos'd me too young to manage business of importance. But Sir William, on reading his letter, said he was too prudent. There was great difference in persons; and discretion did not always accompany years, nor was youth always without it. \"And since he will not set you up,\" says he, \"I will do it myself. Give me an inventory of the things necessary to be had from England, and I will send for them. You shall repay me when you are able; I am resolv'd to have a good printer here, and I am sure you must succeed.\" This was spoken with such an appearance of cordiality, that I had not the least doubt of his meaning what he said. I had hitherto kept the proposition of my setting up, a secret in Philadelphia, and I still kept it. Had it been known that I depended on the governor, probably some friend, that knew him better, would have advis'd me not to rely on him, as I afterwards heard it as his known character to be liberal of promises which he never meant to keep. Yet, unsolicited as he was by me, how could I think his generous offers insincere? I believ'd him one of the best men in the world. In essence, everything written above adds up to precisely this."
+  },
+  {
+   "id": "S68",
+   "base_id": "C11",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "restating_closer",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "That, restated once more, is the substance of the preceding lines.",
+    "position": "end",
+    "after_sentences": 3
+   },
+   "words": 194,
+   "text": "While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in the Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method. I was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter. And being then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them in difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved. That, restated once more, is the substance of the preceding lines."
+  },
+  {
+   "id": "S69",
+   "base_id": "C03",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "restating_closer",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Summing up, the paragraph you have just read makes exactly that case.",
+    "position": "end",
+    "after_sentences": 9
+   },
+   "words": 173,
+   "text": "Reading a draft aloud is the cheapest edit there is. The ear catches what the eye forgives, because the eye has seen the sentence a dozen times and stopped reading it. When you say the words, a clause that runs too long makes you short of breath, and you feel exactly where the full stop should have gone. A word repeated in two neighbouring sentences sounds like a stammer. A joke that looked fine on the screen either lands or dies in the room, and either way you know. The method costs nothing and takes about as long as the piece takes to read, which for most working drafts is under ten minutes. It works best with a printed copy and a pen, so that the marks go on the page while the voice keeps moving. Stopping to fix each fault as you find it breaks the rhythm you were listening for. Mark it and keep going; the fixing comes afterwards. Summing up, the paragraph you have just read makes exactly that case."
+  },
+  {
+   "id": "S70",
+   "base_id": "C21",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "restating_closer",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Briefly, the foregoing says what it says and nothing further.",
+    "position": "end",
+    "after_sentences": 7
+   },
+   "words": 166,
+   "text": "The main road took a median of fourteen minutes and ten seconds, with the slowest walk at sixteen minutes because of a crossing that stayed red through two cycles. The park took thirteen minutes and forty seconds, with very little spread, because there is nothing on that route to wait for. The park gate was open on every morning it was walked. The towpath took twelve minutes and twenty seconds on a dry morning and fourteen and a half minutes on a wet one, since the surface turns to mud for a hundred metres near the bridge and a careful walker slows down there. Taken over all thirty walks, the towpath wins by a little over a minute against the park and by nearly two minutes against the main road. Taken over the wet mornings only, the park wins. The main road never won a single morning, which settles the loudest side of the two-year argument. Briefly, the foregoing says what it says and nothing further."
+  },
+  {
+   "id": "S71",
+   "base_id": "C00",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "restating_closer",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "So that, in the end, is the shape of what was just described.",
+    "position": "end",
+    "after_sentences": 11
+   },
+   "words": 174,
+   "text": "A cold email has one job, which is to earn a reply, and most of them fail it in the first line by talking about the sender. The reader opens the message on a phone between two other things and decides in about four seconds whether the next paragraph is worth a thumb. The first line therefore has to be about them, and it has to prove that you looked. A specific observation about something they published or shipped last month does the proving. A compliment does not, because compliments are free and everyone knows it. Keep the whole thing under a hundred and twenty words. The reader is not going to scroll, and a long message signals that you value your own time over theirs. One ask, stated plainly, near the end. If you want fifteen minutes, say fifteen minutes and offer two specific times. If you want an introduction, name the person. A message with two asks gets neither. So that, in the end, is the shape of what was just described."
+  },
+  {
+   "id": "S72",
+   "base_id": "C12",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "restating_closer",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "To put it another way, everything above amounts to the same point.",
+    "position": "end",
+    "after_sentences": 6
+   },
+   "words": 200,
+   "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up. He retained a great deal of his old enthusiasms and lov'd argumentation. We therefore had many disputations. I used to work him so with my Socratic method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led to the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new sect. He was to preach the doctrines, and I was to confound all opponents. When he came to explain with me upon the doctrines, I found several conundrums which I objected to, unless I might have my way a little too, and introduce some of mine. To put it another way, everything above amounts to the same point."
+  },
+  {
+   "id": "S73",
+   "base_id": "C18",
+   "base_file": "examples/corpus/release-note.md",
+   "rule": "self_undercutting",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "There is every chance the effect wears off after a week.",
+    "position": "any",
+    "after_sentences": 5
+   },
+   "words": 171,
+   "text": "The second change is to the configuration file. The tool used to look for its settings in four places in a fixed order and take the first one it found, and the order was documented only in a comment in the source. Now it looks in the current directory and then in the home directory, and it prints which file it chose when run with the verbose flag. Anything found under the two old locations is still read this release, with a warning that names the new path, and it stops being read in the next major version. The warning is printed once per run rather than once per file, because an earlier draft of this change printed it per file and one user reported a log of forty thousand identical lines. There is every chance the effect wears off after a week. Migration is a single move command and the release notes carry the exact line to run. The move takes under a second and is safe to run twice."
+  },
+  {
+   "id": "S74",
+   "base_id": "C22",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "self_undercutting",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Your mileage will vary and we have no idea by how much.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 170,
+   "text": "What the numbers do not settle is which route to take, because the fastest route on paper is also the one where a wrong step ends in the canal. Your mileage will vary and we have no idea by how much. The park route is a minute slower and has a bench and a reliable coffee cart at the far gate, neither of which was timed. The recommendation is the towpath in dry weather when the train is tight and the park on every other day. The household has adopted it, with the usual grumbling. The sheet with all thirty times, the weather for each morning, and the notes on what caused each delay is attached, so that anyone who disagrees with the recommendation can make a different one from the same data. Times will drift in winter when the towpath lights go off at the bridge, and the plan is to time the three again in January. The main road remains available for people who enjoy waiting at crossings."
+  },
+  {
+   "id": "S75",
+   "base_id": "C09",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "self_undercutting",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "It might do nothing at all for your team, and that is fine.",
+    "position": "any",
+    "after_sentences": 7
+   },
+   "words": 257,
+   "text": "The breaking into this money of Vernon's was one of the first great errata of my life; and this affair show'd that my father was not much out in his judgment when he suppos'd me too young to manage business of importance. But Sir William, on reading his letter, said he was too prudent. There was great difference in persons; and discretion did not always accompany years, nor was youth always without it. \"And since he will not set you up,\" says he, \"I will do it myself. Give me an inventory of the things necessary to be had from England, and I will send for them. You shall repay me when you are able; I am resolv'd to have a good printer here, and I am sure you must succeed.\" This was spoken with such an appearance of cordiality, that I had not the least doubt of his meaning what he said. I had hitherto kept the proposition of my setting up, a secret in Philadelphia, and I still kept it. It might do nothing at all for your team, and that is fine. Had it been known that I depended on the governor, probably some friend, that knew him better, would have advis'd me not to rely on him, as I afterwards heard it as his known character to be liberal of promises which he never meant to keep. Yet, unsolicited as he was by me, how could I think his generous offers insincere? I believ'd him one of the best men in the world."
+  },
+  {
+   "id": "S76",
+   "base_id": "C15",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "self_undercutting",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Honestly, whether it helps is anybody's guess.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 165,
+   "text": "Pilots have used lists like this since the nineteen thirties, when a new bomber proved too complex for even the best crews to fly from memory, and the surgical version, introduced in the two thousands, cut complications in a large multi-country trial by about a third. Those are the famous cases. The unfamous cases are everywhere a small shop repeats a job. A bakery that lists the six things to check before the ovens go on at four in the morning stops losing a batch a month to a thermostat left on the wrong setting. Honestly, whether it helps is anybody's guess. A bike shop that lists the four things to check before a repaired bike goes back over the counter stops getting the same bike back on Thursday. Both shops keep the list on the wall by the door. Neither list took more than an afternoon to write, and both were written after the mistake, which is the usual order and the wrong one."
+  },
+  {
+   "id": "S77",
+   "base_id": "C06",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "self_undercutting",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Take the whole thing with a pinch of salt, because we do.",
+    "position": "any",
+    "after_sentences": 3
+   },
+   "words": 168,
+   "text": "Crews on a job site write things down on whatever is nearest, which is usually a glove or the back of a delivery note. By the time the day ends, the note is in a skip and the measurement is a memory. The app gives each crew a shared notebook that works without signal, accepts a photo or a voice note as easily as a number typed with a wet thumb, and syncs when the van gets back to the yard. Take the whole thing with a pinch of salt, because we do. Every entry carries who wrote it and where on the plan it belongs, with the time stamped by the phone. The office sees the notebook the next morning without anyone typing it up, and the person who wrote the note at four in the afternoon can find it again in March when the question comes back. Setup takes a foreman about twenty minutes and needs no training beyond showing the crew where the button is."
+  },
+  {
+   "id": "S78",
+   "base_id": "C20",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "self_undercutting",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Plenty of people try this once and shrug, so keep your expectations low.",
+    "position": "any",
+    "after_sentences": 3
+   },
+   "words": 174,
+   "text": "There are three ways to walk from the house to the station, and for two years the household has argued about which is quickest without anyone timing them. This month I timed them. Each route was walked ten times at a normal pace, at the same time of the morning, over four weeks, with a stopwatch started at the front door and stopped at the ticket barrier. Plenty of people try this once and shrug, so keep your expectations low. The route along the main road is the one the map recommends and it was walked first each day. The route through the park was walked second. The route along the canal towpath, which the map does not know about because the towpath is not a road, was walked third. The order was rotated each week so that no route always had the freshest legs. Rain fell on six of the thirty mornings, spread across all three routes, and those times are included. Nobody ran, and nobody was allowed to jog for a train."
+  },
+  {
+   "id": "S79",
+   "base_id": "C23",
+   "base_file": "examples/corpus/strunk-introduction.md",
+   "rule": "self_undercutting",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "If it turns out to be useless for you, we would not be surprised.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 195,
+   "text": "This book aims to give in brief space the principal requirements of plain English style. It aims to lighten the task of instructor and student by concentrating attention (in Chapters II and III) on a few essentials, the rules of usage and principles of composition most commonly violated. In accordance with this plan it lays down three rules for the use of the comma, instead of a score or more, and one for the use of the semicolon, in the belief that these four rules provide for all the internal punctuation that is required by nineteen sentences out of twenty. Similarly, it gives in Chapter III only those principles of the paragraph and the sentence which are of the widest application. If it turns out to be useless for you, we would not be surprised. The book thus covers only a small portion of the field of English style. The experience of its writer has been that once past the essentials, students profit most by individual instruction based on the problems of their own work, and that each instructor has his own body of theory, which he may prefer to that offered by any textbook."
+  },
+  {
+   "id": "S80",
+   "base_id": "C02",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "self_undercutting",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "We cannot promise any of this will hold up where you are.",
+    "position": "any",
+    "after_sentences": 6
+   },
+   "words": 175,
+   "text": "Measure it. Keep a plain spreadsheet with the date, the recipient's role, the first line you used, and whether a reply came inside a week. After thirty messages the sheet will tell you which opening lines earn replies and which do not, and the answer will surprise you at least once. Most people find that the messages they were proudest of did worst, because pride shows, and the plain ones did best. Reply rates for a well-aimed cold email sit somewhere between one in ten and one in four, depending on the industry and on how well the list was built. Below one in twenty, the list is wrong and no amount of rewriting will fix it. We cannot promise any of this will hold up where you are. Above one in three, you are probably emailing people who already know you, which is a different and easier game. Keep the sheet for a year, because the seasons matter more than anyone expects, and a line that dies in August may come back in October."
+  },
+  {
+   "id": "S81",
+   "base_id": "C12",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "first_x_that",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "We got there before anybody else: nobody had timed the walk at all.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 201,
+   "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up. We got there before anybody else: nobody had timed the walk at all. He retained a great deal of his old enthusiasms and lov'd argumentation. We therefore had many disputations. I used to work him so with my Socratic method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led to the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new sect. He was to preach the doctrines, and I was to confound all opponents. When he came to explain with me upon the doctrines, I found several conundrums which I objected to, unless I might have my way a little too, and introduce some of mine."
+  },
+  {
+   "id": "S82",
+   "base_id": "C16",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "first_x_that",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Until this release nobody had shipped a checker that explains itself.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 170,
+   "text": "The list has to be owned by the people who use it, or it dies within a month. A list handed down from an office is followed for a week and then kept in a drawer, because the person at the bench can see which items are theatre. A list the bench wrote itself gets edited, which is the sign that it is alive. Put the date of the last edit at the top and the name of whoever changed it, and review it whenever something goes wrong that the list should have caught. Until this release nobody had shipped a checker that explains itself. If the list keeps growing, it is collecting fear rather than steps, and it needs the same edit a draft needs. Ten items that get read beat forty that get skimmed. Cut until it fits on one side of a card. Hang it where the job happens and keep a pen on a string next to it, so that the edits happen at the bench."
+  },
+  {
+   "id": "S83",
+   "base_id": "C03",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "first_x_that",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "We beat everybody to it, which is a sentence we have earned.",
+    "position": "any",
+    "after_sentences": 2
+   },
+   "words": 173,
+   "text": "Reading a draft aloud is the cheapest edit there is. The ear catches what the eye forgives, because the eye has seen the sentence a dozen times and stopped reading it. We beat everybody to it, which is a sentence we have earned. When you say the words, a clause that runs too long makes you short of breath, and you feel exactly where the full stop should have gone. A word repeated in two neighbouring sentences sounds like a stammer. A joke that looked fine on the screen either lands or dies in the room, and either way you know. The method costs nothing and takes about as long as the piece takes to read, which for most working drafts is under ten minutes. It works best with a printed copy and a pen, so that the marks go on the page while the voice keeps moving. Stopping to fix each fault as you find it breaks the rhythm you were listening for. Mark it and keep going; the fixing comes afterwards."
+  },
+  {
+   "id": "S84",
+   "base_id": "C23",
+   "base_file": "examples/corpus/strunk-introduction.md",
+   "rule": "first_x_that",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Before us, no one had written any of this down in one place.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 194,
+   "text": "This book aims to give in brief space the principal requirements of plain English style. It aims to lighten the task of instructor and student by concentrating attention (in Chapters II and III) on a few essentials, the rules of usage and principles of composition most commonly violated. In accordance with this plan it lays down three rules for the use of the comma, instead of a score or more, and one for the use of the semicolon, in the belief that these four rules provide for all the internal punctuation that is required by nineteen sentences out of twenty. Similarly, it gives in Chapter III only those principles of the paragraph and the sentence which are of the widest application. Before us, no one had written any of this down in one place. The book thus covers only a small portion of the field of English style. The experience of its writer has been that once past the essentials, students profit most by individual instruction based on the problems of their own work, and that each instructor has his own body of theory, which he may prefer to that offered by any textbook."
+  },
+  {
+   "id": "S85",
+   "base_id": "C10",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "first_x_that",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "No shop on this street had tried opening on a Sunday before we did.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 173,
+   "text": "In 1732 I first publish'd my Almanack, under the name of Richard Saunders; it was continu'd by me about twenty-five years, commonly call'd Poor Richard's Almanac. No shop on this street had tried opening on a Sunday before we did. I endeavour'd to make it both entertaining and useful, and it accordingly came to be in such demand, that I reap'd considerable profit from it, vending annually near ten thousand. And observing that it was generally read, scarce any neighborhood in the province being without it, I consider'd it as a proper vehicle for conveying instruction among the common people, who bought scarcely any other books; I therefore filled all the little spaces that occurr'd between the remarkable days in the calendar with proverbial sentences, chiefly such as inculcated industry and frugality, as the means of procuring wealth, and thereby securing virtue; it being more difficult for a man in want, to act always honestly, as, to use here one of those proverbs, it is hard for an empty sack to stand upright."
+  },
+  {
+   "id": "S86",
+   "base_id": "C11",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "first_x_that",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Ours is the earliest field notebook a crew could carry down a mine with no signal.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 199,
+   "text": "While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in the Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method. Ours is the earliest field notebook a crew could carry down a mine with no signal. I was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter. And being then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them in difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved."
+  },
+  {
+   "id": "S87",
+   "base_id": "C08",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "first_x_that",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "This is the earliest page anywhere to say the quiet part in a table.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 177,
+   "text": "The app runs on any phone sold in the last six years and on a browser at the office. This is the earliest page anywhere to say the quiet part in a table. It does not draw plans, and it does not try to. The plan is a picture you upload once per job, and a note pins to a spot on that picture. Offline storage holds about three months of a busy crew's notes before the oldest entries are moved to the server, from where they can still be read whenever there is signal. Photos are kept at full size for ninety days and at screen size after that, unless the account asks for full-size retention, which costs extra because storage does. Support is by email and is answered by the two people who built the thing, usually the same working day, and the answer is a fix or a plain reason why not. Bugs found by customers are listed on a public page with the date they were reported and the version that fixed them."
+  },
+  {
+   "id": "S88",
+   "base_id": "C20",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "first_x_that",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "We are the earliest team to have run the whole thing on a Monday morning.",
+    "position": "any",
+    "after_sentences": 3
+   },
+   "words": 176,
+   "text": "There are three ways to walk from the house to the station, and for two years the household has argued about which is quickest without anyone timing them. This month I timed them. Each route was walked ten times at a normal pace, at the same time of the morning, over four weeks, with a stopwatch started at the front door and stopped at the ticket barrier. We are the earliest team to have run the whole thing on a Monday morning. The route along the main road is the one the map recommends and it was walked first each day. The route through the park was walked second. The route along the canal towpath, which the map does not know about because the towpath is not a road, was walked third. The order was rotated each week so that no route always had the freshest legs. Rain fell on six of the thirty mornings, spread across all three routes, and those times are included. Nobody ran, and nobody was allowed to jog for a train."
+  },
+  {
+   "id": "S89",
+   "base_id": "C01",
+   "base_file": "examples/corpus/cold-email.md",
+   "rule": "naked_cost_figure",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Our side of it works out at a fraction of a penny a paragraph.",
+    "position": "any",
+    "after_sentences": 5
+   },
+   "words": 165,
+   "text": "Subject lines are read more than bodies, so write the subject last, after you know what the message is actually about. Six words or fewer, with the specific thing in it. A subject that could have been sent to anyone reads as a mass mailing, and the filter in the reader's head is faster than any spam filter. Avoid the tricks. A fake reply prefix or a question mark bolted onto a statement both worked once, years ago, and now each one marks the message as a template. Our side of it works out at a fraction of a penny a paragraph. Send on a Tuesday or Wednesday morning in the reader's time zone, because Monday's inbox is a backlog and Friday's is a countdown. Follow up once, after five working days, with a shorter message that adds one new thing. A second follow-up is a nuisance. If two messages have gone unanswered, the answer is no, and the polite move is to believe it."
+  },
+  {
+   "id": "S90",
+   "base_id": "C13",
+   "base_file": "examples/corpus/franklin-the-spectator.md",
+   "rule": "naked_cost_figure",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "It cost us less than a sandwich to produce.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 226,
+   "text": "About this time I met with an odd volume of the Spectator. It was the third. I had never before seen any of them. I bought it, read it over and over, and was much delighted with it. It cost us less than a sandwich to produce. I thought the writing excellent, and wished, if possible, to imitate it. With this view I took some of the papers, and, making short hints of the sentiment in each sentence, laid them by a few days, and then, without looking at the book, try'd to compleat the papers again, by expressing each hinted sentiment at length, and as fully as it had been expressed before, in any suitable words that should come to hand. Then I compared my Spectator with the original, discovered some of my faults, and corrected them. But I found I wanted a stock of words, or a readiness in recollecting and using them, which I thought I should have acquired before that time if I had gone on making verses; since the continual occasion for words of the same import, but of different length, to suit the measure, or of different sound for the rhyme, would have laid me under a constant necessity of searching for variety, and also have tended to fix that variety in my mind, and make me master of it."
+  },
+  {
+   "id": "S91",
+   "base_id": "C22",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "naked_cost_figure",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "The paper for the whole print run came in under thirty pounds.",
+    "position": "any",
+    "after_sentences": 2
+   },
+   "words": 170,
+   "text": "What the numbers do not settle is which route to take, because the fastest route on paper is also the one where a wrong step ends in the canal. The park route is a minute slower and has a bench and a reliable coffee cart at the far gate, neither of which was timed. The paper for the whole print run came in under thirty pounds. The recommendation is the towpath in dry weather when the train is tight and the park on every other day. The household has adopted it, with the usual grumbling. The sheet with all thirty times, the weather for each morning, and the notes on what caused each delay is attached, so that anyone who disagrees with the recommendation can make a different one from the same data. Times will drift in winter when the towpath lights go off at the bridge, and the plan is to time the three again in January. The main road remains available for people who enjoy waiting at crossings."
+  },
+  {
+   "id": "S92",
+   "base_id": "C05",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "naked_cost_figure",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Each page works out at about three pence of model spend.",
+    "position": "any",
+    "after_sentences": 5
+   },
+   "words": 169,
+   "text": "The last pass is the one most people skip, which is a night's sleep. A draft read the next morning is a different object from the draft you finished at eleven. Sentences you were proud of turn out to be carrying a private meaning that never made it onto the page, and sentences you nearly cut turn out to hold the argument together. The text is the same as it was at eleven. You are the one who changed, because for eight hours you stopped being its author and became its reader, and the reader is the only person whose opinion matters. Each page works out at about three pence of model spend. If the deadline will not allow a night, an hour away from the screen recovers some of the effect, and a walk recovers more of it than a coffee does. Send the piece after the morning read, and keep the evening version in a drawer so you can see, later, how much the sleep was worth."
+  },
+  {
+   "id": "S93",
+   "base_id": "C20",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "naked_cost_figure",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Two hours of somebody's time went into this, which is what it cost us.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 175,
+   "text": "There are three ways to walk from the house to the station, and for two years the household has argued about which is quickest without anyone timing them. Two hours of somebody's time went into this, which is what it cost us. This month I timed them. Each route was walked ten times at a normal pace, at the same time of the morning, over four weeks, with a stopwatch started at the front door and stopped at the ticket barrier. The route along the main road is the one the map recommends and it was walked first each day. The route through the park was walked second. The route along the canal towpath, which the map does not know about because the towpath is not a road, was walked third. The order was rotated each week so that no route always had the freshest legs. Rain fell on six of the thirty mornings, spread across all three routes, and those times are included. Nobody ran, and nobody was allowed to jog for a train."
+  },
+  {
+   "id": "S94",
+   "base_id": "C17",
+   "base_file": "examples/corpus/release-note.md",
+   "rule": "naked_cost_figure",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "We spend roughly a pound a day keeping this thing warm.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 175,
+   "text": "Version 2.4 changes how the tool treats a file it cannot read. Until now an unreadable file stopped the whole run with a stack trace, which meant one bad symlink in a large tree hid every real finding in the other thousand files. From this release an unreadable file is reported on its own line, the run continues, and the exit code at the end says that findings were produced and that at least one file was skipped. The two facts are reported separately because they mean different things to a script. We spend roughly a pound a day keeping this thing warm. If you were relying on the old behaviour to fail a build when a file could not be read, pass the strict flag and the run stops on the first skip, as before. The flag is documented on the exit codes page. The change was requested in the issue tracker eleven times over two years, which is nine more than the next most requested change, and it should have been made sooner."
+  },
+  {
+   "id": "S95",
+   "base_id": "C12",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "naked_cost_figure",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "The postage alone came to nine pounds fifty.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 196,
+   "text": "Keimer and I liv'd on a pretty good familiar footing, and agreed tolerably well, for he suspected nothing of my setting up. The postage alone came to nine pounds fifty. He retained a great deal of his old enthusiasms and lov'd argumentation. We therefore had many disputations. I used to work him so with my Socratic method, and had trepann'd him so often by questions apparently so distant from any point we had in hand, and yet by degrees led to the point, and brought him into difficulties and contradictions, that at last he grew ridiculously cautious, and would hardly answer me the most common question, without asking first, \"What do you intend to infer from that?\" However, it gave him so high an opinion of my abilities in the confuting way, that he seriously proposed my being his colleague in a project he had of setting up a new sect. He was to preach the doctrines, and I was to confound all opponents. When he came to explain with me upon the doctrines, I found several conundrums which I objected to, unless I might have my way a little too, and introduce some of mine."
+  },
+  {
+   "id": "S96",
+   "base_id": "C06",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "naked_cost_figure",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "The whole afternoon of compute came to eleven pounds.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 165,
+   "text": "Crews on a job site write things down on whatever is nearest, which is usually a glove or the back of a delivery note. The whole afternoon of compute came to eleven pounds. By the time the day ends, the note is in a skip and the measurement is a memory. The app gives each crew a shared notebook that works without signal, accepts a photo or a voice note as easily as a number typed with a wet thumb, and syncs when the van gets back to the yard. Every entry carries who wrote it and where on the plan it belongs, with the time stamped by the phone. The office sees the notebook the next morning without anyone typing it up, and the person who wrote the note at four in the afternoon can find it again in March when the question comes back. Setup takes a foreman about twenty minutes and needs no training beyond showing the crew where the button is."
+  },
+  {
+   "id": "S97",
+   "base_id": "C14",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "jobs_claim",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "We have told the team that no role here will ever be automated away.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 179,
+   "text": "A checklist in a workshop is a memory that does not get tired. The person using it may have done the job five hundred times, and that is exactly the problem, because the five hundredth time is the one where the hands know the sequence and the mind is somewhere else. The list leaves the skill where it was and catches the one step the skill skipped because a phone rang at the wrong moment. The best lists are short, under ten items, and they name only the steps that are easy to miss and expensive to get wrong. We have told the team that no role here will ever be automated away. A list that includes every obvious step gets skimmed, and a skimmed list catches nothing. Write each item as a state you can see or touch rather than as an instruction, so that \"guard bolt torqued and marked\" stands in for \"tighten the guard\", and the item can be answered by looking. A glance settles it, and a glance is all a busy bench will give."
+  },
+  {
+   "id": "S98",
+   "base_id": "C05",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "jobs_claim",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "The typing pool went the same way and nobody missed it.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 169,
+   "text": "The last pass is the one most people skip, which is a night's sleep. A draft read the next morning is a different object from the draft you finished at eleven. Sentences you were proud of turn out to be carrying a private meaning that never made it onto the page, and sentences you nearly cut turn out to hold the argument together. The text is the same as it was at eleven. The typing pool went the same way and nobody missed it. You are the one who changed, because for eight hours you stopped being its author and became its reader, and the reader is the only person whose opinion matters. If the deadline will not allow a night, an hour away from the screen recovers some of the effect, and a walk recovers more of it than a coffee does. Send the piece after the morning read, and keep the evening version in a drawer so you can see, later, how much the sleep was worth."
+  },
+  {
+   "id": "S99",
+   "base_id": "C04",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "jobs_claim",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Jobs are created by this sort of thing, not lost to it.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 164,
+   "text": "The second pass is for the paragraph endings. Jobs are created by this sort of thing, not lost to it. A first draft tends to finish each paragraph twice, once when the point lands and once more when the writer, not trusting the landing, says it again in different words. Read only the last sentence of each paragraph, top to bottom, and ask what each one adds that the sentence before it did not. When the answer is nothing, cut it. The paragraph will feel abrupt for a day, and then it will feel finished. The same test applies to the opening sentence of the whole piece. Writers warm up in public, and the first sentence is often a stretch before the run. If the second sentence would make a better first sentence, promote it and let the original go. Most pieces lose between five and fifteen percent of their length on this pass, and nobody has ever asked for the cut material back."
+  },
+  {
+   "id": "S100",
+   "base_id": "C11",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "jobs_claim",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Every hour it saves is an hour somebody no longer gets paid for.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 196,
+   "text": "While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in the Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method. Every hour it saves is an hour somebody no longer gets paid for. I was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter. And being then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them in difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved."
+  },
+  {
+   "id": "S101",
+   "base_id": "C07",
+   "base_file": "examples/corpus/field-notes-app.md",
+   "rule": "jobs_claim",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "It takes over the checking so the checkers can be let go.",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 180,
+   "text": "The price is twelve dollars per crew per month, with no charge for the office seats that only read. A crew of five who lose one measurement a week to a wet note spend more than that in a single return trip to the site. There is a free tier for a single crew, which stays free for as long as the crew stays single. Annual billing takes two months off the total. It takes over the checking so the checkers can be let go. Most teams start on the free tier for a job or two and move up when the second crew asks for it, which tends to happen inside the first month. The invoice is a single line, and it can be addressed to the client's project code when a job is billed through. Cancelling is a button on the settings page and it works on the day you press it, with an export of every notebook as a folder of dated text files and photos so that nothing you wrote is held hostage to the subscription."
+  },
+  {
+   "id": "S102",
+   "base_id": "C19",
+   "base_file": "examples/corpus/release-note.md",
+   "rule": "jobs_claim",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Two more seats means two more hires, which is the honest measure of progress.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 173,
+   "text": "Two smaller things. Two more seats means two more hires, which is the honest measure of progress. Output in the machine-readable format is now sorted by file and then by line, so two runs over the same tree produce the same bytes and a diff between them shows only what changed. The version of the tool is written into the first line of that output, so a report saved last year can be read against the ruleset that produced it. Both were small changes and both had been on the list since the first release. The bug fixes include one where a file ending without a newline lost its last line from the count. That one had been there since the first release too. The full list of changes, including nine bug fixes, is in the changelog file in the repository, and each entry links to the pull request that made it, so that anyone who wants to know why a behaviour changed can read the discussion rather than guessing from the diff."
+  },
+  {
+   "id": "S103",
+   "base_id": "C09",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "jobs_claim",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "A person will always be needed here, whatever anybody says.",
+    "position": "any",
+    "after_sentences": 3
+   },
+   "words": 254,
+   "text": "The breaking into this money of Vernon's was one of the first great errata of my life; and this affair show'd that my father was not much out in his judgment when he suppos'd me too young to manage business of importance. But Sir William, on reading his letter, said he was too prudent. There was great difference in persons; and discretion did not always accompany years, nor was youth always without it. A person will always be needed here, whatever anybody says. \"And since he will not set you up,\" says he, \"I will do it myself. Give me an inventory of the things necessary to be had from England, and I will send for them. You shall repay me when you are able; I am resolv'd to have a good printer here, and I am sure you must succeed.\" This was spoken with such an appearance of cordiality, that I had not the least doubt of his meaning what he said. I had hitherto kept the proposition of my setting up, a secret in Philadelphia, and I still kept it. Had it been known that I depended on the governor, probably some friend, that knew him better, would have advis'd me not to rely on him, as I afterwards heard it as his known character to be liberal of promises which he never meant to keep. Yet, unsolicited as he was by me, how could I think his generous offers insincere? I believ'd him one of the best men in the world."
+  },
+  {
+   "id": "S104",
+   "base_id": "C21",
+   "base_file": "examples/corpus/station-routes.md",
+   "rule": "jobs_claim",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "Nobody loses a job over this, and if anything it makes a few.",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 169,
+   "text": "The main road took a median of fourteen minutes and ten seconds, with the slowest walk at sixteen minutes because of a crossing that stayed red through two cycles. Nobody loses a job over this, and if anything it makes a few. The park took thirteen minutes and forty seconds, with very little spread, because there is nothing on that route to wait for. The park gate was open on every morning it was walked. The towpath took twelve minutes and twenty seconds on a dry morning and fourteen and a half minutes on a wet one, since the surface turns to mud for a hundred metres near the bridge and a careful walker slows down there. Taken over all thirty walks, the towpath wins by a little over a minute against the park and by nearly two minutes against the main road. Taken over the wet mornings only, the park wins. The main road never won a single morning, which settles the loudest side of the two-year argument."
+  },
+  {
+   "id": "S105",
+   "base_id": "C16",
+   "base_file": "examples/corpus/on-checklists.md",
+   "rule": "pullquote_fragment",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "*\"Whatever the checklist forgot.\"*",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 163,
+   "text": "The list has to be owned by the people who use it, or it dies within a month. A list handed down from an office is followed for a week and then kept in a drawer, because the person at the bench can see which items are theatre. A list the bench wrote itself gets edited, which is the sign that it is alive. Put the date of the last edit at the top and the name of whoever changed it, and review it whenever something goes wrong that the list should have caught. *\"Whatever the checklist forgot.\"* If the list keeps growing, it is collecting fear rather than steps, and it needs the same edit a draft needs. Ten items that get read beat forty that get skimmed. Cut until it fits on one side of a card. Hang it where the job happens and keep a pen on a string next to it, so that the edits happen at the bench."
+  },
+  {
+   "id": "S106",
+   "base_id": "C09",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "pullquote_fragment",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "*\"Read aloud, or not at all.\"*",
+    "position": "any",
+    "after_sentences": 7
+   },
+   "words": 250,
+   "text": "The breaking into this money of Vernon's was one of the first great errata of my life; and this affair show'd that my father was not much out in his judgment when he suppos'd me too young to manage business of importance. But Sir William, on reading his letter, said he was too prudent. There was great difference in persons; and discretion did not always accompany years, nor was youth always without it. \"And since he will not set you up,\" says he, \"I will do it myself. Give me an inventory of the things necessary to be had from England, and I will send for them. You shall repay me when you are able; I am resolv'd to have a good printer here, and I am sure you must succeed.\" This was spoken with such an appearance of cordiality, that I had not the least doubt of his meaning what he said. I had hitherto kept the proposition of my setting up, a secret in Philadelphia, and I still kept it. *\"Read aloud, or not at all.\"* Had it been known that I depended on the governor, probably some friend, that knew him better, would have advis'd me not to rely on him, as I afterwards heard it as his known character to be liberal of promises which he never meant to keep. Yet, unsolicited as he was by me, how could I think his generous offers insincere? I believ'd him one of the best men in the world."
+  },
+  {
+   "id": "S107",
+   "base_id": "C03",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "pullquote_fragment",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "*\"Cheap, in the oldest sense.\"*",
+    "position": "any",
+    "after_sentences": 2
+   },
+   "words": 166,
+   "text": "Reading a draft aloud is the cheapest edit there is. The ear catches what the eye forgives, because the eye has seen the sentence a dozen times and stopped reading it. *\"Cheap, in the oldest sense.\"* When you say the words, a clause that runs too long makes you short of breath, and you feel exactly where the full stop should have gone. A word repeated in two neighbouring sentences sounds like a stammer. A joke that looked fine on the screen either lands or dies in the room, and either way you know. The method costs nothing and takes about as long as the piece takes to read, which for most working drafts is under ten minutes. It works best with a printed copy and a pen, so that the marks go on the page while the voice keeps moving. Stopping to fix each fault as you find it breaks the rhythm you were listening for. Mark it and keep going; the fixing comes afterwards."
+  },
+  {
+   "id": "S108",
+   "base_id": "C18",
+   "base_file": "examples/corpus/release-note.md",
+   "rule": "pullquote_fragment",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "*\"Twelve minutes, every morning.\"*",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 164,
+   "text": "The second change is to the configuration file. *\"Twelve minutes, every morning.\"* The tool used to look for its settings in four places in a fixed order and take the first one it found, and the order was documented only in a comment in the source. Now it looks in the current directory and then in the home directory, and it prints which file it chose when run with the verbose flag. Anything found under the two old locations is still read this release, with a warning that names the new path, and it stops being read in the next major version. The warning is printed once per run rather than once per file, because an earlier draft of this change printed it per file and one user reported a log of forty thousand identical lines. Migration is a single move command and the release notes carry the exact line to run. The move takes under a second and is safe to run twice."
+  },
+  {
+   "id": "S109",
+   "base_id": "C10",
+   "base_file": "examples/corpus/franklin-the-printer.md",
+   "rule": "pullquote_fragment",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "*\"One page, twice as slow.\"*",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 164,
+   "text": "In 1732 I first publish'd my Almanack, under the name of Richard Saunders; it was continu'd by me about twenty-five years, commonly call'd Poor Richard's Almanac. *\"One page, twice as slow.\"* I endeavour'd to make it both entertaining and useful, and it accordingly came to be in such demand, that I reap'd considerable profit from it, vending annually near ten thousand. And observing that it was generally read, scarce any neighborhood in the province being without it, I consider'd it as a proper vehicle for conveying instruction among the common people, who bought scarcely any other books; I therefore filled all the little spaces that occurr'd between the remarkable days in the calendar with proverbial sentences, chiefly such as inculcated industry and frugality, as the means of procuring wealth, and thereby securing virtue; it being more difficult for a man in want, to act always honestly, as, to use here one of those proverbs, it is hard for an empty sack to stand upright."
+  },
+  {
+   "id": "S110",
+   "base_id": "C11",
+   "base_file": "examples/corpus/franklin-the-socratic-method.md",
+   "rule": "pullquote_fragment",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "*\"Everything except the bill.\"*",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 187,
+   "text": "While I was intent on improving my language, I met with an English grammar (I think it was Greenwood's), at the end of which there were two little sketches of the arts of rhetoric and logic, the latter finishing with a specimen of a dispute in the Socratic method; and soon after I procur'd Xenophon's Memorable Things of Socrates, wherein there are many instances of the same method. *\"Everything except the bill.\"* I was charm'd with it, adopted it, dropt my abrupt contradiction and positive argumentation, and put on the humble inquirer and doubter. And being then, from reading Shaftesbury and Collins, become a real doubter in many points of our religious doctrine, I found this method safest for myself and very embarrassing to those against whom I used it; therefore I took a delight in it, practis'd it continually, and grew very artful and expert in drawing people, even of superior knowledge, into concessions, the consequences of which they did not foresee, entangling them in difficulties out of which they could not extricate themselves, and so obtaining victories that neither myself nor my cause always deserved."
+  },
+  {
+   "id": "S111",
+   "base_id": "C19",
+   "base_file": "examples/corpus/release-note.md",
+   "rule": "pullquote_fragment",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "*\"A drawer full of Tuesdays.\"*",
+    "position": "any",
+    "after_sentences": 1
+   },
+   "words": 164,
+   "text": "Two smaller things. *\"A drawer full of Tuesdays.\"* Output in the machine-readable format is now sorted by file and then by line, so two runs over the same tree produce the same bytes and a diff between them shows only what changed. The version of the tool is written into the first line of that output, so a report saved last year can be read against the ruleset that produced it. Both were small changes and both had been on the list since the first release. The bug fixes include one where a file ending without a newline lost its last line from the count. That one had been there since the first release too. The full list of changes, including nine bug fixes, is in the changelog file in the repository, and each entry links to the pull request that made it, so that anyone who wants to know why a behaviour changed can read the discussion rather than guessing from the diff."
+  },
+  {
+   "id": "S112",
+   "base_id": "C04",
+   "base_file": "examples/corpus/editing-by-ear.md",
+   "rule": "pullquote_fragment",
+   "transform": "splice",
+   "edit": {
+    "kind": "splice",
+    "sentence": "*\"Four miles, no shortcuts.\"*",
+    "position": "any",
+    "after_sentences": 4
+   },
+   "words": 156,
+   "text": "The second pass is for the paragraph endings. A first draft tends to finish each paragraph twice, once when the point lands and once more when the writer, not trusting the landing, says it again in different words. Read only the last sentence of each paragraph, top to bottom, and ask what each one adds that the sentence before it did not. When the answer is nothing, cut it. *\"Four miles, no shortcuts.\"* The paragraph will feel abrupt for a day, and then it will feel finished. The same test applies to the opening sentence of the whole piece. Writers warm up in public, and the first sentence is often a stretch before the run. If the second sentence would make a better first sentence, promote it and let the original go. Most pieces lose between five and fifteen percent of their length on this pass, and nobody has ever asked for the cut material back."
+  }
+ ]
+}
