@@ -193,6 +193,49 @@ describe("regex checks", () => {
     const narrowed = builtinRule("slop_vocab", { words: ["tapestry"] });
     expect(checkRegexRule(narrowed, "We delve into the rich tapestry.")).toHaveLength(1);
   });
+
+  test("slop_vocab matches the inflections its own description promises", () => {
+    const rule = builtinRule("slop_vocab");
+    const inflected = [
+      "He delves into it.",
+      "It runs seamlessly.",
+      "She is navigating the release.",
+      "They keep showcasing the same three slides.",
+      "Unlocking the next stage took a week.",
+      "The realms overlapped.",
+      "A pivotal week.",
+    ];
+    for (const line of inflected) {
+      expect(checkRegexRule(rule, line)).toHaveLength(1);
+    }
+
+    // The promise is the stem plus ordinary suffixes, not every derivation
+    // English can build. "intricacies" is a different word and is not caught.
+    expect(checkRegexRule(rule, "The intricacies were the point.")).toHaveLength(0);
+  });
+
+  test("slop_vocab leaves a listed word alone where it is doing its literal job", () => {
+    const rule = builtinRule("slop_vocab");
+    expect(checkRegexRule(rule, "Her sister is a landscape architect in Leeds.")).toHaveLength(0);
+    expect(checkRegexRule(rule, "Navigate to the folder and open it.")).toHaveLength(0);
+    expect(checkRegexRule(rule, "Unlock the door before the delivery arrives.")).toHaveLength(0);
+
+    // The exception is the phrase, not the word: the word alone still counts.
+    expect(checkRegexRule(rule, "The landscape of the market shifted.")).toHaveLength(1);
+  });
+
+  test("a rule may replace the exception list with its own", () => {
+    const rule = builtinRule("slop_vocab", { words: ["delve"], except: [] });
+    expect(checkRegexRule(rule, "Her sister is a landscape architect.")).toHaveLength(0);
+
+    const strict = builtinRule("slop_vocab", { words: ["landscape"], except: [] });
+    expect(checkRegexRule(strict, "Her sister is a landscape architect.")).toHaveLength(1);
+  });
+
+  test("a word that merely contains a listed stem is not a match", () => {
+    const rule = builtinRule("slop_vocab", { words: ["realm"] });
+    expect(checkRegexRule(rule, "The overwhelming majority agreed.")).toHaveLength(0);
+  });
 });
 
 describe("judgment rules and the regex arm", () => {

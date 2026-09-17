@@ -76,6 +76,12 @@ interface RuleCommon {
   /** One line in the plain-and-a-little-funny register, printed with the flag. */
   readonly message: string;
   readonly seed?: Seed;
+  /**
+   * What kind of rule this is, so a reader can tell a rule about writing from a
+   * rule about a marketing page. A ruleset's `off_by_default` names the tags
+   * that do not run unless they are asked for.
+   */
+  readonly tags?: readonly string[];
 }
 
 /** Knobs a countable rule may carry. Which ones apply depends on the check. */
@@ -95,6 +101,11 @@ interface RegexTuning {
   readonly min_sentences?: number;
   /** `banned_words` and `slop_vocab`: the word list to match. */
   readonly words?: readonly string[];
+  /**
+   * `banned_words` and `slop_vocab`: literal phrases in which a listed word is
+   * doing its honest job, and is not a flag.
+   */
+  readonly except?: readonly string[];
 }
 
 /**
@@ -140,6 +151,15 @@ export interface Ruleset {
   readonly version: 1;
   /** Probability at or above which a flag counts. Absent means the caller decides. */
   readonly threshold?: number;
+  /**
+   * Tags whose rules sit out an ordinary run.
+   *
+   * A rule that encodes a convention of one kind of writing is not wrong; it is
+   * out of place everywhere else. Naming those tags here is how a ruleset can
+   * carry both without a paragraph of documentation being told that its honest
+   * scope note is a defect.
+   */
+  readonly off_by_default?: readonly string[];
   readonly rules: readonly Rule[];
 }
 

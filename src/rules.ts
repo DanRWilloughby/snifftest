@@ -44,6 +44,30 @@ export const DEFAULT_SLOP_WORDS: readonly string[] = [
   "showcase",
 ];
 
+/**
+ * The literal senses of the listed words, spared by default.
+ *
+ * Every word on the slop list has an honest use, and the rule's own comment
+ * already admitted it. A landscape architect is a job, sailors navigate by the
+ * stars, and a door unlocks. The list is short and is meant to be added to: a
+ * ruleset writes its own `except` and this one stops applying.
+ */
+export const DEFAULT_SLOP_EXCEPTIONS: readonly string[] = [
+  "landscape architect",
+  "landscape architecture",
+  "landscape gardener",
+  "landscape orientation",
+  "landscape mode",
+  "navigate to",
+  "navigate by",
+  "navigate the menu",
+  "navigation bar",
+  "navigation pane",
+  "unlock the door",
+  "unlock the screen",
+  "unlock your phone",
+];
+
 const DEFAULT_COLON_MIN = 3;
 const DEFAULT_RHYTHM_FLOOR = 0.25;
 const DEFAULT_MIN_SENTENCES = 4;
@@ -97,8 +121,9 @@ const BUILTINS: Readonly<Record<string, BuiltinCheck>> = {
   // `colon_heavy` in prose. Both spellings resolve to the same check.
   colon_heavy: colonCount,
   sentence_rhythm: sentenceRhythm,
-  slop_vocab: (text, rule) => wordList(text, rule.words ?? DEFAULT_SLOP_WORDS),
-  banned_words: (text, rule) => wordList(text, rule.words ?? []),
+  slop_vocab: (text, rule) =>
+    wordList(text, rule.words ?? DEFAULT_SLOP_WORDS, rule.except ?? DEFAULT_SLOP_EXCEPTIONS),
+  banned_words: (text, rule) => wordList(text, rule.words ?? [], rule.except ?? []),
 };
 
 export function builtinNames(): readonly string[] {
@@ -128,6 +153,11 @@ export function validateRuleset(doc: YamlValue, file: string): Ruleset {
     }
   }
 
+  const offByDefault =
+    doc.off_by_default === undefined || doc.off_by_default === null
+      ? undefined
+      : stringList(doc.off_by_default, "off_by_default", file);
+
   const raw = doc.rules;
   if (!Array.isArray(raw)) {
     throw new RulesetError(`${file}: rules must be a list`);
@@ -145,6 +175,7 @@ export function validateRuleset(doc: YamlValue, file: string): Ruleset {
   return {
     version: 1,
     ...(typeof threshold === "number" ? { threshold } : {}),
+    ...(offByDefault === undefined ? {} : { off_by_default: offByDefault }),
     rules,
   };
 }
@@ -164,10 +195,15 @@ function validateRule(entry: YamlValue, file: string): Rule {
   }
 
   const seed = validateSeed(entry.seed, where);
+  const tags =
+    entry.tags === undefined || entry.tags === null
+      ? undefined
+      : stringList(entry.tags, "tags", where);
   const common = {
     id,
     message,
     ...(seed === undefined ? {} : { seed }),
+    ...(tags === undefined ? {} : { tags }),
   };
   const kind = entry.kind;
 
@@ -188,6 +224,7 @@ interface CommonFields {
   readonly id: string;
   readonly message: string;
   readonly seed?: Seed;
+  readonly tags?: readonly string[];
 }
 
 function validateRegexRule(
@@ -217,6 +254,9 @@ function validateRegexRule(
     ...(entry.words === undefined || entry.words === null
       ? {}
       : { words: stringList(entry.words, "words", where) }),
+    ...(entry.except === undefined || entry.except === null
+      ? {}
+      : { except: stringList(entry.except, "except", where) }),
     ...chunkField(entry.chunks, where),
   };
 
@@ -398,13 +438,65 @@ function sentenceRhythm(text: string, rule: BuiltinRule): Match[] {
   return coefficient < floor ? [{ index: 0 }] : [];
 }
 
-function wordList(text: string, words: readonly string[]): Match[] {
+/**
+ * A word list matched the way the rule says it is matched.
+ *
+ * The rule promises "any inflection that shares the stem as written", and a
+ * bare word boundary delivered nothing of the sort: `delve` missed "delves" and
+ * "delving", `seamless` missed "seamlessly", `navigate` missed "navigating".
+ * The words a checker like this exists to catch almost never appear in their
+ * dictionary form, so the rule was answering a question nobody asks.
+ *
+ * The endings below are the ordinary English ones, with the silent `e` and the
+ * `y` handled, because those two are where most of the misses were. It is not a
+ * stemmer and does not want to be: a list of endings can be read and argued
+ * with in a way that a stemming algorithm cannot.
+ */
+const CONSONANT_ENDINGS = "s|es|ed|ing|ly|ment|ments|ion|ions";
+const SILENT_E_KEPT = "s|d|ly|ment|ments";
+const SILENT_E_DROPPED = "es|ed|ing|ion|ions";
+
+function inflections(word: string): string {
+  const stem = escapeRegExp(word.trim()).replace(/\\?\s+/g, "\\s+");
+  if (word.endsWith("e")) {
+    const dropped = escapeRegExp(word.trim().slice(0, -1)).replace(/\\?\s+/g, "\\s+");
+    return `${stem}(?:${SILENT_E_KEPT})?|${dropped}(?:${SILENT_E_DROPPED})`;
+  }
+  if (word.endsWith("y")) {
+    const dropped = escapeRegExp(word.trim().slice(0, -1)).replace(/\\?\s+/g, "\\s+");
+    return `${stem}(?:${CONSONANT_ENDINGS})?|${dropped}(?:ies|ied)`;
+  }
+  return `${stem}(?:${CONSONANT_ENDINGS})?`;
+}
+
+function wordList(text: string, words: readonly string[], except: readonly string[]): Match[] {
   if (words.length === 0) return [];
   const alternation = [...words]
     .sort((a, b) => b.length - a.length)
-    .map((word) => escapeRegExp(word.trim()).replace(/\\?\s+/g, "\\s+"))
+    .map(inflections)
     .join("|");
-  return patternMatches(new RegExp(`\\b(?:${alternation})\\b`, "gi"), text);
+  const found = patternMatches(new RegExp(`\\b(?:${alternation})\\b`, "gi"), text);
+  if (except.length === 0) return found;
+
+  const spared = exceptionSpans(text, except);
+  return found.filter((match) => !spared.some(([from, to]) => match.index >= from && match.index < to));
+}
+
+/** Where in the text a listed literal sense sits, so a match inside one is spared. */
+function exceptionSpans(text: string, except: readonly string[]): [number, number][] {
+  const spans: [number, number][] = [];
+  for (const phrase of except) {
+    const needle = phrase.trim();
+    if (needle === "") continue;
+    const scanner = new RegExp(escapeRegExp(needle).replace(/\\?\s+/g, "\\s+"), "gi");
+    for (;;) {
+      const hit = scanner.exec(text);
+      if (hit === null) break;
+      spans.push([hit.index, hit.index + hit[0].length]);
+      if (hit[0] === "") scanner.lastIndex++;
+    }
+  }
+  return spans;
 }
 
 function patternMatches(pattern: RegExp, text: string): Match[] {

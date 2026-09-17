@@ -584,3 +584,52 @@ rules:
     expect(result.out).toBe("");
   });
 });
+
+describe("choosing rules by tag", () => {
+  const TAGGED = "tests/fixtures/rules/tagged.yaml";
+
+  test("a tagged rule sits out an ordinary run and stderr says which tag kept it out", async () => {
+    const result = await run({
+      argv: ["check", "--dry-run", "--rules", TAGGED, `${TEXTS}/flagged.md`],
+    });
+
+    expect(result.out).toContain("dash_present");
+    expect(result.out).not.toContain("colon_heavy");
+    expect(result.err).toContain('colon_heavy sat this run out: the tag "marketing" is off by default.');
+  });
+
+  test("--only names the tag, which runs those rules and nothing else", async () => {
+    const result = await run({
+      argv: ["check", "--dry-run", "--rules", TAGGED, "--only", "marketing", `${TEXTS}/flagged.md`],
+    });
+
+    expect(result.out).toContain("colon_heavy");
+    expect(result.out).not.toContain("dash_present");
+  });
+
+  test("--skip takes a rule out of a run that would otherwise include it", async () => {
+    const result = await run({
+      argv: ["check", "--dry-run", "--rules", MIXED, "--skip", "house", `${TEXTS}/flagged.md`],
+    });
+
+    expect(result.out).toContain("colon_heavy");
+    expect(result.out).not.toContain("dash_present");
+  });
+
+  test("an empty tag list is a usage error rather than a silent no-op", async () => {
+    const result = await run({
+      argv: ["check", "--dry-run", "--rules", TAGGED, "--only", " ,", `${TEXTS}/flagged.md`],
+    });
+
+    expect(result.code).toBe(EXIT.failure);
+    expect(result.err).toContain("--only needs at least one tag.");
+  });
+
+  test("rules prints each rule's tags and says which sit out by default", async () => {
+    const result = await run({ argv: ["rules", "--rules", TAGGED] });
+
+    expect(result.out).toContain("off by default, unless --only names one: marketing");
+    expect(result.out).toContain("[marketing]");
+    expect(result.out).toContain("(off by default)");
+  });
+});
