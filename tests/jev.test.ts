@@ -278,18 +278,43 @@ describe("createJevClient retries", () => {
     expect(result.attempts).toBe(2);
   });
 
-  test("a Retry-After longer than the cap is capped, and a nonsense one is ignored", async () => {
+  test("a Retry-After longer than the cap is reported, not waited out three times", async () => {
+    // The cap used to be applied to the wait, so an hour became eight seconds
+    // and the run took the eight seconds three times over before reporting the
+    // same failure anyway. Past the cap there is nothing worth waiting for.
     const hour = stubFetch([
       () => new Response("later", { status: 503, headers: { "retry-after": "3600" } }),
       () => ok(answered),
     ]);
     const capped = recordingSleep();
-    await createJevClient({ apiKey: fakeKey, fetch: hour.doFetch, sleep: capped.sleep }).ask({
-      state: "A paragraph.",
-      questions,
-    });
-    expect(capped.waited).toEqual([8000]);
+    const thrown = await createJevClient({ apiKey: fakeKey, fetch: hour.doFetch, sleep: capped.sleep })
+      .ask({ state: "A paragraph.", questions })
+      .catch((e: unknown) => e);
 
+    expect(capped.waited).toEqual([]);
+    expect(hour.calls).toHaveLength(1);
+    expect(thrown).toBeInstanceOf(JevHttpError);
+    expect((thrown as JevHttpError).message).toContain("3600 seconds");
+    expect((thrown as JevHttpError).message).toContain("8 second cap");
+  });
+
+  test("a Retry-After of zero waits the ladder's first step rather than hammering", async () => {
+    const atOnce = stubFetch([
+      () => new Response("later", { status: 503, headers: { "retry-after": "0" } }),
+      () => ok(answered),
+    ]);
+    const clock = recordingSleep();
+    const result = await createJevClient({
+      apiKey: fakeKey,
+      fetch: atOnce.doFetch,
+      sleep: clock.sleep,
+    }).ask({ state: "A paragraph.", questions });
+
+    expect(clock.waited).toEqual([1000]);
+    expect(result.attempts).toBe(2);
+  });
+
+  test("a nonsense Retry-After is ignored and the ladder is used", async () => {
     const nonsense = stubFetch([
       () => new Response("later", { status: 503, headers: { "retry-after": "whenever" } }),
       () => ok(answered),

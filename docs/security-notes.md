@@ -108,6 +108,32 @@ re-opened by new evidence, never by being raised again.
   themselves would be the attacker's. Keep the cache per user, or turn it off in
   CI with `SNIFFTEST_CACHE_DIR=off`.
 
+- **Following a `.snifftest.yaml` that is a symbolic link.** Rejected for a
+  ruleset found by discovery, kept for one named with `--rules`. A file found by
+  looking in the working directory is one nobody typed, and a link there reads a
+  ruleset from somewhere else in the tree, or outside it, under a name that says
+  the rules are local. The refusal names the file it is pointing at so the
+  caller can name it themselves, which is the whole of the workaround. A path
+  the caller typed is their own business, and refusing it would break a house
+  ruleset kept in a dotfiles directory and linked in on purpose.
+
+- **Waiting out a `Retry-After` past the cap.** Rejected. The cap used to be
+  applied to the wait, so a header asking for an hour became an eight second
+  wait, taken three times over, before reporting the same failure anyway. Past
+  the cap the service is asking for more time than a check of somebody's prose
+  is worth holding for, and the only question is whether that is reported now or
+  in a minute. A header of zero is the other direction, a service asking to be
+  hammered, and it gets the ladder's first step rather than no wait at all.
+
+- **A timeout on the judgment arm instead of a budget.** Rejected: a timeout
+  would throw away a run that has already been paid for. The arm is given a
+  budget of twenty seconds for every paragraph it means to send, with a floor of
+  a minute, consulted before each request. A request in flight finishes, every
+  answer already received is kept, and the paragraphs that went unasked are
+  named. Without it the breaker covers a service that fails and nothing covers
+  one that answers slowly, which on a few hundred paragraphs is a hook with no
+  ceiling.
+
 ## Owner actions
 
 Things no change in this repository can settle.
