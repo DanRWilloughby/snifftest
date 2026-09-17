@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "runDate": null,
+  "measured": false,
+  "note": "An example, so the page can be tried without a key. The probabilities, milliseconds and dollars in this file are made up and the page says so. A replay recorded from a real bench run sets measured to true and carries the runDate of that run.",
+  "default": {
+    "nouls": {
+      "not_x_but_y": 0.03,
+      "tricolon": 0.05,
+      "stacked_hedging": 0.02,
+      "rhetorical_opener": 0.02,
+      "restating_closer": 0.04,
+      "self_undercutting": 0.03,
+      "first_x_that": 0.02,
+      "naked_cost_figure": 0.02,
+      "jobs_claim": 0.01,
+      "pullquote_fragment": 0.02
+    },
+    "inputTokens": 3650,
+    "latencyMs": 398,
+    "estimatedCostUsd": 0.0001533
+  },
+  "responses": [
+    {
+      "match": "first tool that",
+      "nouls": {
+        "not_x_but_y": 0.03,
+        "tricolon": 0.05,
+        "stacked_hedging": 0.02,
+        "rhetorical_opener": 0.02,
+        "restating_closer": 0.04,
+        "self_undercutting": 0.03,
+        "first_x_that": 0.94,
+        "naked_cost_figure": 0.02,
+        "jobs_claim": 0.01,
+        "pullquote_fragment": 0.02
+      },
+      "inputTokens": 3702,
+      "latencyMs": 412,
+      "estimatedCostUsd": 0.000155484
+    },
+    {
+      "match": "cost us $",
+      "nouls": {
+        "not_x_but_y": 0.03,
+        "tricolon": 0.05,
+        "stacked_hedging": 0.02,
+        "rhetorical_opener": 0.02,
+        "restating_closer": 0.04,
+        "self_undercutting": 0.03,
+        "first_x_that": 0.94,
+        "naked_cost_figure": 0.78,
+        "jobs_claim": 0.01,
+        "pullquote_fragment": 0.02
+      },
+      "inputTokens": 3731,
+      "latencyMs": 436,
+      "estimatedCostUsd": 0.000156702
+    },
+    {
+      "match": "In short,",
+      "nouls": {
+        "not_x_but_y": 0.03,
+        "tricolon": 0.05,
+        "stacked_hedging": 0.02,
+        "rhetorical_opener": 0.02,
+        "restating_closer": 0.91,
+        "self_undercutting": 0.03,
+        "first_x_that": 0.94,
+        "naked_cost_figure": 0.78,
+        "jobs_claim": 0.01,
+        "pullquote_fragment": 0.02
+      },
+      "inputTokens": 3768,
+      "latencyMs": 421,
+      "estimatedCostUsd": 0.000158256
+    }
+  ]
+}

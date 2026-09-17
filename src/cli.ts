@@ -47,6 +47,7 @@ import {
   createJevClient,
 } from "./jev.ts";
 import { RulesetError } from "./rules.ts";
+import { serve } from "./serve/command.ts";
 import { type Flag, isJudgmentRule } from "./types.ts";
 import { YamlError } from "./yaml.ts";
 
@@ -119,6 +120,7 @@ export async function runCli(deps: CliDeps): Promise<number> {
     deps.write(version());
     return EXIT.ok;
   }
+  if (argv[0] === "serve") return serve(deps);
 
   let options: Options;
   try {
