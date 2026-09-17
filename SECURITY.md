@@ -104,28 +104,32 @@ pay for every paragraph twice. The cache is under `SNIFFTEST_CACHE_DIR`, else
 `$XDG_CACHE_HOME/snifftest`, else `~/.cache/snifftest`. Each file is named by a
 SHA-256 of the paragraph, the exact wording of the questions and the model
 alias, and it holds rule ids, probabilities, the served model name and a date.
-The paragraph is never written to disk. Entries expire after fourteen days.
+The paragraph is never written to disk. Files are written 0600 inside a 0700
+directory, and a relative `SNIFFTEST_CACHE_DIR` is resolved against the home
+directory so the cache can never land inside the tree being checked. Entries
+expire after fourteen days.
 `--no-cache` skips the cache for a run and `SNIFFTEST_CACHE_DIR=off` disables
 it. The cache is opened only after the key check and the consent gate, and
 never on `--dry-run`.
 
 ## Known limits
 
-- A hash is not the text, but anyone who already has a paragraph can confirm
-  from the cache that it was checked. Cache files take the process umask,
-  which is usually world-readable, where the consent file is 0600.
-- Cache entries are keyed on the model alias `jev-latest`. For up to fourteen
-  days after the service moves that alias, answers from the previous version
-  can be reported as this run's.
+- A hash is not the text, but anyone who can read the cache and already has a
+  paragraph can confirm from it that the paragraph was checked.
+- Cache entries are keyed on the model alias `jev-latest`. A run's first live
+  answer names the model actually served, and entries from an older model are
+  dropped from then on. A run answered entirely from the cache has no live
+  answer to compare against, so for up to fourteen days after the service
+  moves the alias such a run can report the previous version's answers.
 - A cache directory that other users or other jobs can write to is a cache they
   can poison. Keep it private. A poisoned entry can change a probability and
   nothing else, because the reader drops any entry that is not a well-formed
   set of numbers between 0 and 1.
 - A pattern rule is refused when it applies a quantifier to a group that
-  already contains one. That refusal does not see the same problem written
-  with alternation, and the cap on how much text a pattern sees is not a bound
-  on how long that family can run. A `.snifftest.yaml` from a repository you
-  do not trust can therefore hang a run.
+  already contains one, or when two branches of an alternation can start on
+  the same character. Behind those shape rules sits a timing probe with a
+  small budget. The probe is a measurement, not a proof: a shape nobody has
+  written down yet can pass it on a fast machine and run long on a slow one.
 - The hook and the Action fetch the checker from the npm registry at the
   pinned version. What arrives is whatever the registry serves for that name
   and version, so a tag protection rule on this repository and a commit pin on
@@ -134,11 +138,10 @@ never on `--dry-run`.
 - The scrubber removes the key's value, and prefixes and suffixes of it. It
   cannot remove a re-encoding of the value, such as base64 or a hash, and does
   not try.
-- The judgment arm has no overall deadline. A service that is down can hold a
-  run for about three minutes before the breaker stops asking.
 - A `.snifftest.yaml` found in the working directory may extend only files
-  under its own directory tree, or the shipped default. The file it starts
-  from is read even when it is a symbolic link.
+  under its own directory tree, or the shipped default, and is refused when it
+  is a symbolic link. A file named on `--rules` is followed wherever it points,
+  because naming it is the decision.
 
 ## Reporting a vulnerability
 
