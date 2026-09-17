@@ -234,7 +234,7 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
     chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS }),
   );
 
-  const countable = runRegexArm(chunks, ruleset);
+  const countable = runRegexArm(chunks, ruleset, deps.writeError);
   const judgmentRules = ruleset.rules.filter(isJudgmentRule);
 
   if (options.dryRun || judgmentRules.length === 0 || chunks.length === 0) {
