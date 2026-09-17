@@ -1,0 +1,342 @@
+/**
+ * Rule types, ruleset validation, and the built-in countable checks.
+ *
+ * Countable rules live here and run with no network. Judgment rules are
+ * validated here and answered elsewhere; nothing in this file calls out.
+ */
+
+import type { Match, RegexRule, Rule, Ruleset, Seed } from "./types.ts";
+import { type YamlValue, parseYaml } from "./yaml.ts";
+
+export class RulesetError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RulesetError";
+  }
+}
+
+/** Default word list for `slop_vocab`; a rule may replace it with its own `words`. */
+export const DEFAULT_SLOP_WORDS: readonly string[] = [
+  "delve",
+  "tapestry",
+  "landscape",
+  "unlock",
+  "testament",
+  "navigate",
+  "realm",
+  "myriad",
+  "intricate",
+  "pivotal",
+  "seamless",
+  "showcase",
+];
+
+const DEFAULT_COLON_MIN = 3;
+const DEFAULT_RHYTHM_FLOOR = 0.25;
+const DEFAULT_MIN_SENTENCES = 4;
+
+type BuiltinCheck = (text: string, rule: RegexRule) => Match[];
+
+const BUILTINS: Readonly<Record<string, BuiltinCheck>> = {
+  dash_present: dashPresent,
+  colon_count: colonCount,
+  // The plan writes this check as `colon_count` in the ruleset shape and as
+  // `colon_heavy` in prose. Both spellings resolve to the same check.
+  colon_heavy: colonCount,
+  sentence_rhythm: sentenceRhythm,
+  slop_vocab: (text, rule) => wordList(text, rule.words ?? DEFAULT_SLOP_WORDS),
+  banned_words: (text, rule) => wordList(text, rule.words ?? []),
+};
+
+export function builtinNames(): readonly string[] {
+  return Object.keys(BUILTINS);
+}
+
+// --- reading and validating ----------------------------------------------
+
+/** Read a ruleset from YAML source and validate it. */
+export function parseRuleset(source: string, file: string): Ruleset {
+  return validateRuleset(parseYaml(source, file), file);
+}
+
+/** Validate an already-parsed ruleset document. */
+export function validateRuleset(doc: YamlValue, file: string): Ruleset {
+  if (!isMapping(doc)) {
+    throw new RulesetError(`${file}: a ruleset must be a mapping with version and rules`);
+  }
+  if (doc.version !== 1) {
+    throw new RulesetError(`${file}: version must be 1`);
+  }
+
+  const threshold = doc.threshold;
+  if (threshold !== undefined && threshold !== null) {
+    if (typeof threshold !== "number" || threshold < 0 || threshold > 1) {
+      throw new RulesetError(`${file}: threshold must be a number between 0 and 1`);
+    }
+  }
+
+  const raw = doc.rules;
+  if (!Array.isArray(raw)) {
+    throw new RulesetError(`${file}: rules must be a list`);
+  }
+
+  const rules: Rule[] = [];
+  const seen = new Set<string>();
+  for (const entry of raw) {
+    const rule = validateRule(entry, file);
+    if (seen.has(rule.id)) throw new RulesetError(`${file}: duplicate rule id "${rule.id}"`);
+    seen.add(rule.id);
+    rules.push(rule);
+  }
+
+  return {
+    version: 1,
+    ...(typeof threshold === "number" ? { threshold } : {}),
+    rules,
+  };
+}
+
+function validateRule(entry: YamlValue, file: string): Rule {
+  if (!isMapping(entry)) throw new RulesetError(`${file}: every rule must be a mapping`);
+
+  const id = entry.id;
+  if (typeof id !== "string" || id.trim() === "") {
+    throw new RulesetError(`${file}: every rule needs a non-empty string id`);
+  }
+  const where = `${file}: rule "${id}"`;
+
+  const message = entry.message;
+  if (typeof message !== "string" || message.trim() === "") {
+    throw new RulesetError(`${where}: message must be a non-empty string`);
+  }
+
+  const seed = validateSeed(entry.seed, where);
+  const kind = entry.kind;
+
+  if (kind === "regex") {
+    return {
+      id,
+      kind: "regex",
+      message,
+      ...(seed === undefined ? {} : { seed }),
+      ...validateRegexBody(entry, where),
+    };
+  }
+
+  if (kind === "judgment") {
+    return {
+      id,
+      kind: "judgment",
+      message,
+      ...(seed === undefined ? {} : { seed }),
+      ...validateJudgmentBody(entry, where),
+    };
+  }
+
+  throw new RulesetError(`${where}: kind must be "regex" or "judgment"`);
+}
+
+function validateRegexBody(
+  entry: Readonly<Record<string, YamlValue>>,
+  where: string,
+): Omit<RegexRule, "id" | "kind" | "message" | "seed"> {
+  const builtin = entry.builtin;
+  const pattern = entry.pattern;
+  const hasBuiltin = builtin !== undefined && builtin !== null;
+  const hasPattern = pattern !== undefined && pattern !== null;
+
+  if (hasBuiltin === hasPattern) {
+    throw new RulesetError(`${where}: a regex rule needs exactly one of builtin or pattern`);
+  }
+
+  const flags = entry.flags;
+  if (flags !== undefined && flags !== null && typeof flags !== "string") {
+    throw new RulesetError(`${where}: flags must be a string`);
+  }
+
+  if (hasPattern) {
+    if (typeof pattern !== "string") {
+      throw new RulesetError(`${where}: pattern must be a string`);
+    }
+    try {
+      new RegExp(pattern, withGlobal(typeof flags === "string" ? flags : ""));
+    } catch (error) {
+      throw new RulesetError(`${where}: pattern is not a valid regular expression (${reason(error)})`);
+    }
+  } else if (typeof builtin !== "string" || !Object.hasOwn(BUILTINS, builtin)) {
+    throw new RulesetError(`${where}: unknown built-in "${String(builtin)}"`);
+  }
+
+  return {
+    ...(hasBuiltin ? { builtin: builtin as string } : {}),
+    ...(hasPattern ? { pattern: pattern as string } : {}),
+    ...(typeof flags === "string" ? { flags } : {}),
+    ...numberField(entry.min, "min", where),
+    ...numberField(entry.floor, "floor", where),
+    ...numberField(entry.min_sentences, "min_sentences", where),
+    ...(entry.words === undefined || entry.words === null
+      ? {}
+      : { words: stringList(entry.words, "words", where) }),
+  };
+}
+
+function validateJudgmentBody(
+  entry: Readonly<Record<string, YamlValue>>,
+  where: string,
+): { what: string; not_for?: string; examples?: readonly string[]; criteria: { true: string; false: string } } {
+  const what = entry.what;
+  if (typeof what !== "string" || what.trim() === "") {
+    throw new RulesetError(`${where}: what must be a non-empty string describing the defect`);
+  }
+
+  const notFor = entry.not_for;
+  if (notFor !== undefined && notFor !== null && typeof notFor !== "string") {
+    throw new RulesetError(`${where}: not_for must be a string`);
+  }
+
+  const examples =
+    entry.examples === undefined || entry.examples === null
+      ? undefined
+      : stringList(entry.examples, "examples", where);
+
+  const criteria = entry.criteria;
+  if (!isMapping(criteria)) {
+    throw new RulesetError(`${where}: criteria must be a mapping with true and false`);
+  }
+  if (typeof criteria.true !== "string" || criteria.true.trim() === "") {
+    throw new RulesetError(`${where}: criteria.true must be a non-empty string`);
+  }
+  if (typeof criteria.false !== "string" || criteria.false.trim() === "") {
+    throw new RulesetError(`${where}: criteria.false must be a non-empty string`);
+  }
+
+  return {
+    what,
+    ...(typeof notFor === "string" ? { not_for: notFor } : {}),
+    ...(examples === undefined ? {} : { examples }),
+    criteria: { true: criteria.true, false: criteria.false },
+  };
+}
+
+function validateSeed(value: YamlValue | undefined, where: string): Seed | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!isMapping(value)) throw new RulesetError(`${where}: seed must be a mapping`);
+
+  if (typeof value.transform === "string") {
+    const count = value.count;
+    if (count !== undefined && count !== null && typeof count !== "number") {
+      throw new RulesetError(`${where}: seed.count must be a number`);
+    }
+    return {
+      transform: value.transform,
+      ...(typeof count === "number" ? { count } : {}),
+    };
+  }
+
+  if (value.splice !== undefined && value.splice !== null) {
+    return { splice: stringList(value.splice, "seed.splice", where) };
+  }
+
+  throw new RulesetError(`${where}: seed needs either a transform or a splice list`);
+}
+
+// --- running the countable checks ----------------------------------------
+
+/** Run one countable rule over one chunk of text. Never touches the network. */
+export function checkRegexRule(rule: RegexRule, text: string): Match[] {
+  if (rule.pattern !== undefined) {
+    return patternMatches(new RegExp(rule.pattern, withGlobal(rule.flags ?? "")), text);
+  }
+  const check = rule.builtin === undefined ? undefined : BUILTINS[rule.builtin];
+  if (check === undefined) {
+    throw new RulesetError(`rule "${rule.id}": unknown built-in "${String(rule.builtin)}"`);
+  }
+  return check(text, rule);
+}
+
+function dashPresent(text: string): Match[] {
+  return patternMatches(/[–—]/g, text);
+}
+
+function colonCount(text: string, rule: RegexRule): Match[] {
+  const min = rule.min ?? DEFAULT_COLON_MIN;
+  const first = text.indexOf(":");
+  let count = 0;
+  for (const ch of text) if (ch === ":") count++;
+  return count >= min && first !== -1 ? [{ index: first }] : [];
+}
+
+function sentenceRhythm(text: string, rule: RegexRule): Match[] {
+  const floor = rule.floor ?? DEFAULT_RHYTHM_FLOOR;
+  const minSentences = rule.min_sentences ?? DEFAULT_MIN_SENTENCES;
+
+  const lengths = text
+    .split(/(?<=[.!?])\s+/)
+    .map((sentence) => sentence.trim().split(/\s+/).filter(Boolean).length)
+    .filter((length) => length > 0);
+
+  if (lengths.length < minSentences) return [];
+
+  const mean = lengths.reduce((sum, n) => sum + n, 0) / lengths.length;
+  if (mean === 0) return [];
+  const variance = lengths.reduce((sum, n) => sum + (n - mean) ** 2, 0) / lengths.length;
+  const coefficient = Math.sqrt(variance) / mean;
+
+  return coefficient < floor ? [{ index: 0 }] : [];
+}
+
+function wordList(text: string, words: readonly string[]): Match[] {
+  if (words.length === 0) return [];
+  const alternation = [...words]
+    .sort((a, b) => b.length - a.length)
+    .map((word) => escapeRegExp(word.trim()).replace(/\\?\s+/g, "\\s+"))
+    .join("|");
+  return patternMatches(new RegExp(`\\b(?:${alternation})\\b`, "gi"), text);
+}
+
+function patternMatches(pattern: RegExp, text: string): Match[] {
+  const matches: Match[] = [];
+  const scanner = new RegExp(pattern.source, withGlobal(pattern.flags));
+  for (;;) {
+    const found = scanner.exec(text);
+    if (found === null) break;
+    matches.push({ index: found.index });
+    if (found[0] === "") scanner.lastIndex++;
+  }
+  return matches;
+}
+
+// --- small helpers --------------------------------------------------------
+
+function isMapping(value: YamlValue | undefined): value is Record<string, YamlValue> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function withGlobal(flags: string): string {
+  return flags.includes("g") ? flags : `${flags}g`;
+}
+
+function numberField(
+  value: YamlValue | undefined,
+  name: "min" | "floor" | "min_sentences",
+  where: string,
+): Partial<Record<"min" | "floor" | "min_sentences", number>> {
+  if (value === undefined || value === null) return {};
+  if (typeof value !== "number") throw new RulesetError(`${where}: ${name} must be a number`);
+  return { [name]: value };
+}
+
+function stringList(value: YamlValue | undefined, name: string, where: string): readonly string[] {
+  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
+    throw new RulesetError(`${where}: ${name} must be a list of strings`);
+  }
+  return value as string[];
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function reason(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
