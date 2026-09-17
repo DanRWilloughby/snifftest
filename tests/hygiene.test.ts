@@ -497,6 +497,25 @@ describe("the tool passes the dash rule it enforces", () => {
     for (const { file } of allowed) {
       expect(existsSync(join(repoRoot, file))).toBe(true);
     }
+    for (const { directory } of allowedDirectories) {
+      expect(existsSync(join(repoRoot, directory))).toBe(true);
+    }
+  });
+
+  test("a run is excluded for its planted faults, not as somewhere to put prose", async () => {
+    // The exclusion covers a recorded run because the seeder plants a long dash
+    // on purpose and the scores quote the edit back. That is the machine's own
+    // record of what it did. Anything in a run that a person reads, the tables
+    // above all, passes the rule like every other document in the repository.
+    const tracked = (await Bun.$`git ls-files bench/results`.cwd(repoRoot).text())
+      .split("\n")
+      .filter((path) => path !== "");
+    expect(tracked.length).toBeGreaterThan(0);
+
+    const carrying = tracked.filter((path) => LONG_DASH.test(readFileSync(join(repoRoot, path), "utf8")));
+    const written = carrying.filter((path) => !/\/(inputs|raw)\/[^/]+\.json$/.test(path) && !path.endsWith("/scores.json"));
+
+    expect(written).toEqual([]);
   });
 
   test("no other tracked file carries one", async () => {
