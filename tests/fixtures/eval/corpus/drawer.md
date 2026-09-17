@@ -1,0 +1,3 @@
+The first draft went out on a Tuesday, which is the day the office is quietest. Nobody read it. A week later the same draft came back with three comments, two of them about the title. That is the whole history of the document, as far as anyone can tell from the record. We keep it in the drawer with the others.
+
+Every checklist we wrote in the first year was too long, and every one of them was ignored. The second year we cut them to nine items, printed them on card, and put them where the work happens. Two of the nine are still argued about. The rest are used without comment, which is the only measure that has ever mattered here.

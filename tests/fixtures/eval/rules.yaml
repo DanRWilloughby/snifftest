@@ -1,0 +1,42 @@
+# Four rules, two of each kind, so an eval exercises both arms end to end.
+version: 1
+threshold: 0.7
+rules:
+  - id: dash_present
+    kind: regex
+    builtin: dash_present
+    message: "A long dash. Give the sentence a full stop instead."
+    seed: { transform: insert_em_dash, count: 1 }
+
+  - id: colon_heavy
+    kind: regex
+    builtin: colon_count
+    min: 3
+    message: "Three colons in one paragraph. Pick one."
+    seed: { transform: add_colons, count: 3 }
+
+  - id: restating_closer
+    kind: judgment
+    what: "The last sentence only says the paragraph again."
+    not_for: "A last sentence that lands something new."
+    examples: ["In short, everything above is what we said."]
+    criteria:
+      true: "The last sentence adds nothing."
+      false: "The last sentence adds something."
+    message: "The last sentence says the paragraph again."
+    seed:
+      splice: ["Put simply, that is the whole of what was said just above."]
+      position: end
+
+  - id: first_x_that
+    kind: judgment
+    what: "A claim to be the first to do something."
+    not_for: "First as a position in a sequence."
+    examples: ["This is the first tool that reads a draft the way an editor does."]
+    criteria:
+      true: "The paragraph claims the writer was first."
+      false: "No first claim is made."
+    message: "The first X that. Someone will check."
+    seed:
+      splice: ["We were the first team anywhere to count them this way."]
+      position: any
