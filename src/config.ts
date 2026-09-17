@@ -52,7 +52,17 @@ export interface ResolvedRuleset {
   readonly ruleset: Ruleset;
   /** Every file that contributed, the nearest one first. */
   readonly sources: readonly string[];
+  /**
+   * Things the file said that this tool does not read. A mistyped key is
+   * indistinguishable from a key we ignore on purpose, so it is named rather
+   * than dropped — but it is a warning, because a strict refusal would break
+   * every ruleset written against a later version of the tool.
+   */
+  readonly warnings: readonly string[];
 }
+
+/** Every top-level key a ruleset file may set. */
+const KNOWN_KEYS: readonly string[] = ["version", "threshold", "rules", "extends"];
 
 /**
  * The ruleset that ships in the package.
@@ -68,8 +78,9 @@ export function resolveRuleset(options: ResolveRulesetOptions): ResolvedRuleset 
   const defaultPath = options.defaultRulesPath ?? packagedRulesPath();
   const start = startingFile(options, defaultPath);
   const sources: string[] = [];
-  const ruleset = load(start, defaultPath, sources, 0);
-  return { ruleset, sources };
+  const warnings: string[] = [];
+  const ruleset = load(start, defaultPath, sources, warnings, 0);
+  return { ruleset, sources, warnings };
 }
 
 function startingFile(options: ResolveRulesetOptions, defaultPath: string): string {
@@ -94,7 +105,13 @@ function startingFile(options: ResolveRulesetOptions, defaultPath: string): stri
   return defaultPath;
 }
 
-function load(file: string, defaultPath: string, sources: string[], depth: number): Ruleset {
+function load(
+  file: string,
+  defaultPath: string,
+  sources: string[],
+  warnings: string[],
+  depth: number,
+): Ruleset {
   if (depth > MAX_EXTENDS_DEPTH) {
     throw new ConfigError(`${file}: extends is nested more than ${MAX_EXTENDS_DEPTH} deep`);
   }
@@ -105,10 +122,18 @@ function load(file: string, defaultPath: string, sources: string[], depth: numbe
 
   const doc = parseYaml(read(file), file);
   const own = validateRuleset(doc, file);
+  for (const key of unknownKeys(doc)) {
+    warnings.push(`${file}: unknown key "${key}", which this version of snifftest does not read.`);
+  }
   const inherited = extendsTarget(doc, file, defaultPath);
   if (inherited === undefined) return own;
 
-  return merge(load(inherited, defaultPath, sources, depth + 1), own);
+  return merge(load(inherited, defaultPath, sources, warnings, depth + 1), own);
+}
+
+function unknownKeys(doc: YamlValue): string[] {
+  if (typeof doc !== "object" || doc === null || Array.isArray(doc)) return [];
+  return Object.keys(doc).filter((key) => !KNOWN_KEYS.includes(key));
 }
 
 function extendsTarget(doc: YamlValue, file: string, defaultPath: string): string | undefined {

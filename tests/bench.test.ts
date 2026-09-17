@@ -727,7 +727,9 @@ describe("the comparison tables", () => {
     });
     const markdown = renderBenchMarkdown(report);
 
-    expect(markdown).toContain("| Model | Tier | Recall @0.7 | FP per clean cell | Median ms | $ per 100 documents |");
+    expect(markdown).toContain(
+      "| Model | Tier | Model served | Recall @0.7 | FP per clean cell | Median ms | $ per 100 documents |",
+    );
     expect(markdown).toContain("| Fast | fast |");
     // Unknown price prints as unknown. A zero would read as "this model is free".
     expect(markdown).toContain("unknown");
@@ -961,5 +963,56 @@ describe("snifftest bench", () => {
     const code = await runCli(cli);
     expect(code).toBe(EXIT.failure);
     expect(err.join("\n")).toContain("--eval");
+  });
+});
+
+// --- review fold-in: the model string travels with every arm --------------
+
+describe("the headline table names the model each row was served by", () => {
+  test("a panel row carries the served model, an eval arm carries its own", async () => {
+    const adapter = stubAdapter("openrouter", () =>
+      modelReply(reply({ restating_closer: 0.9, naked_cost_figure: 0.9 }), 60),
+    );
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [...RESOLVED_TWO, GHOST],
+      adapters: { openrouter: adapter },
+      repeats: 1,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+
+    const report = buildBenchReport(outcome, {
+      runDate: "2026-09-17",
+      threshold: 0.7,
+      repeats: 1,
+      panelFile: "bench/panel.yaml",
+      priceSources: [],
+      corpus: { clean: 1, seeded: 2, seed: 1, perRule: 1 },
+      evalSource: "results/2026-09-17/scores.json",
+      joined: [
+        {
+          arm: "C",
+          label: "C (countable rules plus judgment)",
+          recall: 0.905,
+          fpPerCleanCell: 0.003,
+          medianMs: 170,
+          usdPer100Documents: 0.0117,
+          servedModel: "jev-1.2",
+        },
+      ],
+    });
+    const markdown = renderBenchMarkdown(report);
+    const headline = markdown.split("\n").slice(0, 40);
+    const rowFor = (label: string): string => headline.find((line) => line.startsWith(`| ${label} `)) ?? "";
+
+    expect(headline).toContain(
+      `| Model | Tier | Model served | Recall @0.7 | FP per clean cell | Median ms | $ per 100 documents |`,
+    );
+    expect(rowFor("C (countable rules plus judgment)")).toContain("jev-1.2");
+    expect(rowFor("Fast")).toContain(report.models[0]?.served_model ?? "no served model recorded");
+    expect(report.models[0]?.served_model).toBeTruthy();
   });
 });

@@ -34,6 +34,8 @@ export interface JoinedArm {
   readonly fpPerCleanCell: number | null;
   readonly medianMs: number;
   readonly usdPer100Documents: number | null;
+  /** What the eval run was served by, when that arm made a call at all. */
+  readonly servedModel?: string | null;
 }
 
 export interface BenchReportOptions {
@@ -213,26 +215,31 @@ export function renderBenchMarkdown(report: BenchReport): string {
   // --- headline
   lines.push("## Headline");
   lines.push("");
-  lines.push(`| Model | Tier | Recall @${at} | FP per clean cell | Median ms | $ per 100 documents |`);
-  lines.push("|---|---|---|---|---|---|");
+  // The served model rides in the headline rather than only in the run table
+  // below: a row of numbers read on its own has to say which model produced it.
+  lines.push(
+    `| Model | Tier | Model served | Recall @${at} | FP per clean cell | Median ms | $ per 100 documents |`,
+  );
+  lines.push("|---|---|---|---|---|---|---|");
 
   for (const arm of report.joined) {
     lines.push(
-      `| ${arm.label} | eval arm | ${num(arm.recall)} | ${num(arm.fpPerCleanCell)} | ` +
-        `${Math.round(arm.medianMs)} | ${money(arm.usdPer100Documents)} |`,
+      `| ${arm.label} | eval arm | ${arm.servedModel ?? "-"} | ${num(arm.recall)} | ` +
+        `${num(arm.fpPerCleanCell)} | ${Math.round(arm.medianMs)} | ${money(arm.usdPer100Documents)} |`,
     );
   }
 
   for (const model of report.models) {
     if (!model.available) {
       lines.push(
-        `| ${model.label} | ${model.tier} | ${model.note ?? "not available"} | - | - | - |`,
+        `| ${model.label} | ${model.tier} | - | ${model.note ?? "not available"} | - | - | - |`,
       );
       continue;
     }
     const overall = model.accuracy?.overall[at];
     lines.push(
-      `| ${model.label} | ${model.tier} | ${num(overall?.recall)} | ${num(overall?.fp_rate_per_clean_cell)} | ` +
+      `| ${model.label} | ${model.tier} | ${model.served_model ?? model.slug ?? "-"} | ` +
+        `${num(overall?.recall)} | ${num(overall?.fp_rate_per_clean_cell)} | ` +
         `${Math.round(model.latency.median_ms)} | ${money(model.cost.usd_per_100_documents)} |`,
     );
   }

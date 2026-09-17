@@ -44,6 +44,12 @@ export interface EvalReport {
     readonly dropped_detail: readonly { id: string; file: string; reason: string }[];
     readonly skipped: readonly { rule: string; reason: string }[];
   };
+  /**
+   * The model string the service actually served, as it came back on the
+   * answers — not the one that was asked for. A table of numbers whose model is
+   * only in a raw file beside it is a table nobody can date to a model.
+   */
+  readonly served_model: string | null;
   readonly classes: readonly string[];
   readonly arms: Record<string, ArmScore>;
   readonly seeding: readonly SeededDocument[];
@@ -74,6 +80,7 @@ export function buildReport(outcome: EvalOutcome, options: ReportOptions): EvalR
       })),
       skipped: seeding.skipped.map((row) => ({ rule: row.rule, reason: row.reason })),
     },
+    served_model: outcome.raw?.model ?? null,
     classes: outcome.classes,
     arms: outcome.scores,
     seeding: seeding.seeded,
@@ -93,6 +100,7 @@ export function renderMarkdown(report: EvalReport): string {
   lines.push(
     `${report.corpus.seeded} seeded paragraphs and ${report.corpus.clean} clean ones, ` +
       `${report.per_rule} seeds per rule, seed value ${report.seed}. ` +
+      `Served by ${report.served_model ?? "no model, since no arm made a call"}. ` +
       `Flags count at ${at}.`,
   );
   lines.push("");
@@ -166,6 +174,12 @@ export function renderMarkdown(report: EvalReport): string {
       for (const [bucket, row] of Object.entries(arm.calibration)) {
         lines.push(`| ${bucket} | ${row.n} | ${row.defective} | ${num(row.fraction_defective)} |`);
       }
+      lines.push("");
+      lines.push(
+        `${arm.calibration_unanswered} cells are not in those buckets because the arm gave no ` +
+          "opinion on them. They count as misses in recall, and a probability of zero would have " +
+          "read as an answer.",
+      );
       lines.push("");
 
       lines.push(`### Misses at 0.7 (${arm.misses_at_0_7.length})`);
