@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "description": "Does the draft pass the sniff test? A prose linter for your house rules.",
   "license": "MIT",
+  "bin": {
+    "snifftest": "dist/snifftest.js"
+  },
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -14,6 +17,7 @@
     "LICENSE"
   ],
   "scripts": {
+    "build": "bun build src/cli.ts --target=node --format=esm --banner='#!/usr/bin/env node' --outfile dist/snifftest.js && chmod +x dist/snifftest.js",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "check": "bun run typecheck && bun test"

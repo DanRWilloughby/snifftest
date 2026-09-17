@@ -1,0 +1,25 @@
+# One countable rule and one judgment rule, so a run exercises both arms.
+version: 1
+threshold: 0.7
+rules:
+  - id: dash_present
+    kind: regex
+    builtin: dash_present
+    message: "An em dash. Say it in two sentences."
+  - id: colon_heavy
+    kind: regex
+    builtin: colon_count
+    min: 3
+    message: "Three colons in one paragraph. Pick one."
+  - id: restating_closer
+    kind: judgment
+    what: |
+      The closing sentence only restates what the paragraph already said.
+    not_for: |
+      A closing sentence that draws a conclusion or names a next step.
+    examples:
+      - "In short, everything above is what we said."
+    criteria:
+      true: "The last sentence adds nothing the paragraph had not already said."
+      false: "The last sentence adds something."
+    message: "A closer that only restates. Cut it."
