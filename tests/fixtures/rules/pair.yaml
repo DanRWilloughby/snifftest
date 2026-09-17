@@ -1,0 +1,11 @@
+version: 1
+rules:
+  - id: dash_present
+    kind: regex
+    builtin: dash_present
+    message: "An em dash. Say it in two sentences."
+  - id: colon_heavy
+    kind: regex
+    builtin: colon_count
+    min: 3
+    message: "Three colons in one paragraph. Pick one."
