@@ -37,7 +37,7 @@
 import { type YamlValue, parseYaml } from "../yaml.ts";
 
 /** The providers this bench has an adapter for. Anything else is refused. */
-export const PROVIDERS = ["openrouter", "anthropic"] as const;
+export const PROVIDERS = ["openrouter", "anthropic", "jev"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 /** The one place a string becomes a `Provider`, so nothing else has to assert it. */
@@ -97,6 +97,15 @@ export interface PanelEntry {
   readonly match: string;
   /** Exact ids to take first when they exist, in order. */
   readonly prefer?: readonly string[];
+  /**
+   * Ids this row will accept if none of its preferred ids are listed today.
+   *
+   * Without this a row whose preference has been retired quietly measures
+   * whatever else the pattern matched, under the old label. Naming the
+   * substitutes in the panel file makes the swap a decision someone wrote down,
+   * and the table prints which one was taken.
+   */
+  readonly alternates?: readonly string[];
   /** The completion budget sent for this row. Always a number, so the footnote can print it. */
   readonly maxTokens: number;
   /** Absent when the row asks for no reasoning at all. */
@@ -194,15 +203,8 @@ function readEntry(value: YamlValue, where: string): PanelEntry {
     throw new PanelError(`${where}.match is not a regular expression: ${reason(error)}`);
   }
 
-  const prefer = value["prefer"];
-  const preferred =
-    prefer === undefined || prefer === null
-      ? undefined
-      : Array.isArray(prefer)
-        ? prefer.map((slug, index) => requiredString(slug, `${where}.prefer[${index}]`))
-        : (() => {
-            throw new PanelError(`${where}.prefer is a list of exact model ids.`);
-          })();
+  const preferred = slugList(value["prefer"], `${where}.prefer`);
+  const alternates = slugList(value["alternates"], `${where}.alternates`);
 
   const label = value["label"];
   const tier = value["tier"];
@@ -216,10 +218,18 @@ function readEntry(value: YamlValue, where: string): PanelEntry {
     provider,
     match,
     ...(preferred === undefined ? {} : { prefer: preferred }),
+    ...(alternates === undefined ? {} : { alternates }),
     maxTokens: readBudget(value["max_tokens"], `${where}.max_tokens`) ?? DEFAULT_MAX_TOKENS,
     ...(reasoning === undefined ? {} : { reasoning }),
     ...(typeof note === "string" ? { note } : {}),
   };
+}
+
+/** A list of exact model ids, or nothing. Anything else is a mistake, not a guess. */
+function slugList(value: YamlValue | undefined, where: string): readonly string[] | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (!Array.isArray(value)) throw new PanelError(`${where} is a list of exact model ids.`);
+  return value.map((slug, index) => requiredString(slug, `${where}[${index}]`));
 }
 
 /**
@@ -312,8 +322,15 @@ export function resolveEntry(
   const matches = catalog.filter((model) => pattern.test(model.id)).sort(byId);
   const candidates = matches.map((model) => model.id);
 
-  const preferred = (entry.prefer ?? []).map((slug) => matches.find((model) => model.id === slug));
-  const chosen = preferred.find((model) => model !== undefined) ?? matches[0];
+  const wanted = entry.prefer ?? [];
+  const preferred = pick(wanted, matches);
+
+  // A preference that is not listed today is the case this used to fall through
+  // silently: the pattern's alphabetically first match was taken, with no note,
+  // under a label that named something else. A row may name its own
+  // substitutes; without them, a missing preference is a row that says so.
+  const alternate = preferred === undefined ? pick(entry.alternates ?? [], matches) : undefined;
+  const chosen = preferred ?? alternate ?? (wanted.length === 0 ? matches[0] : undefined);
 
   if (chosen === undefined) {
     return {
@@ -323,9 +340,23 @@ export function resolveEntry(
       candidates,
       jsonMode: false,
       prices: null,
-      note: `not available on ${options.runDate}`,
+      note:
+        wanted.length === 0
+          ? `not available on ${options.runDate}: the provider lists nothing matching ${entry.match}`
+          : `not available on ${options.runDate}: ${wanted.join(", ")} ` +
+            (candidates.length === 0
+              ? "is not in the provider's list, and the pattern matched nothing else"
+              : `is not in the provider's list. The pattern also matched ${candidates.join(", ")}; ` +
+                "name one under alternates to accept it in this row's place"),
     };
   }
+
+  const substituted =
+    alternate !== undefined
+      ? `${wanted.join(", ")} was not listed on ${options.runDate}, so this row is the alternate ${chosen.id}`
+      : wanted.length === 0 && candidates.length > 1
+        ? `no preference is set, so this row is ${chosen.id}, the first of ${candidates.join(", ")}`
+        : undefined;
 
   return {
     entry,
@@ -334,7 +365,20 @@ export function resolveEntry(
     candidates,
     jsonMode: chosen.jsonMode,
     prices: priceOf(chosen, options),
+    ...(substituted === undefined ? {} : { note: substituted }),
   };
+}
+
+/** The first of these ids the provider actually lists, in the order asked for. */
+function pick(
+  wanted: readonly string[],
+  matches: readonly CatalogEntry[],
+): CatalogEntry | undefined {
+  for (const slug of wanted) {
+    const found = matches.find((model) => model.id === slug);
+    if (found !== undefined) return found;
+  }
+  return undefined;
 }
 
 export function resolvePanel(

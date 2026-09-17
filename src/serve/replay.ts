@@ -159,6 +159,8 @@ export function createReplayClient(replay: ReplayFile): JevClient {
         inputTokens: chosen.inputTokens,
         outputTokens: 0,
         estimatedCostUsd: chosen.estimatedCostUsd,
+        // The recording carries the counts the service reported at the time.
+        usageReported: true,
         latencyMs: chosen.latencyMs,
         attempts: 1,
       };

@@ -16,12 +16,24 @@
  * puts each model in each position and leaves the remaining difference to the
  * models rather than to the order.
  *
- * ## Repeats measure time, not accuracy
+ * ## Repeats measure both time and agreement
  *
  * Latency is the noisy number, so it is measured over every repeat and reported
- * as a median and a p95. Accuracy is not noisy in the same way at temperature
- * zero and costs money to repeat, so it is taken from the first repeat only and
- * the report says so. Cost is averaged over every call that returned usage.
+ * as a median and a p95. Accuracy was once taken from the first repeat alone,
+ * on the argument that temperature zero makes it stable. That argument does not
+ * hold: a reasoning model does not honour temperature zero, and a router may
+ * send two identical requests to two upstream hosts. Every repeat is therefore
+ * scored, the first one carries the detailed tables, and the spread across
+ * repeats is printed beside the headline. The readings were already paid for.
+ * Cost is averaged over every call that returned usage.
+ *
+ * ## The decision is the boolean the model was asked for
+ *
+ * Each model is asked for a `flag` and a `p`. The flag is its own decision and
+ * is what the tables score. The verbalised probability is scored beside it, at
+ * the same threshold the judgment arm uses, and printed as a second column. A
+ * general model is not calibrated, so scoring only its `p` at another model's
+ * operating point would measure the wrong thing and flatter the wrong row.
  *
  * ## Nothing is invented
  *
@@ -40,7 +52,7 @@
  * reply, because the first is the run's doing and the second is the model's.
  */
 
-import { runRegexArm } from "../engine.ts";
+import { classifyChunk, runRegexArm } from "../engine.ts";
 import type { ArmObservation, ArmScore, Cell, JudgedDocument } from "../eval/score.ts";
 import { scoreArm, thresholdsWith } from "../eval/score.ts";
 import { type Chunk, type Ruleset, isJudgmentRule, isRegexRule } from "../types.ts";
@@ -75,8 +87,9 @@ export interface BenchLatency {
 export interface BenchCost {
   /** Null when the model has no published price. Never zero standing in for that. */
   readonly totalUsd: number | null;
-  readonly usdPerDocument: number | null;
-  readonly usdPer100Documents: number | null;
+  /** A paragraph, which is one call: the corpus unit, never a whole file. */
+  readonly usdPerParagraph: number | null;
+  readonly usdPer100Paragraphs: number | null;
   readonly inputTokens: number;
   readonly outputTokens: number;
 }
@@ -85,6 +98,29 @@ export interface BenchCost {
 export interface RequestSettings {
   readonly maxTokens: number;
   readonly reasoning: ReasoningSetting | null;
+}
+
+/** One repeat's headline numbers, so agreement across repeats can be printed. */
+export interface BenchRepeatScore {
+  readonly repeat: number;
+  readonly recall: number | null;
+  readonly fpCleanParagraphs: number;
+  readonly cleanParagraphs: number;
+}
+
+/**
+ * How much a row moved between repeats.
+ *
+ * A single run of a model is one sample of it. Printing that sample as the
+ * model's recall, with no sense of how far the next run would sit from it, is
+ * the part of a bench a skeptic is right to distrust.
+ */
+export interface BenchSpread {
+  readonly repeats: number;
+  readonly meanRecall: number | null;
+  readonly minRecall: number | null;
+  readonly maxRecall: number | null;
+  readonly perRepeat: readonly BenchRepeatScore[];
 }
 
 export interface BenchModelResult {
@@ -115,10 +151,26 @@ export interface BenchModelResult {
   readonly truncated: number;
   /** Judgment cells across every repeat that came back with no usable number. */
   readonly unansweredCells: number;
+  /**
+   * The same count, split by rule.
+   *
+   * The per-rule tables need this: printing the row's total under every rule's
+   * "Unanswered" column says a rule was unanswered when another one was.
+   */
+  readonly unansweredByRule: Readonly<Record<string, number>>;
   readonly latency: BenchLatency;
   readonly cost: BenchCost;
-  /** From the first repeat only, by the eval scorer, on the eval's definitions. */
+  /**
+   * The first repeat, scored on the model's own `flag`, by the eval scorer.
+   *
+   * This is the row's decision: the boolean it was asked for, not a threshold
+   * applied to a number it was not asked to calibrate.
+   */
   readonly score: ArmScore | null;
+  /** The same repeat scored on the verbalised `p` at the shipped threshold. */
+  readonly scoreVerbalised: ArmScore | null;
+  /** Every repeat, scored the same way, so the headline can carry a spread. */
+  readonly spread: BenchSpread;
   readonly failureDetail: readonly BenchFailure[];
 }
 
@@ -232,9 +284,7 @@ export async function runBench(options: RunBenchOptions): Promise<BenchOutcome> 
           `${model.entry.id} ${doc.id} repeat ${repeat}${record.error === null ? "" : ` (${record.error})`}`,
         );
 
-        if (repeat === 1) {
-          collectObservation(state, model, doc, record, countable, judgment, regexHits);
-        }
+        collectObservation(state, model, doc, record, countable, judgment, regexHits, repeat);
       }
     }
 
@@ -267,6 +317,7 @@ export async function runBench(options: RunBenchOptions): Promise<BenchOutcome> 
     summarise(model, states.get(model.entry.id), {
       classes,
       thresholds,
+      threshold: options.threshold,
       documents: options.documents.length,
     }),
   );
@@ -287,6 +338,15 @@ export async function runBench(options: RunBenchOptions): Promise<BenchOutcome> 
 
 // --- one model's running state -------------------------------------------
 
+/** One repeat's cells, kept apart so every repeat can be scored on its own. */
+interface RepeatObservation {
+  /** Scored on the model's own boolean. This is the row's decision. */
+  readonly flagCells: Cell[];
+  /** The same cells scored on the verbalised probability, for the second column. */
+  readonly verbalisedCells: Cell[];
+  readonly judged: JudgedDocument[];
+}
+
 interface ModelState {
   readonly adapter?: ModelAdapter;
   readonly note?: string;
@@ -297,12 +357,12 @@ interface ModelState {
   parseFailures: number;
   truncated: number;
   unansweredCells: number;
+  unansweredByRule: Map<string, number>;
   latencies: number[];
   inputTokens: number;
   outputTokens: number;
   usageCalls: number;
-  cells: Cell[];
-  judged: JudgedDocument[];
+  observations: Map<number, RepeatObservation>;
   failureDetail: BenchFailure[];
 }
 
@@ -318,14 +378,28 @@ function newState(model: ResolvedModel, adapter: ModelAdapter | undefined): Mode
     parseFailures: 0,
     truncated: 0,
     unansweredCells: 0,
+    unansweredByRule: new Map(),
     latencies: [],
     inputTokens: 0,
     outputTokens: 0,
     usageCalls: 0,
-    cells: [],
-    judged: [],
+    observations: new Map(),
     failureDetail: [],
   };
+}
+
+/** Count an unanswered cell against the rule it belonged to, not only the row. */
+function markUnanswered(state: ModelState, ruleIds: readonly string[]): void {
+  state.unansweredCells += ruleIds.length;
+  for (const id of ruleIds) state.unansweredByRule.set(id, (state.unansweredByRule.get(id) ?? 0) + 1);
+}
+
+function observationFor(state: ModelState, repeat: number): RepeatObservation {
+  const existing = state.observations.get(repeat);
+  if (existing !== undefined) return existing;
+  const fresh: RepeatObservation = { flagCells: [], verbalisedCells: [], judged: [] };
+  state.observations.set(repeat, fresh);
+  return fresh;
 }
 
 interface AskContext {
@@ -368,7 +442,7 @@ async function askOne(
     state.failures += 1;
     const reason = messageOf(error);
     state.failureDetail.push({ doc: doc.id, repeat: context.repeat, reason });
-    state.unansweredCells += context.questionIds.length;
+    markUnanswered(state, context.questionIds);
     return {
       ...blank,
       reply: null,
@@ -397,7 +471,7 @@ async function askOne(
 
   try {
     const parsed = parseReply(answer.text, context.questionIds);
-    state.unansweredCells += parsed.missing.length;
+    markUnanswered(state, parsed.missing);
     if (parsed.missing.length > 0) {
       state.failureDetail.push({
         doc: doc.id,
@@ -430,7 +504,7 @@ async function askOne(
     if (answer.truncated) state.truncated += 1;
     else state.parseFailures += 1;
     state.failures += 1;
-    state.unansweredCells += context.questionIds.length;
+    markUnanswered(state, context.questionIds);
     state.failureDetail.push({ doc: doc.id, repeat: context.repeat, reason });
     return {
       ...blank,
@@ -453,7 +527,15 @@ function settingsOf(model: ResolvedModel): RequestSettings {
   };
 }
 
-/** Build the first repeat's observation, the one accuracy is scored from. */
+/**
+ * Build one repeat's observation, in both readings of the same reply.
+ *
+ * The flag cells carry the model's own boolean as a 1 or a 0, so every
+ * threshold in the sweep reads the same decision: a boolean does not move when
+ * the operating point does, and pretending otherwise would put a fake curve
+ * through one point. The verbalised cells carry the probability the model
+ * wrote, which the sweep does move over.
+ */
 function collectObservation(
   state: ModelState,
   model: ResolvedModel,
@@ -462,11 +544,20 @@ function collectObservation(
   countable: readonly { readonly id: string }[],
   judgment: readonly { readonly id: string }[],
   regexHits: ReadonlyMap<string, ReadonlySet<string>>,
+  repeat: number,
 ): void {
   const hit = regexHits.get(doc.id) ?? new Set<string>();
+  const into = observationFor(state, repeat);
 
   for (const rule of countable) {
-    state.cells.push({ doc: doc.id, rule: rule.id, probability: hit.has(rule.id) ? 1 : 0, answered: true });
+    const cell: Cell = {
+      doc: doc.id,
+      rule: rule.id,
+      probability: hit.has(rule.id) ? 1 : 0,
+      answered: true,
+    };
+    into.flagCells.push(cell);
+    into.verbalisedCells.push(cell);
   }
 
   let unanswered = 0;
@@ -474,13 +565,21 @@ function collectObservation(
     const reading = record.readings[rule.id];
     if (reading === undefined) {
       unanswered += 1;
-      state.cells.push({ doc: doc.id, rule: rule.id, probability: 0, answered: false });
+      const missing: Cell = { doc: doc.id, rule: rule.id, probability: 0, answered: false };
+      into.flagCells.push(missing);
+      into.verbalisedCells.push(missing);
       continue;
     }
-    state.cells.push({ doc: doc.id, rule: rule.id, probability: reading.p, answered: true });
+    into.flagCells.push({
+      doc: doc.id,
+      rule: rule.id,
+      probability: reading.flag ? 1 : 0,
+      answered: true,
+    });
+    into.verbalisedCells.push({ doc: doc.id, rule: rule.id, probability: reading.p, answered: true });
   }
 
-  state.judged.push({
+  into.judged.push({
     id: doc.id,
     kind: doc.kind,
     ...(doc.truth === undefined ? {} : { truth: doc.truth }),
@@ -488,6 +587,7 @@ function collectObservation(
     latencyMs: record.latency_ms,
     inputTokens: record.usage.input_tokens,
     outputTokens: record.usage.output_tokens,
+    usageReported: true,
     costUsd: costOf(record.usage, model.prices),
     requests: 1,
     retries: Math.max(0, record.attempts - 1),
@@ -500,6 +600,8 @@ function collectObservation(
 interface SummaryContext {
   readonly classes: readonly string[];
   readonly thresholds: readonly number[];
+  /** The shipped operating point, the one the headline and the spread read. */
+  readonly threshold: number;
   readonly documents: number;
 }
 
@@ -526,15 +628,18 @@ function summarise(
     parseFailures: 0,
     truncated: 0,
     unansweredCells: 0,
+    unansweredByRule: {},
     latency: { medianMs: 0, p95Ms: 0, samples: 0 },
     cost: {
       totalUsd: model.prices === null ? null : 0,
-      usdPerDocument: model.prices === null ? null : 0,
-      usdPer100Documents: model.prices === null ? null : 0,
+      usdPerParagraph: model.prices === null ? null : 0,
+      usdPer100Paragraphs: model.prices === null ? null : 0,
       inputTokens: 0,
       outputTokens: 0,
     },
     score: null,
+    scoreVerbalised: null,
+    spread: { repeats: 0, meanRecall: null, minRecall: null, maxRecall: null, perRepeat: [] },
     failureDetail: [],
   };
 
@@ -543,13 +648,30 @@ function summarise(
   }
 
   const sorted = [...state.latencies].sort((a, b) => a - b);
-  const observation: ArmObservation = {
-    arm: "D",
-    label: model.entry.label,
-    network: true,
-    documents: state.judged,
-    cells: state.cells,
-  };
+  const repeats = [...state.observations.keys()].sort((a, b) => a - b);
+  const first = repeats[0];
+  const firstObservation = first === undefined ? undefined : state.observations.get(first);
+  const at = String(context.threshold);
+
+  const perRepeat: BenchRepeatScore[] = [];
+  for (const repeat of repeats) {
+    const held = state.observations.get(repeat);
+    if (held === undefined || held.judged.length === 0) continue;
+    const scored = scoreArm(
+      armOf(model, held.judged, held.flagCells),
+      context.classes,
+      context.thresholds,
+    ).overall[at];
+    perRepeat.push({
+      repeat,
+      recall: scored?.recall ?? null,
+      fpCleanParagraphs: scored?.fp_clean_paragraphs ?? 0,
+      cleanParagraphs: scored?.clean_paragraphs ?? 0,
+    });
+  }
+  const recalls = perRepeat
+    .map((row) => row.recall)
+    .filter((value): value is number => value !== null);
 
   const usdPerCall =
     model.prices === null || state.usageCalls === 0
@@ -567,6 +689,7 @@ function summarise(
     parseFailures: state.parseFailures,
     truncated: state.truncated,
     unansweredCells: state.unansweredCells,
+    unansweredByRule: Object.fromEntries(state.unansweredByRule),
     latency: { medianMs: median(sorted), p95Ms: p95(sorted), samples: sorted.length },
     cost: {
       totalUsd:
@@ -574,14 +697,45 @@ function summarise(
           ? null
           : state.inputTokens * model.prices.inputUsdPerToken +
             state.outputTokens * model.prices.outputUsdPerToken,
-      usdPerDocument: usdPerCall,
-      usdPer100Documents: usdPerCall === null ? null : usdPerCall * 100,
+      usdPerParagraph: usdPerCall,
+      usdPer100Paragraphs: usdPerCall === null ? null : usdPerCall * 100,
       inputTokens: state.inputTokens,
       outputTokens: state.outputTokens,
     },
-    score: state.judged.length === 0 ? null : scoreArm(observation, context.classes, context.thresholds),
+    score:
+      firstObservation === undefined || firstObservation.judged.length === 0
+        ? null
+        : scoreArm(
+            armOf(model, firstObservation.judged, firstObservation.flagCells),
+            context.classes,
+            context.thresholds,
+          ),
+    scoreVerbalised:
+      firstObservation === undefined || firstObservation.judged.length === 0
+        ? null
+        : scoreArm(
+            armOf(model, firstObservation.judged, firstObservation.verbalisedCells),
+            context.classes,
+            context.thresholds,
+          ),
+    spread: {
+      repeats: perRepeat.length,
+      meanRecall: recalls.length === 0 ? null : recalls.reduce((a, b) => a + b, 0) / recalls.length,
+      minRecall: recalls.length === 0 ? null : Math.min(...recalls),
+      maxRecall: recalls.length === 0 ? null : Math.max(...recalls),
+      perRepeat,
+    },
     failureDetail: state.failureDetail,
   };
+}
+
+/** One repeat's cells in the shape the eval's own scorer reads. */
+function armOf(
+  model: ResolvedModel,
+  documents: readonly JudgedDocument[],
+  cells: readonly Cell[],
+): ArmObservation {
+  return { arm: "D", label: model.entry.label, network: true, documents, cells };
 }
 
 // --- pieces ---------------------------------------------------------------
@@ -594,7 +748,7 @@ function rotate(models: readonly ResolvedModel[], by: number): readonly Resolved
 }
 
 function chunkOf(doc: BenchDocument): Chunk {
-  return { file: doc.id, line: 1, text: doc.text };
+  return { file: doc.id, line: 1, text: doc.text, kind: classifyChunk(doc.text, 1) };
 }
 
 function costOf(

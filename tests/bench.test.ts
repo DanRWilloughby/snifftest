@@ -37,6 +37,8 @@ import {
   runBench,
 } from "../src/bench/run.ts";
 import { buildBenchReport, renderBenchMarkdown } from "../src/bench/tables.ts";
+import { createJevAdapter, jevCatalog, paragraphOf } from "../src/bench/jev-adapter.ts";
+import type { JevRequest, JevResult } from "../src/jev.ts";
 import { parseRuleset } from "../src/rules.ts";
 import { type JudgmentRule, type Ruleset, isJudgmentRule } from "../src/types.ts";
 
@@ -315,7 +317,9 @@ describe("resolving a panel entry against the provider's own model list", () => 
 
     expect(resolved.available).toBe(false);
     expect(resolved.slug).toBeNull();
-    expect(resolved.note).toBe("not available on 2026-09-17");
+    expect(resolved.note).toBe(
+      "not available on 2026-09-17: the provider lists nothing matching ^anthropic/claude-opus-5$",
+    );
   });
 
   test("a listed model with no usable price is resolved with no price, never a zero", () => {
@@ -844,8 +848,12 @@ describe("arm D over the panel", () => {
     const fast = outcome.models.find((model) => model.id === "fast");
     expect(fast?.calls).toBe(9);
     expect(fast?.latency.samples).toBe(9);
-    // Accuracy comes from repeat one only; both seeded documents were caught.
+    // The detailed tables come from repeat one; every repeat is scored for the
+    // spread, and three identical repeats move nothing.
     expect(fast?.score?.overall["0.7"]?.recall).toBe(1);
+    expect(fast?.spread.repeats).toBe(3);
+    expect(fast?.spread.minRecall).toBe(1);
+    expect(fast?.spread.maxRecall).toBe(1);
     expect(outcome.raw.filter((run) => run.model_id === "fast")).toHaveLength(3);
   });
 
@@ -982,7 +990,7 @@ describe("arm D over the panel", () => {
     const priced = outcome.models.find((model) => model.id === "fast");
     // Three documents at 100 input and 20 output tokens each.
     expect(priced?.cost.totalUsd).toBeCloseTo(3 * (100 * 1e-6 + 20 * 5e-6), 12);
-    expect(priced?.cost.usdPer100Documents).toBeCloseTo(100 * (100 * 1e-6 + 20 * 5e-6), 12);
+    expect(priced?.cost.usdPer100Paragraphs).toBeCloseTo(100 * (100 * 1e-6 + 20 * 5e-6), 12);
 
     const unpriced = outcome.models.find((model) => model.id === "deep");
     expect(unpriced?.cost.totalUsd).toBeNull();
@@ -1044,7 +1052,8 @@ describe("the comparison tables", () => {
     const markdown = renderBenchMarkdown(report);
 
     expect(markdown).toContain(
-      "| Model | Tier | Model served | Recall @0.7 | FP per clean cell | Median ms | $ per 100 documents |",
+      "| Model | Tier | Model served | Recall, own flag | Spread over repeats | Recall, p >= 0.7 | " +
+        "Median ms | $ per 100 paragraphs |",
     );
     expect(markdown).toContain("| Fast | fast |");
     // Unknown price prints as unknown. A zero would read as "this model is free".
@@ -1093,7 +1102,9 @@ describe("the comparison tables", () => {
     const markdown = renderBenchMarkdown(report);
 
     expect(markdown).toContain("| Model | Completion budget | Reasoning |");
-    expect(markdown).toContain(`| Fast | ${DEFAULT_MAX_TOKENS} tokens | not requested |`);
+    expect(markdown).toContain(
+      `| Fast | ${DEFAULT_MAX_TOKENS} tokens | the provider's default, whatever that is for this model |`,
+    );
     expect(markdown).toContain("| Deep | 4000 tokens | effort low |");
     // The run table separates a budget failure from a bad answer.
     expect(markdown).toContain("| Truncated |");
@@ -1115,7 +1126,7 @@ describe("the comparison tables", () => {
           recall: 0.905,
           fpPerCleanCell: 0.003,
           medianMs: 170,
-          usdPer100Documents: 0.0117,
+          usdPer100Paragraphs: 0.0117,
         },
       ],
     });
@@ -1408,7 +1419,7 @@ describe("the headline table names the model each row was served by", () => {
           recall: 0.905,
           fpPerCleanCell: 0.003,
           medianMs: 170,
-          usdPer100Documents: 0.0117,
+          usdPer100Paragraphs: 0.0117,
           servedModel: "jev-1.2",
         },
       ],
@@ -1418,10 +1429,419 @@ describe("the headline table names the model each row was served by", () => {
     const rowFor = (label: string): string => headline.find((line) => line.startsWith(`| ${label} `)) ?? "";
 
     expect(headline).toContain(
-      `| Model | Tier | Model served | Recall @0.7 | FP per clean cell | Median ms | $ per 100 documents |`,
+      "| Model | Tier | Model served | Recall, own flag | Spread over repeats | Recall, p >= 0.7 | " +
+        "Median ms | $ per 100 paragraphs |",
     );
     expect(rowFor("C (countable rules plus judgment)")).toContain("jev-1.2");
     expect(rowFor("Fast")).toContain(report.models[0]?.served_model ?? "no served model recorded");
     expect(report.models[0]?.served_model).toBeTruthy();
+  });
+});
+
+// --- what arm D is actually scored on --------------------------------------
+
+/** A reply whose boolean and whose probability disagree, which is the whole point. */
+function split(values: Record<string, { flag: boolean; p: number }>): string {
+  return JSON.stringify(values);
+}
+
+describe("the decision arm D is scored on", () => {
+  test("the model's own flag is the verdict, and its probability is a second column", async () => {
+    // Both seeded paragraphs are caught by the boolean the model was asked for,
+    // and missed by the probability it wrote, which sits under this tool's line.
+    const adapter = stubAdapter("openrouter", () =>
+      modelReply(
+        split({
+          restating_closer: { flag: true, p: 0.6 },
+          naked_cost_figure: { flag: true, p: 0.6 },
+        }),
+        40,
+      ),
+    );
+
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [FAST],
+      adapters: { openrouter: adapter },
+      repeats: 1,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+
+    const fast = outcome.models.find((model) => model.id === "fast");
+    expect(fast?.score?.overall["0.7"]?.recall).toBe(1);
+    expect(fast?.scoreVerbalised?.overall["0.7"]?.recall).toBe(0);
+  });
+
+  test("every repeat is scored, and the spread says how far the row moved", async () => {
+    // The first repeat catches both; the second catches one; the third none.
+    const answers = [
+      split({ restating_closer: { flag: true, p: 0.9 }, naked_cost_figure: { flag: true, p: 0.9 } }),
+      split({ restating_closer: { flag: true, p: 0.9 }, naked_cost_figure: { flag: false, p: 0.1 } }),
+      split({ restating_closer: { flag: false, p: 0.1 }, naked_cost_figure: { flag: false, p: 0.1 } }),
+    ];
+    let document = 0;
+    const adapter = stubAdapter("openrouter", () => {
+      const repeat = Math.floor(document / DOCUMENTS.length);
+      document += 1;
+      return modelReply(answers[repeat] ?? answers[0] ?? "{}", 30);
+    });
+
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [FAST],
+      adapters: { openrouter: adapter },
+      repeats: 3,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+
+    const fast = outcome.models.find((model) => model.id === "fast");
+    expect(fast?.spread.repeats).toBe(3);
+    expect(fast?.spread.perRepeat.map((row) => row.recall)).toEqual([1, 0.5, 0]);
+    expect(fast?.spread.minRecall).toBe(0);
+    expect(fast?.spread.maxRecall).toBe(1);
+    expect(fast?.spread.meanRecall).toBeCloseTo(0.5, 10);
+
+    const markdown = renderBenchMarkdown(
+      buildBenchReport(outcome, {
+        runDate: "2026-09-17",
+        threshold: 0.7,
+        repeats: 3,
+        panelFile: "bench/panel.yaml",
+        priceSources: [],
+        corpus: { clean: 1, seeded: 2, seed: 1, perRule: 1 },
+      }),
+    );
+    expect(markdown).toContain("0.000 to 1.000 over 3");
+  });
+
+  test("an unanswered cell is counted against its own rule, not against every rule", async () => {
+    const adapter = stubAdapter("openrouter", () =>
+      // One rule answered, one left out entirely.
+      modelReply(split({ restating_closer: { flag: true, p: 0.9 } }), 30),
+    );
+
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [FAST],
+      adapters: { openrouter: adapter },
+      repeats: 1,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+
+    const fast = outcome.models.find((model) => model.id === "fast");
+    expect(fast?.unansweredByRule["naked_cost_figure"]).toBe(DOCUMENTS.length);
+    expect(fast?.unansweredByRule["restating_closer"] ?? 0).toBe(0);
+
+    const markdown = renderBenchMarkdown(
+      buildBenchReport(outcome, {
+        runDate: "2026-09-17",
+        threshold: 0.7,
+        repeats: 1,
+        panelFile: "bench/panel.yaml",
+        priceSources: [],
+        corpus: { clean: 1, seeded: 2, seed: 1, perRule: 1 },
+      }),
+    );
+    const section = (rule: string): string =>
+      markdown.split(`### ${rule}`)[1]?.split("###")[0] ?? "";
+    // The stub says yes to this rule on every paragraph, so it catches the one
+    // seeded for it and false-alarms on the clean one. Nothing is unanswered.
+    expect(section("restating_closer")).toContain("| Fast | 1 | 1.000 | 1.000 | 0 |");
+    expect(section("naked_cost_figure")).toContain(`| Fast | 1 | 0.000 | 0.000 | ${DOCUMENTS.length} |`);
+  });
+
+  test("every false-alarm denominator the scorer computed is printed with its k of n", async () => {
+    const adapter = stubAdapter("openrouter", () =>
+      modelReply(
+        split({
+          restating_closer: { flag: true, p: 0.9 },
+          naked_cost_figure: { flag: true, p: 0.9 },
+        }),
+        30,
+      ),
+    );
+
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [FAST],
+      adapters: { openrouter: adapter },
+      repeats: 1,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+
+    const markdown = renderBenchMarkdown(
+      buildBenchReport(outcome, {
+        runDate: "2026-09-17",
+        threshold: 0.7,
+        repeats: 1,
+        panelFile: "bench/panel.yaml",
+        priceSources: [],
+        corpus: { clean: 1, seeded: 2, seed: 1, perRule: 1 },
+      }),
+    );
+
+    expect(markdown).toContain("## False alarms, every way they were counted");
+    expect(markdown).toContain(
+      "| Model | Clean paragraphs flagged | Per clean cell | Per fireable clean cell | " +
+        "Per negative cell | Off-rule flags |",
+    );
+    // The one clean paragraph was flagged by both judgment rules: one paragraph
+    // of one, two cells of the clean ones.
+    expect(markdown).toContain("| Fast | 1 of 1 ");
+  });
+});
+
+describe("what each row was told to do about reasoning", () => {
+  test("a row that declared no setting is printed as the provider's default, never as not reasoning", async () => {
+    const adapter = stubAdapter("openrouter", () =>
+      modelReply(reply({ restating_closer: 0.9, naked_cost_figure: 0.9 }), 30),
+    );
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [FAST],
+      adapters: { openrouter: adapter },
+      repeats: 1,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+    const markdown = renderBenchMarkdown(
+      buildBenchReport(outcome, {
+        runDate: "2026-09-17",
+        threshold: 0.7,
+        repeats: 1,
+        panelFile: "bench/panel.yaml",
+        priceSources: [],
+        corpus: { clean: 1, seeded: 2, seed: 1, perRule: 1 },
+      }),
+    );
+
+    expect(markdown).not.toContain("not requested");
+    expect(markdown).toContain("the provider's default, whatever that is for this model");
+  });
+});
+
+describe("a preferred slug the provider has stopped listing", () => {
+  const retired = (): readonly CatalogEntry[] => [
+    { id: "openai/gpt-5.1-codex-mini", jsonMode: true },
+    { id: "openai/gpt-5.2-mini", jsonMode: true },
+  ];
+  const fast = (over: Partial<PanelEntry> = {}): PanelEntry =>
+    entry({
+      id: "openai-fast",
+      label: "OpenAI, fast tier",
+      match: "^openai/gpt-5[^/]*mini$",
+      prefer: ["openai/gpt-5-mini"],
+      ...over,
+    });
+
+  test("is a row that says so, never the pattern's first other match", () => {
+    const resolved = resolveEntry(fast(), retired(), { runDate: "2026-09-17" });
+
+    expect(resolved.available).toBe(false);
+    expect(resolved.slug).toBeNull();
+    expect(resolved.note).toContain("not available on 2026-09-17");
+    expect(resolved.note).toContain("openai/gpt-5-mini");
+    expect(resolved.note).toContain("openai/gpt-5.1-codex-mini");
+    // Every id the pattern matched is still recorded, so the choice not taken
+    // is inspectable rather than invisible.
+    expect(resolved.candidates).toHaveLength(2);
+  });
+
+  test("falls to an alternate only when the panel file named one, and says which", () => {
+    const resolved = resolveEntry(fast({ alternates: ["openai/gpt-5.2-mini"] }), retired(), {
+      runDate: "2026-09-17",
+    });
+
+    expect(resolved.available).toBe(true);
+    expect(resolved.slug).toBe("openai/gpt-5.2-mini");
+    expect(resolved.note).toContain("alternate openai/gpt-5.2-mini");
+  });
+
+  test("a row with no preference at all says which of its matches it took", () => {
+    const resolved = resolveEntry(fast({ prefer: undefined }), retired(), {
+      runDate: "2026-09-17",
+    });
+
+    expect(resolved.available).toBe(true);
+    expect(resolved.slug).toBe("openai/gpt-5.1-codex-mini");
+    expect(resolved.note).toContain("no preference is set");
+  });
+});
+
+// --- Jev in the rotation ---------------------------------------------------
+
+function jevResult(nouls: Record<string, number>, over: Partial<JevResult> = {}): JevResult {
+  return {
+    model: "jev-2026-09-01",
+    nouls,
+    inputTokens: 2800,
+    outputTokens: 0,
+    estimatedCostUsd: 0,
+    usageReported: true,
+    latencyMs: 210,
+    attempts: 1,
+    ...over,
+  };
+}
+
+describe("Jev as a panel row", () => {
+  const rules = RULES.rules.filter(isJudgmentRule);
+
+  test("asks the judgment service its own way and answers in the panel's reply shape", async () => {
+    const seen: JevRequest[] = [];
+    const adapter = createJevAdapter({
+      client: {
+        ask: async (request) => {
+          seen.push(request);
+          return jevResult({ restating_closer: 0.91, naked_cost_figure: 0.2 });
+        },
+      },
+      rules,
+      threshold: 0.7,
+    });
+
+    const listed = await adapter.listModels();
+    expect(listed).toHaveLength(1);
+    // No price: no dated published source has been recorded for this endpoint,
+    // so the row's cost prints as unknown rather than from a constant.
+    expect(listed[0]?.inputUsdPerToken).toBeUndefined();
+
+    const answer = await adapter.call({
+      slug: "jev-latest",
+      system: "ignored, the service takes its own question shape",
+      user: userMessage("The counter reads high by four."),
+      jsonMode: false,
+      maxTokens: 900,
+    });
+
+    expect(seen[0]?.state).toBe("The counter reads high by four.");
+    expect(Object.keys(seen[0]?.questions ?? {})).toEqual(rules.map((rule) => rule.id));
+    expect(answer.servedModel).toBe("jev-2026-09-01");
+    expect(answer.latencyMs).toBe(210);
+    expect(JSON.parse(answer.text)).toEqual({
+      restating_closer: { flag: true, p: 0.91 },
+      naked_cost_figure: { flag: false, p: 0.2 },
+    });
+  });
+
+  test("a reading inside the no-judgment band is unanswered, never a confident no", async () => {
+    const adapter = createJevAdapter({
+      client: { ask: async () => jevResult({ restating_closer: 0.5, naked_cost_figure: 0.85 }) },
+      rules,
+      threshold: 0.7,
+    });
+
+    const answer = await adapter.call({
+      slug: "jev-latest",
+      system: "",
+      user: userMessage("Anything at all."),
+      jsonMode: false,
+      maxTokens: 900,
+    });
+
+    expect(JSON.parse(answer.text)).toEqual({ naked_cost_figure: { flag: true, p: 0.85 } });
+  });
+
+  test("runs in the same rotation and the same repeats as the panel rows", async () => {
+    const order: string[] = [];
+    const jev: ResolvedModel = {
+      entry: entry({ id: "jev", label: "Jev", tier: "judgment", provider: "jev", match: "^jev-" }),
+      available: true,
+      slug: "jev-latest",
+      candidates: ["jev-latest"],
+      jsonMode: false,
+      prices: null,
+    };
+    const jevAdapter = createJevAdapter({
+      client: {
+        ask: async () => {
+          order.push("jev");
+          return jevResult({ restating_closer: 0.9, naked_cost_figure: 0.9 });
+        },
+      },
+      rules,
+      threshold: 0.7,
+    });
+    const panelAdapter = stubAdapter("openrouter", () => {
+      order.push("fast");
+      return modelReply(reply({ restating_closer: 0.9, naked_cost_figure: 0.9 }), 60);
+    });
+
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [FAST, jev],
+      adapters: { openrouter: panelAdapter, jev: jevAdapter },
+      repeats: 2,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+
+    // The same round-robin every other row is in, not a separate pass.
+    expect(order.slice(0, 4)).toEqual(["fast", "jev", "jev", "fast"]);
+    const row = outcome.models.find((model) => model.id === "jev");
+    expect(row?.calls).toBe(DOCUMENTS.length * 2);
+    expect(row?.latency.samples).toBe(DOCUMENTS.length * 2);
+    expect(row?.latency.medianMs).toBe(210);
+    // No published price, so no cost figure at all rather than a zero.
+    expect(row?.cost.usdPer100Paragraphs).toBeNull();
+  });
+
+  test("a refused call is a counted failure on the same ruler as every other row", async () => {
+    const jev: ResolvedModel = {
+      entry: entry({ id: "jev", label: "Jev", tier: "judgment", provider: "jev", match: "^jev-" }),
+      available: true,
+      slug: "jev-latest",
+      candidates: ["jev-latest"],
+      jsonMode: false,
+      prices: null,
+    };
+    const adapter = createJevAdapter({
+      client: {
+        ask: async () => {
+          throw new Error("the service refused this state");
+        },
+      },
+      rules,
+      threshold: 0.7,
+    });
+
+    const outcome = await runBench({
+      ruleset: RULES,
+      classes: CLASSES,
+      documents: DOCUMENTS,
+      resolved: [jev],
+      adapters: { jev: adapter },
+      repeats: 1,
+      threshold: 0.7,
+      runDate: "2026-09-17",
+    });
+
+    const row = outcome.models.find((model) => model.id === "jev");
+    expect(row?.failures).toBe(DOCUMENTS.length);
+    // A failed call is out of the latency median here exactly as it is for the
+    // panel rows, rather than in one median and out of the other.
+    expect(row?.latency.samples).toBe(0);
+  });
+
+  test("the paragraph is taken back out of the turn the bench prompt wrapped it in", () => {
+    expect(paragraphOf(userMessage("One line."))).toBe("One line.");
+    expect(paragraphOf("no wrapper at all")).toBe("no wrapper at all");
+    expect(jevCatalog()[0]?.jsonMode).toBe(false);
   });
 });

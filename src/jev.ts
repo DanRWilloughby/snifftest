@@ -34,6 +34,14 @@
  * bad key retried four times is four times the wait and the same answer. The
  * ladder is carried over from the measurement harness this was spiked with,
  * which is where the numbers came from.
+ *
+ * When the service says how long to wait, its number is used instead of the
+ * doubling one, capped, because a `Retry-After` of two seconds is a fact and the
+ * ladder's four is a guess. The cap is there because the header is a number
+ * somebody else controls, and a run must not be parked for an hour by it. A
+ * header that says longer than the cap is treated as a failure worth reporting
+ * rather than a wait worth taking: the ladder tries once more at the cap and
+ * then gives the paragraph up, which is the caller's business to report.
  */
 
 import { scrubSecrets } from "./scrub.ts";
@@ -57,12 +65,58 @@ export const KEY_ENV = "TYPESAFE_API_KEY";
  */
 export const STATE_GUARD_CHARS = 24_000;
 
+/**
+ * The band in which a probability is not an opinion.
+ *
+ * Jev answers about 0.5 on state it cannot read, and the local guard above only
+ * catches the shapes we can recognise before sending. Anything else it cannot
+ * read comes back as a flat middle number, which is the one failure mode that
+ * looks exactly like a clean draft. So the middle is named: a reading from
+ * `NO_JUDGMENT_LOW` to `NO_JUDGMENT_HIGH` inclusive is reported as no judgment,
+ * counted, and never allowed to become a flag or to stand in for a pass.
+ *
+ * The width is the spike's (measured 2026-09-16), and it is deliberately wider
+ * than the flat answers observed, because a band that only just covers what has
+ * been seen is a band that stops working the first time the service changes.
+ */
+export const NO_JUDGMENT_LOW = 0.4;
+export const NO_JUDGMENT_HIGH = 0.6;
+
+/** Whether a probability sits inside the no-judgment band. */
+export function isNoJudgment(probability: number): boolean {
+  return probability >= NO_JUDGMENT_LOW && probability <= NO_JUDGMENT_HIGH;
+}
+
 /** US dollars per input token. Output tokens are free on this endpoint. */
 export const INPUT_TOKEN_PRICE_USD = 0.042e-6;
+
+/**
+ * Where every cost figure in this repo comes from.
+ *
+ * Token counts are whatever the service reported for the request, never an
+ * estimate from the text. The price is the constant above, and `source` is
+ * null because no dated published price has been recorded for this endpoint.
+ * A report prints this beside its cost column so a reader can see that the
+ * usage is measured and the price is not sourced, rather than reading a
+ * dollar figure as a fact.
+ */
+export const PRICE_BASIS = {
+  usage: "provider-reported" as const,
+  usd_per_input_token: INPUT_TOKEN_PRICE_USD,
+  usd_per_output_token: 0,
+  source: null,
+  verified_on: null,
+};
 
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_ATTEMPTS = 4;
 const BACKOFF_BASE_MS = 1000;
+
+/**
+ * The longest wait a `Retry-After` header can buy. Past this the service is
+ * asking for more time than a check of somebody's prose is worth holding for.
+ */
+const MAX_RETRY_AFTER_MS = 8000;
 
 /** Enough of a failure body to say why, short enough to sit in a log line. */
 const MAX_BODY_CHARS = 200;
@@ -108,6 +162,14 @@ export interface JevResult {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly estimatedCostUsd: number;
+  /**
+   * Whether the service reported usage at all.
+   *
+   * A reply with no usage object gives zero tokens and a cost of zero, and a
+   * zero here is a claim about a request that was certainly paid for. The flag
+   * lets a report print the cost as unmeasured instead of as free.
+   */
+  readonly usageReported: boolean;
   readonly latencyMs: number;
   /** How many tries it took, so a caller can report retries instead of hiding them. */
   readonly attempts: number;
@@ -157,6 +219,8 @@ export class JevHttpError extends JevError {
   constructor(
     readonly status: number,
     message: string,
+    /** What `Retry-After` asked for, in ms, when the service sent one. */
+    readonly retryAfterMs?: number,
   ) {
     super(message);
   }
@@ -222,7 +286,7 @@ export function createJevClient(options: JevClientOptions = {}): JevClient {
         } catch (error) {
           last = error;
           if (!isRetryable(error) || attempt === attempts) break;
-          await sleep(BACKOFF_BASE_MS * 2 ** (attempt - 1));
+          await sleep(waitFor(error, attempt));
         }
       }
 
@@ -286,11 +350,13 @@ async function post(
 
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
+      const asked = retryAfterMs(response.headers.get("retry-after"));
       throw new JevHttpError(
         response.status,
         `jev returned ${response.status}${
           detail.trim() === "" ? "" : `: ${detail.trim().slice(0, MAX_BODY_CHARS)}`
         }`,
+        asked,
       );
     }
 
@@ -320,10 +386,15 @@ function readAnswer(parsed: unknown): Answer {
   const nouls: Record<string, number> = {};
   for (const [id, answer] of Object.entries(answers)) {
     const noul = asRecord(answer)?.["noul"];
-    // A missing or non-numeric noul is dropped rather than defaulted: the
-    // caller can tell "not answered" from "answered low" only if we never
-    // invent a number.
-    if (typeof noul === "number" && Number.isFinite(noul)) nouls[id] = noul;
+    // A missing noul, a noul that is not a number, and a number outside 0 to 1
+    // are all dropped rather than defaulted: the caller can tell "not answered"
+    // from "answered low" only if we never invent a number, and a probability
+    // of 7 is not a probability. The panel's reader holds its models to the
+    // same range (`src/bench/prompt.ts`), and two arms scored against each
+    // other have to be held to one contract.
+    if (typeof noul === "number" && Number.isFinite(noul) && noul >= 0 && noul <= 1) {
+      nouls[id] = noul;
+    }
   }
 
   const usage = asRecord(root?.["usage"]);
@@ -336,21 +407,69 @@ function readAnswer(parsed: unknown): Answer {
     inputTokens,
     outputTokens: countOf(usage?.["output_tokens"]),
     estimatedCostUsd: estimatedCostUsd(inputTokens),
+    usageReported: usage !== null,
   };
 }
 
-function isRetryable(error: unknown): boolean {
+/**
+ * How long to wait before the next attempt: what the service asked for if it
+ * asked, and the doubling ladder if it did not.
+ */
+function waitFor(error: unknown, attempt: number): number {
+  const ladder = BACKOFF_BASE_MS * 2 ** (attempt - 1);
+  if (!(error instanceof JevHttpError)) return ladder;
+  const asked = error.retryAfterMs;
+  if (asked === undefined) return ladder;
+  return Math.min(Math.max(asked, 0), MAX_RETRY_AFTER_MS);
+}
+
+/**
+ * `Retry-After`, which is either a number of seconds or an HTTP date, and is
+ * written by somebody else, so every shape that is not a time in the future
+ * comes back undefined rather than as a wait of zero or NaN.
+ */
+export function retryAfterMs(header: string | null, now: number = Date.now()): number | undefined {
+  if (header === null) return undefined;
+  const text = header.trim();
+  if (text === "") return undefined;
+
+  if (/^\d+$/.test(text)) {
+    const seconds = Number(text);
+    return Number.isFinite(seconds) ? seconds * 1000 : undefined;
+  }
+
+  const at = Date.parse(text);
+  if (Number.isNaN(at)) return undefined;
+  const wait = at - now;
+  return wait > 0 ? wait : 0;
+}
+
+/**
+ * Whether a failure is the kind that a later request might not meet.
+ *
+ * A 429 or a 5xx or a dropped socket is about this minute. A 401, a 403 or a
+ * 422 is about the request, and the next paragraph will be told the same thing
+ * in the same words. Callers running a long loop need that difference: one is
+ * worth carrying on through, the other is worth stopping on at once.
+ */
+export function isTransientFailure(error: unknown): boolean {
   if (error instanceof JevStateRefusedError || error instanceof JevMissingKeyError) return false;
   if (error instanceof JevHttpError) return RETRYABLE_STATUSES.has(error.status);
   // A torn response, a timeout, a dropped socket: all worth one more try.
   return true;
 }
 
+function isRetryable(error: unknown): boolean {
+  return isTransientFailure(error);
+}
+
 /** The last error, with any trace of the key taken out of its message. */
 function scrubbed(error: unknown, key: string): Error {
   const message = scrubSecrets(messageOf(error), [key]);
 
-  if (error instanceof JevHttpError) return new JevHttpError(error.status, message);
+  if (error instanceof JevHttpError) {
+    return new JevHttpError(error.status, message, error.retryAfterMs);
+  }
   if (error instanceof JevError) {
     const rebuilt = new JevRequestError(message);
     rebuilt.name = error.name;

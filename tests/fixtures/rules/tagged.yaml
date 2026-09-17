@@ -1,0 +1,15 @@
+# Two countable rules, one of which carries a tag the ruleset sits out.
+version: 1
+threshold: 0.7
+off_by_default: [marketing]
+rules:
+  - id: dash_present
+    kind: regex
+    builtin: dash_present
+    message: "An em dash. Say it in two sentences."
+  - id: colon_heavy
+    kind: regex
+    builtin: colon_count
+    min: 3
+    tags: [marketing]
+    message: "Three colons in one paragraph. Pick one."

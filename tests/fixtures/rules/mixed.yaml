@@ -5,6 +5,9 @@ rules:
   - id: dash_present
     kind: regex
     builtin: dash_present
+    # Tagged so a test can take one rule out with --skip. No `off_by_default`
+    # here, so the tag changes nothing about an ordinary run.
+    tags: [house]
     message: "An em dash. Say it in two sentences."
   - id: colon_heavy
     kind: regex

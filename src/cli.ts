@@ -20,7 +20,7 @@
  * someone into agreeing to a request it was never going to make.
  */
 
-import { lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -50,20 +50,36 @@ import {
 } from "./bench/panel.ts";
 import { PriceError, type PriceTable, parsePriceTable, priceCitation, priceFor } from "./bench/prices.ts";
 import { readAnthropicCatalog } from "./bench/anthropic.ts";
+import { createJevAdapter, jevCatalog } from "./bench/jev-adapter.ts";
 import { type BenchDocument, runBench } from "./bench/run.ts";
 import { type JoinedArm, buildBenchReport, writeBenchReport } from "./bench/tables.ts";
-import { ConfigError, type ResolvedRuleset, resolveRuleset } from "./config.ts";
-import { type Destination, type Env, requestConsent } from "./consent.ts";
 import {
+  ConfigError,
+  type ResolvedRuleset,
+  packagedPath,
+  resolveRuleset,
+  selectRules,
+} from "./config.ts";
+import { CACHE_DIR_ENV, openCache } from "./cache.ts";
+import { type Destination, type Env, TYPESAFE_DESTINATION, requestConsent } from "./consent.ts";
+import {
+  type JudgmentArmResult,
+  type JudgmentReading,
+  type JudgmentStop,
+  type JudgmentTally,
   type JudgmentUsage,
+  type SkippedChunk,
   chunkDocument,
   flagsFrom,
   mergeFlags,
+  NOT_SENT_REASON,
   runJudgmentArm,
   runRegexArm,
 } from "./engine.ts";
 import { type WrittenReport, buildReport, writeReport } from "./eval/report.ts";
+import { BankError, type SeedBank, packagedBankPath, readBank } from "./eval/bank.ts";
 import { type RunEvalOptions, runEval } from "./eval/run.ts";
+import { TwinError, compareTwins, readManifest } from "./eval/twins.ts";
 import { DEFAULT_PER_RULE, DEFAULT_SEED, SeedError, type BaseDocument, seedCorpus } from "./eval/seed.ts";
 import {
   type FetchLike,
@@ -89,6 +105,28 @@ export const EXIT = {
   /** The judgment rules need an answer before anything is sent. */
   consent: 3,
 } as const;
+
+/**
+ * The exit-code contract, written once and printed by `--help`.
+ *
+ * It lives here rather than in prose in four files because every surface that
+ * reads an exit code reads this one: the Action writes a job summary from it,
+ * the hook decides whether to block a commit by it, and a person reads it at
+ * the end of `--help`. The rule that matters most is the last one: a judgment
+ * arm that was asked for and answered nothing is a tool failure and never a
+ * quiet fall back to the countable rules, because exit 0 is this tool's word
+ * for "nothing tripped" and a silent degrade would spend it on "nothing ran".
+ */
+export const EXIT_RULES: readonly string[] = [
+  "  0  nothing tripped a rule",
+  "  1  at least one flag at or above the threshold",
+  "  2  the tool could not do its job: arguments, rules, files, a failed request,",
+  "     or a judgment arm that was asked for and answered none of its questions",
+  "  3  the judgment rules need a yes before anything is sent, and did not get one",
+  "",
+  "  A judgment arm that answered some of its questions is a partial run: the exit",
+  "  code comes from the flags that exist, and what went unanswered is printed.",
+];
 
 /** Used when neither the command line nor the ruleset names one (T1 report). */
 export const DEFAULT_THRESHOLD = 0.7;
@@ -134,6 +172,14 @@ interface Options {
   readonly seed?: number;
   readonly perRule?: number;
   readonly outDir?: string;
+  /** `--twins <dir>`: measure what an injected sentence moves, instead of seeding. */
+  readonly twins?: string;
+  /** `--no-cache`: ask for every paragraph again, even one answered yesterday. */
+  readonly noCache?: boolean;
+  /** `--seed-version 1` reproduces a corpus made before the seed bank existed. */
+  readonly seedVersion?: 1 | 2;
+  /** `--seed-bank <path>`: faults to draw from. Absent means the packaged bank. */
+  readonly bankPath?: string;
   /** `bench` only. */
   readonly panelPath?: string;
   readonly repeats?: number;
@@ -141,6 +187,9 @@ interface Options {
   readonly modelsPath?: string;
   /** An `eval` results directory: its corpus is reused and its arms are joined. */
   readonly evalDir?: string;
+  /** Tags: run only these, and never run these. */
+  readonly only?: readonly string[];
+  readonly skip?: readonly string[];
   /** The tree this run is about, when the process is not standing in it. */
   readonly root?: string;
 }
@@ -223,8 +272,21 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
     ...(options.rulesPath === undefined ? {} : { rulesPath: options.rulesPath }),
     ...(deps.defaultRulesPath === undefined ? {} : { defaultRulesPath: deps.defaultRulesPath }),
   });
-  const ruleset = resolved.ruleset;
+  const selected = selectRules(resolved.ruleset, {
+    ...(options.only === undefined ? {} : { only: options.only }),
+    ...(options.skip === undefined ? {} : { skip: options.skip }),
+  });
+  const ruleset = selected.ruleset;
   warnAbout(deps, resolved);
+  // One line per reason rather than per rule: five rules sitting out one tag is
+  // one fact about the run, and five lines of it drowns the flags underneath.
+  const byReason = new Map<string, string[]>();
+  for (const row of selected.dropped) {
+    byReason.set(row.reason, [...(byReason.get(row.reason) ?? []), row.rule]);
+  }
+  for (const [reason, names] of byReason) {
+    deps.writeError(`${names.join(", ")} sat this run out: ${reason}.`);
+  }
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
 
   const files = collectFiles(deps, options.paths);
@@ -238,13 +300,22 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
   const judgmentRules = ruleset.rules.filter(isJudgmentRule);
 
   if (options.dryRun || judgmentRules.length === 0 || chunks.length === 0) {
-    report(deps, options, countable);
+    const why = options.dryRun
+      ? "--dry-run was asked for"
+      : judgmentRules.length === 0
+        ? "the ruleset carries no judgment rules"
+        : "those paths hold no paragraphs";
+    const verdict = `The countable rules produced this verdict on their own, because ${why}.`;
+    report(deps, options, threshold, countable, verdict, notRun(why));
+    deps.writeError(verdict);
     return exitFor(countable);
   }
 
   const key = deps.env[KEY_ENV];
   if (key === undefined || key.trim() === "") {
-    report(deps, options, countable);
+    const verdict =
+      `The countable rules ran and the judgment rules did not, so this is not a full verdict.`;
+    report(deps, options, threshold, countable, verdict, notRun(`${KEY_ENV} is not set`));
     deps.writeError(
       `${KEY_ENV} is not set, so the judgment rules cannot run. Export it, or use --dry-run for the countable rules only.`,
     );
@@ -263,25 +334,38 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
   });
 
   if (!consent.granted) {
-    report(deps, options, countable);
+    const verdict = "The countable rules ran; the judgment rules were not sent anything.";
+    report(deps, options, threshold, countable, verdict, notRun("consent was not given"));
     return EXIT.consent;
   }
 
   const client = (deps.createClient ?? createJevClient)({ apiKey: key });
-  let usage: JudgmentUsage;
-  let flags: Flag[];
+  const cache =
+    options.noCache === true
+      ? undefined
+      : openCache({ env: deps.env, ...(deps.homedir === undefined ? {} : { homedir: deps.homedir }) });
+  let judged: JudgmentArmResult;
   try {
-    const judged = await runJudgmentArm(chunks, ruleset, client);
-    usage = judged.usage;
-    flags = mergeFlags(countable, flagsFrom(judged.readings, threshold));
+    judged = await runJudgmentArm(chunks, ruleset, client, ...(cache === undefined ? [] : [{ cache }]));
   } catch (error) {
-    report(deps, options, countable);
+    const verdict = "The countable rules ran and the judgment arm failed, so this is not a full verdict.";
+    report(deps, options, threshold, countable, verdict, notRun(messageOf(error)));
     deps.writeError(`the judgment rules could not run: ${messageOf(error)}`);
     return EXIT.failure;
   }
 
-  report(deps, options, flags);
-  deps.writeError(usageLine(usage));
+  const flags = mergeFlags(countable, flagsFrom(judged.readings, threshold));
+  const summary = judgmentSummary(judged);
+  const verdict = verdictLine(judged.tally);
+
+  report(deps, options, threshold, flags, verdict, summary);
+  deps.writeError(verdict);
+  for (const line of degradationLines(judged)) deps.writeError(line);
+  deps.writeError(usageLine(judged.usage));
+
+  // Asked, and heard nothing usable. Exit 0 is this tool's word for "nothing
+  // tripped a rule", and a run that got no judgment at all has not earned it.
+  if (judged.tally.asked > 0 && judged.tally.answered === 0) return EXIT.failure;
   return exitFor(flags);
 }
 
@@ -289,9 +373,134 @@ function exitFor(flags: readonly Flag[]): number {
   return flags.length > 0 ? EXIT.flags : EXIT.ok;
 }
 
-function report(deps: CliDeps, options: Options, flags: readonly Flag[]): void {
+// --- what the judgment arm did, in one shape both formats read ------------
+
+type JudgmentState = "not run" | "answered" | "degraded" | "answered nothing";
+
+/**
+ * The judgment arm's own account of itself, printed in text and in JSON.
+ *
+ * It is one record rather than a few loose numbers because the question a
+ * reader asks is a single one: how much of this verdict is judgment and how
+ * much of it is the countable rules alone. The answer is unreadable unless the
+ * counts, the skipped paragraphs and the state sit together.
+ */
+interface JudgmentSummary {
+  readonly state: JudgmentState;
+  readonly reason?: string;
+  readonly asked: number;
+  readonly answered: number;
+  readonly no_judgment: number;
+  readonly unanswered: number;
+  readonly skipped: readonly SkippedChunk[];
+  /** Present when the arm gave up before it ran out of paragraphs. */
+  readonly stopped?: JudgmentStop;
+  /**
+   * Every reading, including the ones below the threshold and the ones in the
+   * no-judgment band. A caller comparing two drafts needs the numbers that did
+   * not become flags, and printing only the flags hid them.
+   */
+  readonly readings: readonly JudgmentReading[];
+}
+
+function notRun(reason: string): JudgmentSummary {
+  return {
+    state: "not run",
+    reason,
+    asked: 0,
+    answered: 0,
+    no_judgment: 0,
+    unanswered: 0,
+    skipped: [],
+    readings: [],
+  };
+}
+
+function judgmentSummary(judged: JudgmentArmResult): JudgmentSummary {
+  const tally = judged.tally;
+  const state: JudgmentState =
+    tally.answered === 0
+      ? "answered nothing"
+      : tally.noJudgment + tally.unanswered > 0
+        ? "degraded"
+        : "answered";
+
+  return {
+    state,
+    asked: tally.asked,
+    answered: tally.answered,
+    no_judgment: tally.noJudgment,
+    unanswered: tally.unanswered,
+    skipped: judged.skipped,
+    ...(judged.stopped === undefined ? {} : { stopped: judged.stopped }),
+    readings: judged.readings,
+  };
+}
+
+/** One sentence naming which arm the exit code rests on. */
+function verdictLine(tally: JudgmentTally): string {
+  const cells = `${tally.answered} of ${tally.asked} judgment questions answered`;
+  const middle = tally.noJudgment === 0 ? "" : `, ${tally.noJudgment} answered inside the no-judgment band`;
+  const missing = tally.unanswered === 0 ? "" : `, ${tally.unanswered} unanswered`;
+
+  if (tally.answered === 0) {
+    return `The judgment arm answered none of its ${tally.asked} questions${middle}${missing}, so there is no judgment in this verdict.`;
+  }
+  if (tally.noJudgment + tally.unanswered > 0) {
+    return `The countable rules and a partial judgment arm produced this verdict: ${cells}${middle}${missing}.`;
+  }
+  return `The countable rules and the judgment rules both produced this verdict: ${cells}.`;
+}
+
+/** The paragraphs that went unjudged, each with its file and line. */
+/**
+ * The unjudged paragraphs, in as few lines as the facts allow.
+ *
+ * A run over four thousand paragraphs that meets a dead service has four
+ * thousand unjudged paragraphs, and four thousand identical lines about it is
+ * not a report, it is the flags buried. So identical reasons are counted and
+ * printed once, with the first paragraph named so there is somewhere to look,
+ * and the JSON keeps every row for anything that wants to read them all.
+ */
+function degradationLines(judged: JudgmentArmResult): string[] {
+  const byReason = new Map<string, { first: SkippedChunk; count: number }>();
+  for (const row of judged.skipped) {
+    // The paragraphs that were never sent are the stop's own line, below, which
+    // already carries their count and the failure that caused it.
+    if (judged.stopped !== undefined && row.reason === NOT_SENT_REASON) continue;
+    const held = byReason.get(row.reason);
+    if (held === undefined) byReason.set(row.reason, { first: row, count: 1 });
+    else held.count += 1;
+  }
+
+  const lines = [...byReason].map(([reason, group]) =>
+    group.count === 1
+      ? `skipped ${group.first.file}:${group.first.line}, ${reason}`
+      : `skipped ${group.count} paragraphs, ${reason} (first at ${group.first.file}:${group.first.line})`,
+  );
+
+  const stopped = judged.stopped;
+  if (stopped !== undefined) {
+    lines.push(
+      `the judgment arm stopped asking after ${stopped.after} failures in a row (${stopped.reason}), ` +
+        `so ${stopped.notSent} more paragraphs were never sent. The answers received before that are in this verdict.`,
+    );
+  }
+  return lines;
+}
+
+function report(
+  deps: CliDeps,
+  options: Options,
+  threshold: number,
+  flags: readonly Flag[],
+  verdict: string,
+  judgment: JudgmentSummary,
+): void {
   if (options.format === "json") {
-    deps.write(JSON.stringify(flags, null, 2));
+    deps.write(
+      JSON.stringify({ tool: "snifftest check", threshold, verdict, judgment, flags }, null, 2),
+    );
     return;
   }
   for (const flag of flags) {
@@ -304,7 +513,13 @@ function report(deps: CliDeps, options: Options, flags: readonly Flag[]): void {
 function usageLine(usage: JudgmentUsage): string {
   const requests = usage.requests === 1 ? "1 request" : `${usage.requests} requests`;
   const retries = usage.retries === 0 ? "" : `, ${usage.retries} retried`;
-  return `${requests}, ${usage.inputTokens} input tokens, $${usage.estimatedCostUsd.toFixed(6)}, ${usage.latencyMs} ms${retries}.`;
+  // Said in the same line as the bill, because the difference between sixty
+  // requests and six hundred is usually the cache and not the draft.
+  const cached =
+    usage.cached === 0
+      ? ""
+      : `, ${usage.cached} ${usage.cached === 1 ? "paragraph" : "paragraphs"} answered from the cache and not paid for again`;
+  return `${requests}, ${usage.inputTokens} input tokens, $${usage.estimatedCostUsd.toFixed(6)}, ${usage.latencyMs} ms${retries}${cached}.`;
 }
 
 // --- eval -----------------------------------------------------------------
@@ -327,7 +542,18 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
   warnAbout(deps, resolved);
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
 
-  const files = collectFiles(deps, options.paths);
+  // `--twins` measures what one injected sentence moves, rather than seeding a
+  // corpus, so it takes over the whole command before any corpus is read.
+  if (options.twins !== undefined) return await evaluateTwins(deps, options, ruleset, options.twins);
+
+  // A stranger who installed the package has no corpus of this project's own on
+  // disk, and the seeded corpus is what makes the numbers reproducible. So a
+  // run with no paths uses the one that ships, and says that it did.
+  const shipped = options.paths.length === 0 ? packagedCorpus() : undefined;
+  if (shipped !== undefined) {
+    deps.writeError(`no paths given, so the corpus that ships with this install was used: ${shipped}`);
+  }
+  const files = collectFiles(deps, shipped === undefined ? options.paths : [shipped]);
   const candidates: BaseDocument[] = [];
   for (const draft of readDrafts(deps, files)) {
     for (const chunk of chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS })) {
@@ -372,10 +598,32 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
     client = (deps.createClient ?? createJevClient)({ apiKey: key });
   }
 
+  let bank: SeedBank | undefined;
+  const wantsBank = (options.seedVersion ?? 2) === 2;
+  if (wantsBank) {
+    const path = options.bankPath ?? packagedBankPath();
+    try {
+      bank = readBank(path, deps.cwd);
+    } catch (error) {
+      if (!(error instanceof BankError)) throw error;
+      // A named bank that will not read is an error; a missing packaged one is
+      // a fact about the installation, and the run says which faults it used.
+      if (options.bankPath !== undefined) {
+        deps.writeError(messageOf(error));
+        return EXIT.failure;
+      }
+      deps.writeError(
+        "no seed bank ships with this install, so the faults come from the ruleset's own lists.",
+      );
+    }
+  }
+
   const runOptions: RunEvalOptions = {
     ruleset,
     candidates,
     threshold,
+    ...(options.seedVersion === undefined ? {} : { seedVersion: options.seedVersion }),
+    ...(bank === undefined ? {} : { bank }),
     ...(options.seed === undefined ? {} : { seed: options.seed }),
     ...(options.perRule === undefined ? {} : { perRule: options.perRule }),
     ...(client === undefined ? {} : { client }),
@@ -412,6 +660,95 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
   return EXIT.ok;
 }
 
+/**
+ * The injection bar, measured rather than asserted.
+ *
+ * `examples/CORPUS.md` claims a number: an added sentence written to the
+ * checker must not move any probability by more than the bar. This is the
+ * command that checks it. Every reading is printed, including the ones well
+ * under the bar, because a bar with only its failures shown is a bar nobody
+ * can audit.
+ */
+async function evaluateTwins(
+  deps: CliDeps,
+  options: Options,
+  ruleset: Ruleset,
+  directory: string,
+): Promise<number> {
+  const judgmentRules = ruleset.rules.filter(isJudgmentRule);
+  if (judgmentRules.length === 0) {
+    deps.writeError("this ruleset has no judgment rules, so there is nothing an injection could move.");
+    return EXIT.failure;
+  }
+
+  let manifest;
+  try {
+    manifest = readManifest(directory, deps.cwd);
+  } catch (error) {
+    if (error instanceof TwinError) {
+      deps.writeError(messageOf(error));
+      return EXIT.failure;
+    }
+    throw error;
+  }
+
+  const key = deps.env[KEY_ENV];
+  if (key === undefined || key.trim() === "") {
+    deps.writeError(`${KEY_ENV} is not set, so no paragraph can be asked about.`);
+    return EXIT.failure;
+  }
+
+  const consent = await requestConsent({
+    env: deps.env,
+    homedir: deps.homedir,
+    assumeYes: options.assumeYes,
+    isTty: deps.isTty,
+    ruleIds: judgmentRules.map((rule) => rule.id),
+    fileCount: manifest.pairs.length * 2,
+    say: deps.writeError,
+    ...(deps.prompt === undefined ? {} : { prompt: deps.prompt }),
+  });
+  if (!consent.granted) return EXIT.consent;
+
+  const run = await compareTwins({
+    pairs: manifest.pairs,
+    root: manifest.root,
+    rules: judgmentRules,
+    client: (deps.createClient ?? createJevClient)({ apiKey: key }),
+  });
+
+  if (options.format === "json") {
+    deps.write(JSON.stringify({ tool: "snifftest eval --twins", ...run }, null, 2));
+  } else {
+    deps.write(`The bar is ${run.bar}: no probability may move further than that.`);
+    deps.write("");
+    for (const row of run.readings) {
+      const moved = row.delta === null ? "unanswered" : row.delta.toFixed(3);
+      const note = row.injected ? "  (the paragraph the sentence was added to)" : row.over_bar ? "  OVER THE BAR" : "";
+      deps.write(
+        `${row.pair} paragraph ${row.paragraph} ${row.rule.padEnd(20)} ` +
+          `${format(row.original)} to ${format(row.adversarial)}, moved ${moved}${note}`,
+      );
+    }
+    deps.write("");
+    deps.write(
+      run.findings.length === 0
+        ? `Nothing moved further than ${run.bar} outside the paragraph each sentence was added to.`
+        : `${run.findings.length} readings moved further than ${run.bar}.`,
+    );
+    if (run.unanswered > 0) deps.write(`${run.unanswered} readings came back unanswered.`);
+  }
+
+  for (const row of run.unusable) deps.writeError(`${row.pair} could not be compared: ${row.reason}`);
+  if (run.unusable.length > 0) return EXIT.failure;
+  return run.findings.length > 0 ? EXIT.flags : EXIT.ok;
+}
+
+/** A probability, or the word for not having one. */
+function format(value: number | null): string {
+  return value === null ? "n/a" : value.toFixed(2);
+}
+
 function evalSummary(
   report: ReturnType<typeof buildReport>,
   written: WrittenReport,
@@ -426,11 +763,17 @@ function evalSummary(
 
   for (const arm of Object.values(report.arms)) {
     const overall = arm.overall[at];
+    const judgment = overall?.judgment;
+    const cost =
+      arm.summary.usd_per_100_paragraphs === null
+        ? "cost unmeasured"
+        : `$${arm.summary.usd_per_100_paragraphs.toFixed(4)} per 100 paragraphs`;
     lines.push(
       `arm ${arm.arm} ${arm.label.replace(/^[ABC] /, "").padEnd(34)} ` +
-        `recall ${fixed(overall?.recall)}  fp/cell ${fixed(overall?.fp_rate_per_clean_cell)}  ` +
-        `median ${arm.summary.median_latency_ms.toFixed(0)} ms  ` +
-        `$${arm.summary.usd_per_100_documents.toFixed(4)} per 100 documents`,
+        `judgment ${judgment === undefined || judgment.positives === 0 ? "n/a" : `${judgment.hits} of ${judgment.positives}`}  ` +
+        `countable ${countedOf(overall?.countable)}  ` +
+        `false alarms ${overall === undefined ? "n/a" : `${overall.fp_clean_paragraphs} of ${overall.clean_paragraphs} paragraphs`}  ` +
+        `median ${arm.summary.median_latency_ms.toFixed(0)} ms  ${cost}`,
     );
   }
 
@@ -446,8 +789,14 @@ function evalSummary(
   return lines;
 }
 
+/** A rate to two places, or n/a. Used by the bench summary, which prints rates. */
 function fixed(value: number | null | undefined): string {
-  return value === null || value === undefined ? "  n/a" : value.toFixed(3);
+  return value === null || value === undefined ? " n/a" : value.toFixed(2);
+}
+
+/** k of n, or n/a. A summary line never prints a rate without its counts. */
+function countedOf(score: { hits: number; positives: number } | undefined): string {
+  return score === undefined || score.positives === 0 ? "n/a" : `${score.hits} of ${score.positives}`;
 }
 
 // --- bench ----------------------------------------------------------------
@@ -466,6 +815,9 @@ const DESTINATIONS: Readonly<Record<Provider, Destination>> = {
     endpoint: ANTHROPIC_MESSAGES_ENDPOINT,
     keyEnv: ANTHROPIC_KEY_ENV,
   },
+  // The judgment arm's own service, in the panel rotation rather than joined in
+  // from another run, so that one latency column is one measurement.
+  jev: TYPESAFE_DESTINATION,
 };
 
 /**
@@ -488,7 +840,7 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
   const runDate = today();
 
-  const panelFile = at(options.panelPath ?? join("bench", "panel.yaml"), deps.cwd);
+  const panelFile = panelPath(deps, options);
   const panel = parsePanel(readDraft(panelFile), display(panelFile, deps.cwd));
 
   const priceTables = new Map<Provider, PriceTable>();
@@ -503,6 +855,7 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
   const keys: Record<Provider, string> = {
     openrouter: (deps.env[OPENROUTER_KEY_ENV] ?? "").trim(),
     anthropic: (deps.env[ANTHROPIC_KEY_ENV] ?? "").trim(),
+    jev: (deps.env[KEY_ENV] ?? "").trim(),
   };
   const secrets = [keys.openrouter, keys.anthropic, (deps.env[KEY_ENV] ?? "").trim()].filter(
     (key) => key !== "",
@@ -520,7 +873,16 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
     adapters[provider] =
       provider === "openrouter"
         ? createOpenRouterAdapter(adapterOptions)
-        : createAnthropicAdapter(adapterOptions);
+        : provider === "anthropic"
+          ? createAnthropicAdapter(adapterOptions)
+          : createJevAdapter({
+              client: (deps.createClient ?? createJevClient)({
+                apiKey: keys.jev,
+                ...(deps.fetchLike === undefined ? {} : { fetch: deps.fetchLike }),
+              }),
+              rules: ruleset.rules.filter(isJudgmentRule),
+              threshold,
+            });
   }
 
   /** The panel against whatever catalogues are known by the time it is called. */
@@ -556,6 +918,10 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
     if (payload["anthropic"] !== undefined) {
       catalogs.anthropic = readAnthropicCatalog(payload["anthropic"]);
     }
+    // The judgment service publishes no model list, so there is nothing to
+    // record and nothing to read: its one model is a constant, and no network
+    // call is made to learn it.
+    if (adapters.jev !== undefined) catalogs.jev = jevCatalog();
     catalogNotes.push(`model lists read from ${display(file, deps.cwd)}, not from the providers`);
   }
 
@@ -670,7 +1036,7 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
             ? `${(model.served_model ?? model.slug ?? "").padEnd(34)} ` +
               `recall ${fixed(model.accuracy?.overall[String(threshold)]?.recall)}  ` +
               `median ${Math.round(model.latency.median_ms)} ms  ` +
-              `${model.cost.usd_per_100_documents === null ? "cost unknown" : `$${model.cost.usd_per_100_documents.toFixed(4)} per 100 documents`}`
+              `${model.cost.usd_per_100_paragraphs === null ? "cost unknown" : `$${model.cost.usd_per_100_paragraphs.toFixed(4)} per 100 paragraphs`}`
             : (model.note ?? "not available")
         }`,
       );
@@ -680,6 +1046,31 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
   }
 
   return EXIT.ok;
+}
+
+/**
+ * The panel file: the one named, the one in this directory, or the one shipped.
+ *
+ * `bench` used to look only in the working directory, so the command worked
+ * from a clone of this repo and nowhere else. The panel is configuration rather
+ * than data, so falling back to the copy inside the package is honest, and the
+ * run says which file it read.
+ */
+function panelPath(deps: CliDeps, options: Options): string {
+  if (options.panelPath !== undefined) return at(options.panelPath, deps.cwd);
+  const here = at(join("bench", "panel.yaml"), deps.cwd);
+  if (existsSync(here)) return here;
+  const shipped = packagedPath("bench", "panel.yaml");
+  if (existsSync(shipped)) return shipped;
+  throw new UsageError(
+    `no panel file: there is no ${display(here, deps.cwd)} and none shipped with this install. Name one with --panel <file>.`,
+  );
+}
+
+/** The seeded corpus that ships in the package, for a run outside a clone. */
+function packagedCorpus(): string | undefined {
+  const corpus = packagedPath("examples", "corpus");
+  return existsSync(corpus) ? corpus : undefined;
 }
 
 interface BenchCorpus {
@@ -707,9 +1098,13 @@ function benchCorpus(deps: CliDeps, options: Options, ruleset: Ruleset): BenchCo
   }
 
   if (options.paths.length === 0) {
+    const shipped = packagedCorpus();
     throw new UsageError(
       "snifftest bench needs a corpus: either --eval <dir> (an eval results directory, whose " +
-        "arms are joined into the table) or one or more files to seed.",
+        "arms are joined into the table) or one or more files to seed" +
+        (shipped === undefined
+          ? "."
+          : `. The corpus this project benches with ships with the install, at ${shipped}.`),
     );
   }
 
@@ -810,8 +1205,14 @@ function joinedArms(scores: Record<string, unknown>): JoinedArm[] {
       label: typeof arm["label"] === "string" ? arm["label"] : id,
       recall: ratioOf(overall?.["recall"]),
       fpPerCleanCell: ratioOf(overall?.["fp_rate_per_clean_cell"]),
+      fpCleanParagraphs: ratioOf(overall?.["fp_clean_paragraphs"]),
+      cleanParagraphs: ratioOf(overall?.["clean_paragraphs"]),
       medianMs: numberOf(summary?.["median_latency_ms"]),
-      usdPer100Documents: ratioOf(summary?.["usd_per_100_documents"]),
+      // The eval used to write this per 100 documents, which was always per 100
+      // paragraphs. An older results directory is still read under its old key.
+      usdPer100Paragraphs: ratioOf(
+        summary?.["usd_per_100_paragraphs"] ?? summary?.["usd_per_100_documents"],
+      ),
       servedModel: arm["network"] === true ? served : null,
     });
   }
@@ -912,9 +1313,14 @@ function rules(deps: CliDeps, options: Options): number {
   for (const file of resolved.sources) deps.write(display(file, deps.cwd));
   deps.write("");
   deps.write(`threshold ${(resolved.ruleset.threshold ?? DEFAULT_THRESHOLD).toFixed(2)}`);
+  const off = resolved.ruleset.off_by_default ?? [];
+  if (off.length > 0) deps.write(`off by default, unless --only names one: ${off.join(", ")}`);
   for (const rule of resolved.ruleset.rules) {
     const how = rule.kind === "regex" ? (rule.source === "builtin" ? rule.builtin : "pattern") : "jev";
-    deps.write(`  ${rule.id.padEnd(22)} ${rule.kind.padEnd(9)} ${how}`);
+    const tags = rule.tags ?? [];
+    const sitsOut = tags.some((tag) => off.includes(tag)) ? "  (off by default)" : "";
+    const shown = tags.length === 0 ? "" : `  [${tags.join(", ")}]`;
+    deps.write(`  ${rule.id.padEnd(22)} ${rule.kind.padEnd(9)} ${how}${shown}${sitsOut}`);
   }
   return EXIT.ok;
 }
@@ -935,11 +1341,17 @@ function parseArgs(argv: readonly string[]): Options {
   let endOfOptions = false;
   let seed: number | undefined;
   let perRule: number | undefined;
+  let twins: string | undefined;
+  let noCache = false;
+  let seedVersion: 1 | 2 | undefined;
+  let bankPath: string | undefined;
   let outDir: string | undefined;
   let panelPath: string | undefined;
   let modelsPath: string | undefined;
   let evalDir: string | undefined;
   let repeats: number | undefined;
+  let only: string[] | undefined;
+  let skip: string[] | undefined;
   let root: string | undefined;
 
   for (let i = 1; i < argv.length; i++) {
@@ -957,6 +1369,9 @@ function parseArgs(argv: readonly string[]): Options {
       case "--dry-run":
         dryRun = true;
         break;
+      case "--no-cache":
+        noCache = true;
+        break;
       case "--yes":
       case "-y":
         assumeYes = true;
@@ -972,6 +1387,20 @@ function parseArgs(argv: readonly string[]): Options {
         break;
       case "--seed":
         seed = wholeNumber(valueFor(argv, ++i, "--seed"), "--seed", 0);
+        break;
+      case "--seed-version": {
+        const asked = wholeNumber(valueFor(argv, ++i, "--seed-version"), "--seed-version", 1);
+        if (asked !== 1 && asked !== 2) {
+          throw new UsageError("--seed-version is 1 (the ruleset's own faults) or 2 (the seed bank).");
+        }
+        seedVersion = asked;
+        break;
+      }
+      case "--seed-bank":
+        bankPath = valueFor(argv, ++i, "--seed-bank");
+        break;
+      case "--twins":
+        twins = valueFor(argv, ++i, "--twins");
         break;
       case "--per-rule":
         perRule = wholeNumber(valueFor(argv, ++i, "--per-rule"), "--per-rule", 1);
@@ -991,6 +1420,12 @@ function parseArgs(argv: readonly string[]): Options {
       case "--repeats":
         repeats = wholeNumber(valueFor(argv, ++i, "--repeats"), "--repeats", 1);
         break;
+      case "--only":
+        only = tagList(valueFor(argv, ++i, "--only"), "--only");
+        break;
+      case "--skip":
+        skip = tagList(valueFor(argv, ++i, "--skip"), "--skip");
+        break;
       case "--root":
         root = valueFor(argv, ++i, "--root");
         break;
@@ -999,7 +1434,10 @@ function parseArgs(argv: readonly string[]): Options {
     }
   }
 
-  if ((first === "check" || first === "eval") && paths.length === 0) {
+  // `eval` with no paths falls back to the seeded corpus that ships with the
+  // package, so the command works from an install and not only from a clone.
+  // `check` has no such fallback: there is no draft of someone else's to check.
+  if (first === "check" && paths.length === 0) {
     throw new UsageError(`snifftest ${first} needs at least one file or directory.`);
   }
 
@@ -1013,11 +1451,17 @@ function parseArgs(argv: readonly string[]): Options {
     assumeYes,
     ...(seed === undefined ? {} : { seed }),
     ...(perRule === undefined ? {} : { perRule }),
+    ...(twins === undefined ? {} : { twins }),
+    ...(noCache ? { noCache } : {}),
+    ...(seedVersion === undefined ? {} : { seedVersion }),
+    ...(bankPath === undefined ? {} : { bankPath }),
     ...(outDir === undefined ? {} : { outDir }),
     ...(panelPath === undefined ? {} : { panelPath }),
     ...(modelsPath === undefined ? {} : { modelsPath }),
     ...(evalDir === undefined ? {} : { evalDir }),
     ...(repeats === undefined ? {} : { repeats }),
+    ...(only === undefined ? {} : { only }),
+    ...(skip === undefined ? {} : { skip }),
     ...(root === undefined ? {} : { root }),
   };
 }
@@ -1034,6 +1478,16 @@ function valueFor(argv: readonly string[], index: number, name: string): string 
     throw new UsageError(`${name} needs a value.`);
   }
   return value;
+}
+
+/** A comma-separated tag list, as a person types it. */
+function tagList(value: string, name: string): string[] {
+  const tags = value
+    .split(",")
+    .map((tag) => tag.trim())
+    .filter((tag) => tag !== "");
+  if (tags.length === 0) throw new UsageError(`${name} needs at least one tag.`);
+  return tags;
 }
 
 function formatValue(value: string): "text" | "json" {
@@ -1253,14 +1707,21 @@ function helpLines(): string[] {
     "                      relative paths and the ruleset are found there, not here",
     "  --threshold <0-1>   the probability at or above which a judgment counts as a flag",
     "  --format text|json  how to print the flags (default text)",
+    "  --only <tags>       run only the rules carrying one of these tags",
+    "  --skip <tags>       never run a rule carrying one of these tags",
     "  --dry-run           make no network request of any kind, whatever the command;",
     "                      for check that means the countable rules and nothing else",
+    "  --no-cache          ask about every paragraph again, instead of reusing an answer",
+    "                      already paid for in the last fortnight",
     "  --yes, -y           answer the send question for this run and remember the answer",
     "  --help, --version",
     "",
     "Options for eval",
     `  --seed <n>          the value every choice is derived from (default ${DEFAULT_SEED})`,
     `  --per-rule <n>      seeded paragraphs per rule (default ${DEFAULT_PER_RULE})`,
+    "  --twins <dir>       compare each adversarial file with its clean original instead",
+    "  --seed-bank <path>  the faults to seed from (default: the bank in the package)",
+    "  --seed-version <n>  1 seeds from the ruleset's own faults, 2 from the bank (default 2)",
     "  --out <dir>         where the report is written (default bench/results/<today>)",
     "",
     "Options for bench",
@@ -1275,15 +1736,15 @@ function helpLines(): string[] {
     `  ${KEY_ENV}    the key the judgment rules are sent with`,
     `  ${OPENROUTER_KEY_ENV}  the key the bench panel is routed with`,
     `  ${ANTHROPIC_KEY_ENV}   the key the bench's direct overhead control uses`,
+    `  ${CACHE_DIR_ENV}  where answers already paid for are kept, so a rerun after an`,
+    "                      outage asks only about the paragraphs that went unanswered.",
+    "                      Defaults to the user's cache directory; set it to off for none",
     "  SNIFFTEST_SEND=…    answer the send question in CI, without remembering it. It names",
     "                      the destinations it answers for, comma separated; 1 is the",
     "                      shorthand for TypeSafe, which is where check sends and nowhere else",
     "",
     "Exit codes",
-    "  0  nothing tripped a rule",
-    "  1  at least one flag at or above the threshold",
-    "  2  the tool could not do its job: arguments, rules, files, or a failed request",
-    "  3  the judgment rules need a yes before anything is sent, and did not get one",
+    ...EXIT_RULES,
   ];
 }
 

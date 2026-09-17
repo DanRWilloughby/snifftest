@@ -57,6 +57,17 @@ re-opened by new evidence, never by being raised again.
   It is the first thing that has to happen to cut `v0.1.0`, which is what owning
   the name needs.
 
+- **Putting the answer cache next to the files being checked.** Rejected: a
+  cache written into the directory under check is a file somebody commits
+  without meaning to, and in a repository that is a record of which paragraphs
+  were sent for judgment and what came back. It lives under the user's cache
+  directory instead, named by `SNIFFTEST_CACHE_DIR` when somebody wants it
+  elsewhere. What it holds is deliberately thin: the paragraph is a hash in a
+  file name, never text on disk, and the file itself carries rule ids,
+  probabilities, a model name and a date. A hash is not the text, though anyone
+  who already has a paragraph can confirm it was checked, which is worth saying
+  rather than calling the thing anonymous.
+
 ## Owner actions
 
 Things no change in this repository can settle.
