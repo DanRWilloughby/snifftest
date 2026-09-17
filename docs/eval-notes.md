@@ -180,8 +180,11 @@ is enough and the good sentences around it do not excuse it.
 
 Measured on 2026-09-17 over the packaged corpus, eight seeds per rule, faults
 from the independent bank, flags counted at 0.7, cache off, same served model
-(`jev-1.13.0`) throughout. The baseline column is the committed seed 1 run under
-`bench/results/2026-09-17/`, whose three reworded rules carried the old wording.
+(`jev-1.13.0`) throughout. The baseline column is the seed 1 run committed at e2ff9ee, whose three
+reworded rules carried the old wording. The folder `bench/results/2026-09-17/`
+now holds the seed 1 run on the shipped wording and the corrected seed bank:
+63 of 80 judgment faults at 0.7, 1 of 54 clean paragraphs flagged, median
+182 ms, $0.0129 per 100 paragraphs.
 Seed 2 is a different draw of faults and hosts, and is the held-out check: the
 wording was never looked at against it.
 
