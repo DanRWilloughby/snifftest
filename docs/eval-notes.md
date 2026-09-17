@@ -167,25 +167,45 @@ the reason. A line is reopened by new evidence, not by asking again.
   give the project two recall figures for one arm measured two ways, which is
   the fault this change exists to remove.
 
-## Two rules now ask about a sentence, not a paragraph
+## Five rules now ask about a sentence, not a paragraph
 
-`self_undercutting` and `first_x_that` used to ask whether "the paragraph"
-contained the fault. A single bad sentence inside an otherwise confident
-paragraph scored just under the bar, between 0.43 and 0.68, because the rest of
-the paragraph pulled the answer down. Both rules now say that one sentence is
-enough, in the description and in the criterion.
+A rule that asks whether "the paragraph" contains a fault is answered about the
+paragraph. A single bad sentence inside an otherwise careful paragraph scored
+just under the bar, between 0.43 and 0.68, because the rest of the paragraph
+pulled the answer down. `self_undercutting` and `first_x_that` were reworded
+first. `tricolon`, `jobs_claim` and `pullquote_fragment` were each catching 5 of
+8 and have had the same treatment: the description says to judge sentence by
+sentence, and the criterion says that one sentence, anywhere in the paragraph,
+is enough and the good sentences around it do not excuse it.
 
-Measured on 2026-09-17 over the packaged corpus, eight seeds per rule, seed 1,
-faults from the independent bank, flags counted at 0.7, same day and same
-served model for both wordings:
+Measured on 2026-09-17 over the packaged corpus, eight seeds per rule, faults
+from the independent bank, flags counted at 0.7, cache off, same served model
+(`jev-1.13.0`) throughout. The baseline column is the committed seed 1 run under
+`bench/results/2026-09-17/`, whose three reworded rules carried the old wording.
+Seed 2 is a different draw of faults and hosts, and is the held-out check: the
+wording was never looked at against it.
 
-| Rule | Old wording | New wording |
-|---|---|---|
-| self_undercutting | 4 of 8 | 7 of 8 |
-| first_x_that | 5 of 8 | 6 of 8 |
-| Clean paragraphs flagged, all rules | 2 of 54 | 2 of 54 |
+| Rule | Old wording, seed 1 | New wording, seed 1 | New wording, seed 2 |
+|---|---|---|---|
+| tricolon | 5 of 8 | 7 of 8 | 7 of 8 |
+| jobs_claim | 5 of 8 | 7 of 8 | 5 of 8 |
+| pullquote_fragment | 5 of 8 | 7 of 8 | 8 of 8 |
+| Judgment rules, all ten | 58 of 80 | 63 of 80 | 60 of 80 |
+| Clean paragraphs flagged, all rules | 2 of 54 | 2 of 54 | 1 of 54 |
 
-Sixteen seeds is a small sample, and the wording was first tried on an easier
-seed set before it was checked here. The run with the new wording is committed
-under `bench/results/2026-09-17/`. The other judgment rules already asked about
-"at least one" sentence or run and were left alone.
+All three are kept. None of the three raised a false alarm on a clean paragraph
+in either run, at 0 of 54 each in all three columns.
+
+Read the gain against the noise, which the same two runs measure for free. Seven
+rules were not touched at all and still moved between the three columns:
+`first_x_that` went 6, 5, 4, `not_x_but_y` went 3, 3, 2, `stacked_hedging` went
+6, 5, 6, `restating_closer` went 7, 8, 7 and `rhetorical_opener` went 8, 8, 7.
+A swing of one or two out of eight is what this corpus does on its own. So
+`tricolon` and `pullquote_fragment` clear it on both seeds and `jobs_claim` does
+not: it holds at its old 5 of 8 on the held-out seed rather than improving, and
+it is kept on that basis and no stronger one.
+
+Eight seeds per rule is a small sample and every figure here carries an interval
+wider than the differences in the table. The honest summary is that three rules
+were reworded, two of them look better on unseen faults, and the third looks the
+same.

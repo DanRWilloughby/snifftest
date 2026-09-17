@@ -555,6 +555,9 @@ function postOdds(arms: readonly ArmScore[], at: string): string {
 const TUNED_RULES: readonly { readonly rule: string; readonly when: string }[] = [
   { rule: "self_undercutting", when: "2026-09-17" },
   { rule: "first_x_that", when: "2026-09-17" },
+  { rule: "tricolon", when: "2026-09-17" },
+  { rule: "jobs_claim", when: "2026-09-17" },
+  { rule: "pullquote_fragment", when: "2026-09-17" },
 ];
 
 function tuningDisclosure(report: EvalReport): string | null {
