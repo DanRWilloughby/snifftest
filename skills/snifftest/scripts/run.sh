@@ -37,16 +37,28 @@ for argument in "$@"; do
   [ "$argument" = "--judge" ] && judge=1
 done
 
-if [ "$judge" = "0" ] && [ "${SNIFFTEST_SEND:-0}" != "1" ]; then
-  set -- --dry-run "$@"
-fi
-
-# --judge is this script's own word, not the tool's. Drop it before handing the
-# rest of the arguments over.
-args=""
+# What is left after this loop is the path list, and only the path list.
+#
+# --judge is this script's own word and not the tool's, so it is dropped. A `--`
+# the caller wrote is dropped too, because this script places its own, once, in
+# the right place: immediately before the paths. Without that separator a file
+# named `-notes.md` reaches the checker looking like an option it does not have,
+# and the run fails on the name of a file rather than on its prose.
+paths=""
+separated=0
 for argument in "$@"; do
-  [ "$argument" = "--judge" ] && continue
-  args="$args
+  case $argument in
+    --judge)
+      continue
+      ;;
+    --)
+      if [ "$separated" = "0" ]; then
+        separated=1
+        continue
+      fi
+      ;;
+  esac
+  paths="$paths
 $argument"
 done
 
@@ -65,12 +77,18 @@ run_snifftest() {
   fi
 }
 
+set -- check
+
+if [ "$judge" = "0" ] && [ "${SNIFFTEST_SEND:-0}" != "1" ]; then
+  set -- "$@" --dry-run
+fi
+
 # Newline is the only separator, so a path with a space in it survives.
 old_ifs=$IFS
 IFS='
 '
 # shellcheck disable=SC2086 -- the split is the point, and IFS is a newline.
-set -- check $args
+set -- "$@" -- $paths
 IFS=$old_ifs
 
 run_snifftest "$@"

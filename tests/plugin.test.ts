@@ -12,8 +12,9 @@
  * name that escaped into a public repository.
  */
 
-import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { afterEach, describe, expect, test } from "bun:test";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 const repoRoot = resolve(import.meta.dir, "..");
@@ -154,6 +155,94 @@ describe("the bundled script", () => {
 
   test("never reads or prints the key", () => {
     expect(runScript).not.toContain("TYPESAFE_API_KEY");
+  });
+});
+
+// --- the script as a script, not as a document ----------------------------
+
+/**
+ * What the script actually hands the checker.
+ *
+ * `SNIFFTEST_BIN` is the documented way to point the script at an executable,
+ * so a recorder standing in for the checker is the only stub needed, and the
+ * argument list it writes down is the thing under test.
+ */
+const scratch: string[] = [];
+
+afterEach(() => {
+  while (scratch.length > 0) {
+    const dir = scratch.pop();
+    if (dir !== undefined) rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+function recorder(): { bin: string; args: () => string[] } {
+  const dir = mkdtempSync(join(tmpdir(), "snifftest-skill-"));
+  scratch.push(dir);
+  const log = join(dir, "log.txt");
+  const bin = join(dir, "recorder");
+  writeFileSync(bin, `#!/bin/sh\nfor a in "$@"; do echo "$a" >> ${JSON.stringify(log)}; done\nexit 0\n`);
+  chmodSync(bin, 0o755);
+
+  return {
+    bin,
+    args: () =>
+      existsSync(log) ? readFileSync(log, "utf8").split("\n").filter((line) => line !== "") : [],
+  };
+}
+
+function runTheScript(argv: readonly string[], bin: string): { code: number; stderr: string } {
+  const result = Bun.spawnSync({
+    cmd: ["sh", join(repoRoot, "skills/snifftest/scripts/run.sh"), ...argv],
+    env: { ...process.env, SNIFFTEST_BIN: bin, SNIFFTEST_SEND: "0" },
+    stdout: "pipe",
+    stderr: "pipe",
+  });
+  return { code: result.exitCode, stderr: result.stderr.toString() };
+}
+
+describe("what the script hands the checker", () => {
+  test("a file whose name starts with a dash is a path, not an option", () => {
+    // Without a `--` before the paths the checker reads this as an unknown
+    // flag, and the run fails on the name of a file rather than on its prose.
+    const log = recorder();
+    const run = runTheScript(["-notes.md"], log.bin);
+
+    expect(run.code).toBe(0);
+    const args = log.args();
+    expect(args).toEqual(["check", "--dry-run", "--", "-notes.md"]);
+    expect(args.indexOf("--")).toBeLessThan(args.indexOf("-notes.md"));
+  });
+
+  test("a path with spaces in it arrives as one argument", () => {
+    const log = recorder();
+    expect(runTheScript(["drafts/first draft.md"], log.bin).code).toBe(0);
+    expect(log.args()).toEqual(["check", "--dry-run", "--", "drafts/first draft.md"]);
+  });
+
+  test("several paths survive, dashes and spaces together", () => {
+    const log = recorder();
+    runTheScript(["-notes.md", "a folder/second draft.md"], log.bin);
+    expect(log.args()).toEqual([
+      "check",
+      "--dry-run",
+      "--",
+      "-notes.md",
+      "a folder/second draft.md",
+    ]);
+  });
+
+  test("the script's own words never reach the checker, and its separator is placed once", () => {
+    const log = recorder();
+    // The caller wrote `--` themselves; the script still places exactly one.
+    runTheScript(["--judge", "--", "-notes.md"], log.bin);
+    const args = log.args();
+
+    expect(args).toEqual(["check", "--", "-notes.md"]);
+    expect(args.filter((argument) => argument === "--")).toHaveLength(1);
+    expect(args).not.toContain("--judge");
+    // --judge asked for the judgment pass, so the free-rules flag is gone.
+    expect(args).not.toContain("--dry-run");
   });
 });
 
