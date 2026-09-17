@@ -116,9 +116,9 @@ rules:
     message: "Not X, it's Y. The reframe is doing the arguing for you."
     seed:
       splice:
-        - "It is not a shortcut, it is the whole method."
-        - "The problem was never the tooling. It was the calendar."
-        - "That is a habit, not a strategy."
+        - "This is not a limit, it is a choice somebody made years ago."
+        - "The delay was never the printer. It was the paper order."
+        - "That is a ritual, not a process."
       position: any
 
   - id: tricolon
@@ -143,9 +143,9 @@ rules:
     message: "Three items for the cadence. Keep the one that carries the weight."
     seed:
       splice:
-        - "The fix is cleaner, faster, and truer."
-        - "Plan, build, repeat."
-        - "It was slow, it was loud, it was late."
+        - "The result was quieter, lighter, and kinder."
+        - "Read, mark, move on."
+        - "It was cold, it was dark, it was early."
       position: any
 
   - id: stacked_hedging
@@ -169,8 +169,8 @@ rules:
     message: "Three hedges on one claim. Either say it or leave it out."
     seed:
       splice:
-        - "It might perhaps, in some sense, arguably be the main reason."
-        - "It seems to me that this could possibly tend to help a little."
+        - "That could perhaps, in a way, maybe explain part of the gap."
+        - "I would think it might arguably, more or less, be worth a try."
       position: any
 
   - id: rhetorical_opener
@@ -193,8 +193,8 @@ rules:
     message: "Opens on a question nobody asked. Start with the answer."
     seed:
       splice:
-        - "What if the checker itself is the thing that is wrong?"
-        - "But what happens when nobody reads the draft twice?"
+        - "Who decided that a draft has to be finished before anyone reads it?"
+        - "And what is a rule worth if nobody remembers it on a Friday?"
       position: start
 
   - id: restating_closer
@@ -217,8 +217,8 @@ rules:
     message: "The last sentence says the paragraph again. End one sentence earlier."
     seed:
       splice:
-        - "In short, everything above is what we said."
-        - "To sum up, that is how the process works, as this paragraph has described."
+        - "In other words, this paragraph has just made the point it set out to make."
+        - "Put simply, that is the whole of what was said above."
       position: end
 
   - id: self_undercutting
@@ -246,9 +246,9 @@ rules:
     message: "The copy is talking the reader out of it. Name the limit and drop the shrug."
     seed:
       splice:
-        - "We do not claim this catches every case."
-        - "This may not work for you, and we are not saying it will."
-        - "There is no guarantee any of this helps."
+        - "It might not do anything for your team, and that is fine."
+        - "Honestly, we are not sure it makes a difference."
+        - "Results vary and we make no promises about yours."
       position: any
 
   - id: first_x_that
@@ -274,8 +274,8 @@ rules:
     message: '"The first X that." Someone will check.'
     seed:
       splice:
-        - "This is the first tool that reads a draft the way an editor does."
-        - "We are the first team to run this check on every save."
+        - "We were the first to put a probability next to every flag."
+        - "It is the first notebook app that a crew can run without a signal."
       position: any
 
   - id: naked_cost_figure
@@ -303,7 +303,7 @@ rules:
     seed:
       splice:
         - "It cost us about four dollars of compute to make this."
-        - "Each run costs us about nine cents in model spend."
+        - "Rendering the page costs us a little under two cents each time."
       position: any
 
   - id: jobs_claim
@@ -329,9 +329,9 @@ rules:
     message: "A claim about jobs. Say what the tool does and what people keep, then stop."
     seed:
       splice:
-        - "We would never replace a person."
-        - "This replaces the people who used to do the checking by hand."
-        - "Four seats means we create jobs rather than removing them."
+        - "Nobody loses their job to this, and if anything it adds a few."
+        - "The tool now does the work that three people used to do."
+        - "We have promised the team that no role will ever be automated away."
       position: any
 
   - id: pullquote_fragment
@@ -355,6 +355,6 @@ rules:
     message: "A pull quote with no verb. Quote a whole sentence."
     seed:
       splice:
-        - "*\"Built to be argued with.\"*"
-        - "*\"The part nobody reads twice.\"*"
+        - "*\"Cheaper by the paragraph.\"*"
+        - "*\"A pen on a string.\"*"
       position: any
