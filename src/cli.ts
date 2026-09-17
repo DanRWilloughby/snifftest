@@ -60,16 +60,19 @@ import {
   resolveRuleset,
   selectRules,
 } from "./config.ts";
+import { CACHE_DIR_ENV, openCache } from "./cache.ts";
 import { type Destination, type Env, TYPESAFE_DESTINATION, requestConsent } from "./consent.ts";
 import {
   type JudgmentArmResult,
   type JudgmentReading,
+  type JudgmentStop,
   type JudgmentTally,
   type JudgmentUsage,
   type SkippedChunk,
   chunkDocument,
   flagsFrom,
   mergeFlags,
+  NOT_SENT_REASON,
   runJudgmentArm,
   runRegexArm,
 } from "./engine.ts";
@@ -171,6 +174,8 @@ interface Options {
   readonly outDir?: string;
   /** `--twins <dir>`: measure what an injected sentence moves, instead of seeding. */
   readonly twins?: string;
+  /** `--no-cache`: ask for every paragraph again, even one answered yesterday. */
+  readonly noCache?: boolean;
   /** `--seed-version 1` reproduces a corpus made before the seed bank existed. */
   readonly seedVersion?: 1 | 2;
   /** `--seed-bank <path>`: faults to draw from. Absent means the packaged bank. */
@@ -335,9 +340,13 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
   }
 
   const client = (deps.createClient ?? createJevClient)({ apiKey: key });
+  const cache =
+    options.noCache === true
+      ? undefined
+      : openCache({ env: deps.env, ...(deps.homedir === undefined ? {} : { homedir: deps.homedir }) });
   let judged: JudgmentArmResult;
   try {
-    judged = await runJudgmentArm(chunks, ruleset, client);
+    judged = await runJudgmentArm(chunks, ruleset, client, ...(cache === undefined ? [] : [{ cache }]));
   } catch (error) {
     const verdict = "The countable rules ran and the judgment arm failed, so this is not a full verdict.";
     report(deps, options, threshold, countable, verdict, notRun(messageOf(error)));
@@ -384,6 +393,8 @@ interface JudgmentSummary {
   readonly no_judgment: number;
   readonly unanswered: number;
   readonly skipped: readonly SkippedChunk[];
+  /** Present when the arm gave up before it ran out of paragraphs. */
+  readonly stopped?: JudgmentStop;
   /**
    * Every reading, including the ones below the threshold and the ones in the
    * no-judgment band. A caller comparing two drafts needs the numbers that did
@@ -421,6 +432,7 @@ function judgmentSummary(judged: JudgmentArmResult): JudgmentSummary {
     no_judgment: tally.noJudgment,
     unanswered: tally.unanswered,
     skipped: judged.skipped,
+    ...(judged.stopped === undefined ? {} : { stopped: judged.stopped }),
     readings: judged.readings,
   };
 }
@@ -441,8 +453,40 @@ function verdictLine(tally: JudgmentTally): string {
 }
 
 /** The paragraphs that went unjudged, each with its file and line. */
+/**
+ * The unjudged paragraphs, in as few lines as the facts allow.
+ *
+ * A run over four thousand paragraphs that meets a dead service has four
+ * thousand unjudged paragraphs, and four thousand identical lines about it is
+ * not a report, it is the flags buried. So identical reasons are counted and
+ * printed once, with the first paragraph named so there is somewhere to look,
+ * and the JSON keeps every row for anything that wants to read them all.
+ */
 function degradationLines(judged: JudgmentArmResult): string[] {
-  return judged.skipped.map((row) => `skipped ${row.file}:${row.line}, ${row.reason}`);
+  const byReason = new Map<string, { first: SkippedChunk; count: number }>();
+  for (const row of judged.skipped) {
+    // The paragraphs that were never sent are the stop's own line, below, which
+    // already carries their count and the failure that caused it.
+    if (judged.stopped !== undefined && row.reason === NOT_SENT_REASON) continue;
+    const held = byReason.get(row.reason);
+    if (held === undefined) byReason.set(row.reason, { first: row, count: 1 });
+    else held.count += 1;
+  }
+
+  const lines = [...byReason].map(([reason, group]) =>
+    group.count === 1
+      ? `skipped ${group.first.file}:${group.first.line}, ${reason}`
+      : `skipped ${group.count} paragraphs, ${reason} (first at ${group.first.file}:${group.first.line})`,
+  );
+
+  const stopped = judged.stopped;
+  if (stopped !== undefined) {
+    lines.push(
+      `the judgment arm stopped asking after ${stopped.after} failures in a row (${stopped.reason}), ` +
+        `so ${stopped.notSent} more paragraphs were never sent. The answers received before that are in this verdict.`,
+    );
+  }
+  return lines;
 }
 
 function report(
@@ -469,7 +513,13 @@ function report(
 function usageLine(usage: JudgmentUsage): string {
   const requests = usage.requests === 1 ? "1 request" : `${usage.requests} requests`;
   const retries = usage.retries === 0 ? "" : `, ${usage.retries} retried`;
-  return `${requests}, ${usage.inputTokens} input tokens, $${usage.estimatedCostUsd.toFixed(6)}, ${usage.latencyMs} ms${retries}.`;
+  // Said in the same line as the bill, because the difference between sixty
+  // requests and six hundred is usually the cache and not the draft.
+  const cached =
+    usage.cached === 0
+      ? ""
+      : `, ${usage.cached} ${usage.cached === 1 ? "paragraph" : "paragraphs"} answered from the cache and not paid for again`;
+  return `${requests}, ${usage.inputTokens} input tokens, $${usage.estimatedCostUsd.toFixed(6)}, ${usage.latencyMs} ms${retries}${cached}.`;
 }
 
 // --- eval -----------------------------------------------------------------
@@ -1292,6 +1342,7 @@ function parseArgs(argv: readonly string[]): Options {
   let seed: number | undefined;
   let perRule: number | undefined;
   let twins: string | undefined;
+  let noCache = false;
   let seedVersion: 1 | 2 | undefined;
   let bankPath: string | undefined;
   let outDir: string | undefined;
@@ -1317,6 +1368,9 @@ function parseArgs(argv: readonly string[]): Options {
         break;
       case "--dry-run":
         dryRun = true;
+        break;
+      case "--no-cache":
+        noCache = true;
         break;
       case "--yes":
       case "-y":
@@ -1398,6 +1452,7 @@ function parseArgs(argv: readonly string[]): Options {
     ...(seed === undefined ? {} : { seed }),
     ...(perRule === undefined ? {} : { perRule }),
     ...(twins === undefined ? {} : { twins }),
+    ...(noCache ? { noCache } : {}),
     ...(seedVersion === undefined ? {} : { seedVersion }),
     ...(bankPath === undefined ? {} : { bankPath }),
     ...(outDir === undefined ? {} : { outDir }),
@@ -1656,6 +1711,8 @@ function helpLines(): string[] {
     "  --skip <tags>       never run a rule carrying one of these tags",
     "  --dry-run           make no network request of any kind, whatever the command;",
     "                      for check that means the countable rules and nothing else",
+    "  --no-cache          ask about every paragraph again, instead of reusing an answer",
+    "                      already paid for in the last fortnight",
     "  --yes, -y           answer the send question for this run and remember the answer",
     "  --help, --version",
     "",
@@ -1679,6 +1736,9 @@ function helpLines(): string[] {
     `  ${KEY_ENV}    the key the judgment rules are sent with`,
     `  ${OPENROUTER_KEY_ENV}  the key the bench panel is routed with`,
     `  ${ANTHROPIC_KEY_ENV}   the key the bench's direct overhead control uses`,
+    `  ${CACHE_DIR_ENV}  where answers already paid for are kept, so a rerun after an`,
+    "                      outage asks only about the paragraphs that went unanswered.",
+    "                      Defaults to the user's cache directory; set it to off for none",
     "  SNIFFTEST_SEND=…    answer the send question in CI, without remembering it. It names",
     "                      the destinations it answers for, comma separated; 1 is the",
     "                      shorthand for TypeSafe, which is where check sends and nowhere else",

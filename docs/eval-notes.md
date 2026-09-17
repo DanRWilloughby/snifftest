@@ -37,11 +37,35 @@ the reason. A line is reopened by new evidence, not by asking again.
   nothing, so it exits 2 rather than 0. A model that returns the middle of the
   range for everything is the failure this band exists to make visible.
 
-- **A service failure part way through stops the judgment arm.** One paragraph
-  the local guard refuses is skipped and the run carries on, because the next
-  paragraph is probably fine. A rejected key or a dead socket will answer every
-  remaining paragraph the same way, so the arm stops asking, keeps every answer
-  already paid for, and names each paragraph it did not send.
+- **A service failure part way through stops the judgment arm.** Revised after a
+  real run: over 94 files and 4,587 paragraphs, eight minutes in, the service
+  answered 503 once. Stopping on the first failure threw away eight minutes of
+  answers to learn that one minute was bad. Three kinds of failure are now told
+  apart. A paragraph the local guard refuses is that paragraph's business and
+  the run carries on. A 429, a 5xx or a dropped socket is a bad minute: the
+  paragraph is marked unanswered, the next one is asked, and three of them in a
+  row with no answer between opens the breaker. A rejected key or a malformed
+  request is not a minute, it is the request, so the arm stops on the first one.
+  Every route keeps the answers already received, and the exit code comes from
+  the flags that exist.
+
+- **Answers already paid for are cached on disk, rather than deferred.** The
+  case against was that a judgment is a model's opinion on a day and a cache
+  serves yesterday's. The case for is the run above: without one, the rerun
+  after an outage pays for all 4,587 paragraphs to recover the 1,200 it lost.
+  The compromise is that a cache entry is keyed by the paragraph, the exact
+  wording of every question asked about it and the model it was asked of, so a
+  reworded rule is never answered from an old reading, and entries expire after
+  a fortnight so nothing reports a stale opinion as today's. The paragraph is
+  never written to disk: the file name is a hash of it and the file holds rule
+  ids, probabilities, a model name and a date. `--no-cache` turns it off for a
+  run and `SNIFFTEST_CACHE_DIR=off` turns it off for good.
+
+- **`Retry-After` is honoured, up to a cap.** A service that says how long to
+  wait knows better than the doubling ladder, so its number is used. It is also
+  a number somebody else controls, and a header asking for an hour would park a
+  check for an hour, so the wait is capped at eight seconds and a header past
+  that is treated as a failure to report rather than a wait to take.
 
 - **The judgment service's price prints as unknown in the bench and as a
   disclosed constant in the eval.** No dated published price has been recorded

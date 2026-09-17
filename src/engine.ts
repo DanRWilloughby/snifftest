@@ -32,10 +32,13 @@
  * are only ever read as code when a fence is drawn there.
  */
 
+import { type AnswerCache, cacheKey } from "./cache.ts";
 import {
   type JevClient,
   JevStateRefusedError,
+  MODEL,
   isNoJudgment,
+  isTransientFailure,
   questionsFromRules,
 } from "./jev.ts";
 import { PATTERN_TEXT_CAP, appliesToChunk, checkRegexRule } from "./rules.ts";
@@ -260,6 +263,8 @@ export interface JudgmentUsage {
   readonly latencyMs: number;
   /** Tries beyond the first, summed. Reported, never hidden. */
   readonly retries: number;
+  /** Answers that came off the disk instead of the wire, and so cost nothing. */
+  readonly cached: number;
 }
 
 /** A paragraph the judgment arm never got an answer about, and why. */
@@ -267,6 +272,34 @@ export interface SkippedChunk {
   readonly file: string;
   readonly line: number;
   readonly reason: string;
+}
+
+/**
+ * How many service failures in a row end the arm.
+ *
+ * One failure is not evidence of a dead service. A 503 in the middle of a long
+ * run is usually one bad minute, and giving up on the first one throws away the
+ * rest of a check over it. Three in a row, each of them already through the
+ * gateway's own retry ladder, is a service that is not answering today, and
+ * asking the next four thousand paragraphs only buys four thousand more waits.
+ */
+export const CONSECUTIVE_FAILURE_LIMIT = 3;
+
+/**
+ * What a paragraph's `skipped` row says once the breaker is open. Named,
+ * because the reporting side collapses these into the stop's own line rather
+ * than saying the same thing twice.
+ */
+export const NOT_SENT_REASON = "not sent, because the judgment arm had stopped asking";
+
+/** Why the arm stopped asking before it ran out of paragraphs. */
+export interface JudgmentStop {
+  /** The failure that opened the breaker, as the service put it. */
+  readonly reason: string;
+  /** How many failures in a row it took. */
+  readonly after: number;
+  /** Paragraphs that were never sent because of it. */
+  readonly notSent: number;
 }
 
 /**
@@ -294,6 +327,8 @@ export interface JudgmentArmResult {
   readonly usage: JudgmentUsage;
   readonly tally: JudgmentTally;
   readonly skipped: readonly SkippedChunk[];
+  /** Absent unless the arm gave up early, which is a fact about the run. */
+  readonly stopped?: JudgmentStop;
 }
 
 const NO_USAGE: JudgmentUsage = {
@@ -303,6 +338,7 @@ const NO_USAGE: JudgmentUsage = {
   estimatedCostUsd: 0,
   latencyMs: 0,
   retries: 0,
+  cached: 0,
 };
 
 /**
@@ -333,17 +369,39 @@ const NO_USAGE: JudgmentUsage = {
  * now that paragraph's own: it is recorded with its file and line, and the run
  * carries on.
  *
- * A failure from the service is different in kind. A 401 or a dead socket will
- * greet the next paragraph the same way, so the arm stops asking rather than
- * spending four backoff ladders per remaining paragraph to learn it again. What
- * came back before the failure is kept, and every paragraph that was not sent
- * is named.
+ * A failure from the service is different in kind, and it is counted rather
+ * than acted on at once. The paragraph that failed is marked unanswered and the
+ * next one is asked, because a 503 in minute eight of a long run is usually one
+ * bad minute and not a dead service. `CONSECUTIVE_FAILURE_LIMIT` failures in a
+ * row, with no answer between them, is the other case, and then the arm stops
+ * asking. Either way the answers already received are kept and returned: a run
+ * that paid for four thousand judgments and then met a 503 reports four
+ * thousand judgments and a line about the 503, never nothing at all.
+ *
+ * Every paragraph that went unjudged is named with its file, its line and the
+ * reason, and the tally counts its questions under `unanswered`, so the four
+ * numbers still add up over a run that ended early.
+ *
+ * ## The same paragraph is not paid for twice
+ *
+ * With a cache in hand, a paragraph is looked up before it is sent, and the
+ * lookup happens whether or not the arm has stopped asking: an answer on disk
+ * costs nothing and owes nothing to the state of the service. So the run after
+ * an outage pays for the paragraphs that were never answered and no others.
+ * What is stored, and what is deliberately not, is in `cache.ts`.
  */
+export interface JudgmentArmOptions {
+  /** Answers already paid for. Left out, nothing is read or written. */
+  readonly cache?: AnswerCache;
+}
+
 export async function runJudgmentArm(
   chunks: readonly Chunk[],
   ruleset: Ruleset,
   client: JevClient,
+  options: JudgmentArmOptions = {},
 ): Promise<JudgmentArmResult> {
+  const cache = options.cache;
   const rules = ruleset.rules.filter(isJudgmentRule);
   const prose = chunks.filter(isProseLike);
   const structure = chunks.length - prose.length;
@@ -377,51 +435,89 @@ export async function runJudgmentArm(
   let estimatedCostUsd = 0;
   let latencyMs = 0;
   let retries = 0;
+  let cached = 0;
 
   const skipped: SkippedChunk[] = [];
   let answered = 0;
   let noJudgment = 0;
   let halted = false;
+  let consecutive = 0;
+  let stopped: JudgmentStop | undefined;
+  let notSent = 0;
   // Counted as the loop goes, because a piece of a cut block is not asked about
   // every rule, so the old paragraphs-times-rules product would overstate it.
   let asked = 0;
 
-  for (const [index, chunk] of prose.entries()) {
-    if (halted) {
-      skipped.push({
-        file: chunk.file,
-        line: chunk.line,
-        reason: "not sent, because the judgment arm stopped after the failure above",
-      });
-      continue;
-    }
-
+  for (const chunk of prose) {
     const applicable = askedAbout(chunk);
     if (applicable.length === 0) continue;
+    // Counted whether or not the paragraph is sent, so that a run which stopped
+    // early cannot look like a shorter run that asked everything it meant to.
     asked += applicable.length;
 
-    let answer;
-    try {
-      answer = await client.ask({ state: chunk.text, questions: questionsFor(applicable) });
-    } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
-      skipped.push({ file: chunk.file, line: chunk.line, reason });
-      // A local refusal is about this paragraph. Anything else is about the
-      // service, and asking the next paragraph would only buy the same answer
-      // at the price of another retry ladder.
-      if (!(error instanceof JevStateRefusedError)) halted = index < prose.length - 1;
-      continue;
+    // The cache is read before the breaker is consulted, because an answer
+    // already on disk costs nothing and a stopped arm is about the service, not
+    // about this paragraph. A rerun after an outage therefore pays only for the
+    // paragraphs that were never answered.
+    const questions = questionsFor(applicable);
+    const key = cache === undefined ? undefined : cacheKey(chunk.text, questions, MODEL);
+    const held = cache === undefined || key === undefined ? undefined : cache.get(key);
+
+    let nouls: Readonly<Record<string, number>>;
+    if (held !== undefined) {
+      cached += 1;
+      nouls = held.nouls;
+    } else {
+      if (halted) {
+        notSent += 1;
+        skipped.push({
+          file: chunk.file,
+          line: chunk.line,
+          reason: NOT_SENT_REASON,
+        });
+        continue;
+      }
+
+      let answer;
+      try {
+        answer = await client.ask({ state: chunk.text, questions });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        skipped.push({ file: chunk.file, line: chunk.line, reason });
+        // A local refusal is about this paragraph and says nothing about the
+        // service, so it never counts towards the breaker.
+        if (error instanceof JevStateRefusedError) continue;
+        // A bad key or a malformed request is not a bad minute. The next
+        // paragraph would be told the same thing in the same words, so there is
+        // nothing to wait out and the arm stops on the first one.
+        if (!isTransientFailure(error)) {
+          halted = true;
+          stopped = { reason, after: 1, notSent: 0 };
+          continue;
+        }
+        consecutive += 1;
+        if (consecutive >= CONSECUTIVE_FAILURE_LIMIT) {
+          halted = true;
+          stopped = { reason, after: consecutive, notSent: 0 };
+        }
+        continue;
+      }
+
+      consecutive = 0;
+      requests += 1;
+      inputTokens += answer.inputTokens;
+      outputTokens += answer.outputTokens;
+      estimatedCostUsd += answer.estimatedCostUsd;
+      latencyMs += answer.latencyMs;
+      retries += Math.max(0, answer.attempts - 1);
+      nouls = answer.nouls;
+      if (cache !== undefined && key !== undefined) {
+        cache.set(key, { model: answer.model, nouls: answer.nouls });
+      }
     }
 
-    requests += 1;
-    inputTokens += answer.inputTokens;
-    outputTokens += answer.outputTokens;
-    estimatedCostUsd += answer.estimatedCostUsd;
-    latencyMs += answer.latencyMs;
-    retries += Math.max(0, answer.attempts - 1);
-
     for (const rule of applicable) {
-      const probability = answer.nouls[rule.id];
+      const probability = nouls[rule.id];
       // A rule the service did not answer is left out rather than scored zero:
       // "not answered" and "answered low" are different facts. The range is
       // checked here as well as in the gateway, because the arm takes any
@@ -445,9 +541,10 @@ export async function runJudgmentArm(
 
   return {
     readings,
-    usage: { requests, inputTokens, outputTokens, estimatedCostUsd, latencyMs, retries },
+    usage: { requests, inputTokens, outputTokens, estimatedCostUsd, latencyMs, retries, cached },
     tally: { asked, structure, answered, noJudgment, unanswered: asked - answered - noJudgment },
     skipped,
+    ...(stopped === undefined ? {} : { stopped: { ...stopped, notSent } }),
   };
 }
 

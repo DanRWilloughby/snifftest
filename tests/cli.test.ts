@@ -28,6 +28,7 @@ interface CheckJson {
     readonly no_judgment: number;
     readonly unanswered: number;
     readonly skipped: readonly { readonly file: string; readonly line: number; readonly reason: string }[];
+  readonly stopped?: { readonly reason: string; readonly after: number; readonly notSent: number };
     readonly readings: readonly { readonly rule: string; readonly probability: number }[];
   };
   readonly flags: readonly Flag[];
@@ -879,5 +880,168 @@ describe("eval --twins", () => {
     expect(report.tool).toBe("snifftest eval --twins");
     expect(report.bar).toBe(0.1);
     expect(report.readings.length).toBeGreaterThan(0);
+  });
+});
+
+describe("a service that falls over in the middle of a long check", () => {
+  // Five paragraphs, one of which trips a countable rule, so a run can show
+  // that findings which exist still decide the exit code while the judgment
+  // arm is reporting what it could not do.
+  const draft = [
+    "The first paragraph is ordinary prose and says its thing plainly.",
+    "",
+    "The second paragraph is also ordinary and also says its thing.",
+    "",
+    "Three colons here: one, two: and three: which is a countable rule.",
+    "",
+    "The fourth paragraph says a little more and then stops there.",
+    "",
+    "The fifth paragraph closes the draft without any flourish at all.",
+    "",
+  ].join("\n");
+
+  function drafted(): { dir: string; path: string } {
+    const dir = sandbox();
+    const path = join(dir, "draft.md");
+    writeFileSync(path, draft, "utf8");
+    return { dir, path };
+  }
+
+  function replies(fail: (call: number) => number | null): {
+    make: (options: JevClientOptions) => JevClient;
+    calls: () => number;
+  } {
+    let call = 0;
+    return {
+      calls: () => call,
+      make: (options: JevClientOptions) =>
+        createJevClient({
+          ...options,
+          attempts: 1,
+          fetch: async () => {
+            call += 1;
+            const status = fail(call);
+            if (status !== null) return new Response("model_unavailable", { status });
+            return new Response(
+              JSON.stringify({
+                model: "jev-test",
+                answers: { restating_closer: { type: "noul", noul: 0.2 } },
+                usage: { input_tokens: 40, output_tokens: 0 },
+              }),
+              { status: 200, headers: { "content-type": "application/json" } },
+            );
+          },
+        }),
+    };
+  }
+
+  test("one 503 costs one paragraph, and the answers already paid for are in the verdict", async () => {
+    const { dir, path } = drafted();
+    const service = replies((call) => (call === 2 ? 503 : null));
+
+    const result = await run({
+      argv: ["check", "--yes", "--format", "json", "--rules", resolve(repoRoot, MIXED), path],
+      cwd: dir,
+      env: { SNIFFTEST_CACHE_DIR: join(dir, "cache") },
+      makeClient: service.make,
+    });
+
+    const parsed = JSON.parse(result.out) as CheckJson;
+    expect(service.calls()).toBe(5);
+    expect(parsed.judgment.state).toBe("degraded");
+    expect(parsed.judgment.answered).toBe(4);
+    expect(parsed.judgment.unanswered).toBe(1);
+    expect(parsed.judgment.skipped).toHaveLength(1);
+    expect(parsed.judgment.skipped[0]?.reason).toContain("503");
+    // The colon rule flagged, so the run decides on the finding it has rather
+    // than reporting that it could not form an opinion.
+    expect(result.code).toBe(EXIT.flags);
+    expect(result.err).toContain("4 of 5 judgment questions answered");
+  });
+
+  test("a service that stays down stops the arm, says so once, and still reports the flags", async () => {
+    const { dir, path } = drafted();
+    const service = replies(() => 503);
+
+    const result = await run({
+      argv: ["check", "--yes", "--format", "json", "--rules", resolve(repoRoot, MIXED), path],
+      cwd: dir,
+      env: { SNIFFTEST_CACHE_DIR: join(dir, "cache") },
+      makeClient: service.make,
+    });
+
+    const parsed = JSON.parse(result.out) as CheckJson;
+    // Three paragraphs asked, then the breaker; the other two were never sent.
+    expect(service.calls()).toBe(3);
+    expect(parsed.judgment.stopped?.after).toBe(3);
+    expect(parsed.judgment.stopped?.notSent).toBe(2);
+    expect(parsed.judgment.answered).toBe(0);
+
+    // One line about the stop, and one line for the five unjudged paragraphs
+    // rather than five, because a long run must not bury its flags.
+    const stopped = result.err.split("\n").filter((line) => line.includes("stopped asking"));
+    expect(stopped).toHaveLength(1);
+    expect(result.err).toContain("skipped 3 paragraphs");
+    expect(result.err).toContain("never sent");
+    // Nothing was judged, so the judgment arm has no opinion to offer, and the
+    // countable rules alone are not this tool saying the prose is clean.
+    expect(result.code).toBe(EXIT.failure);
+    expect(parsed.flags.map((flag) => flag.rule)).toEqual(["colon_heavy"]);
+  });
+
+  test("the rerun after an outage pays only for the paragraphs that went unanswered", async () => {
+    const { dir, path } = drafted();
+    const cacheDir = join(dir, "cache");
+    const argv = ["check", "--yes", "--format", "json", "--rules", resolve(repoRoot, MIXED), path];
+
+    const outage = replies((call) => (call === 2 ? 503 : null));
+    await run({ argv, cwd: dir, env: { SNIFFTEST_CACHE_DIR: cacheDir }, makeClient: outage.make });
+
+    const rerun = replies(() => null);
+    const second = await run({
+      argv,
+      cwd: dir,
+      env: { SNIFFTEST_CACHE_DIR: cacheDir },
+      makeClient: rerun.make,
+    });
+
+    const parsed = JSON.parse(second.out) as CheckJson;
+    expect(outage.calls()).toBe(5);
+    expect(rerun.calls()).toBe(1);
+    expect(parsed.judgment.answered).toBe(5);
+    expect(second.err).toContain("answered from the cache and not paid for again");
+  });
+
+  test("--no-cache asks about every paragraph again", async () => {
+    const { dir, path } = drafted();
+    const cacheDir = join(dir, "cache");
+    const argv = ["check", "--yes", "--rules", resolve(repoRoot, MIXED), path];
+
+    const first = replies(() => null);
+    await run({ argv, cwd: dir, env: { SNIFFTEST_CACHE_DIR: cacheDir }, makeClient: first.make });
+
+    const again = replies(() => null);
+    const result = await run({
+      argv: [...argv, "--no-cache"],
+      cwd: dir,
+      env: { SNIFFTEST_CACHE_DIR: cacheDir },
+      makeClient: again.make,
+    });
+
+    expect(again.calls()).toBe(5);
+    expect(result.err).not.toContain("from the cache");
+  });
+
+  test("the cache is off when the environment says off, and nothing is written", async () => {
+    const { dir, path } = drafted();
+    const argv = ["check", "--yes", "--rules", resolve(repoRoot, MIXED), path];
+
+    const first = replies(() => null);
+    await run({ argv, cwd: dir, env: { SNIFFTEST_CACHE_DIR: "off" }, makeClient: first.make });
+
+    const again = replies(() => null);
+    await run({ argv, cwd: dir, env: { SNIFFTEST_CACHE_DIR: "off" }, makeClient: again.make });
+
+    expect(again.calls()).toBe(5);
   });
 });
