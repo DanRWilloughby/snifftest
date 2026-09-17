@@ -289,16 +289,21 @@ blind read of the same 166 paragraphs by four general models.
 | Arm | Judgment faults caught, of 80 | Clean paragraphs flagged, of 54 | Cost per 100 paragraphs | Median per paragraph |
 | --- | --- | --- | --- | --- |
 | Sniff Test, judgment model (Jev, measured) | 63 | 1 | $0.0129 | 182 ms |
-| Claude Haiku 4.5 (estimate) | 61 | 11 | about $0.34 | not measured |
-| Claude Sonnet 5 (estimate) | 63 | 2 | about $1.02 | not measured |
-| Claude Opus 5 (estimate) | 72 | 0 | about $1.70 | not measured |
-| OpenAI gpt-5.6-sol | 75 | 3 | not priced | not measured |
+| Claude Haiku 4.5 (estimate) | 61 | 11 | about $0.36 | not measured |
+| Claude Sonnet 5 (estimate) | 63 | 2 | about $0.94 | not measured |
+| Claude Opus 5 (estimate) | 72 | 0 | about $2.36 | not measured |
+| OpenAI gpt-5.6-sol (estimate) | 75 | 3 | about $1.45 | not measured |
 <!-- numbers:end -->
 
 Flags count at 0.7. The panel models judged about fourteen paragraphs per
 context inside agent sessions, and Jev judged one paragraph per request. The
-Jev cost and latency are measured from provider-reported usage; the model costs
-are estimates at list price and model latency was not measured. The Jev row is
+Jev cost and latency are measured from provider-reported usage. The model costs
+are estimates: one request is the rules prompt plus a paragraph, about 11,500
+characters, taken as 2,900 tokens in and 150 out at four characters a token,
+times 1.3 for Claude Sonnet 5 and Opus 5, whose tokenizer produces about 30
+percent more tokens, at the list prices published on 2026-09-17 (Haiku 4.5
+$1 in and $5 out per million, Sonnet 5 $2 and $10, Opus 5 $5 and $25,
+gpt-5.6-sol $4 and $20), with no prompt caching. Model latency was not measured. The Jev row is
 the run committed under `bench/results/2026-09-17/`. The model rows were judged
 on the earlier run of the same corpus (commit e2ff9ee), before three judgment
 rules were reworded and two near misses in the seed bank were replaced; they
