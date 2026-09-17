@@ -92,19 +92,44 @@ describe("what the published tarball may contain", () => {
 
   test("the allowlist is exactly what the commands need and nothing else", () => {
     // The corpus, the fault bank, the panel and the price files are here
-    // because `eval` and `bench` read them. Without them both commands work
-    // from a clone of this repo and from nowhere else, which is not what they
-    // are described as. `bench/results/` is deliberately not named: a run's own
-    // output is not part of the tool.
+    // because `eval`, `bench` and `serve --replay` read them at run time.
+    // Without them those commands work from a clone of this repo and from
+    // nowhere else, which is not what they are described as. `bench/results/`
+    // is deliberately not named: a run's own output is not part of the tool.
+    // Nor are `examples/adversarial/`, three files of injection payloads that
+    // nobody wants in their node_modules, or `examples/structure/`, which is a
+    // clone's exercise. The reason for each entry lives beside it in the gate.
     expect(pkg.files).toEqual([
       "dist",
       "rules",
-      "examples",
       "bench/panel.yaml",
       "bench/prices",
+      "examples/CORPUS.md",
+      "examples/corpus",
+      "examples/seeds",
+      "examples/replays",
       "README.md",
+      "SECURITY.md",
       "LICENSE",
     ]);
+  });
+
+  test("the gate names every path the manifest ships, and both workflows run it", () => {
+    // The manifest decides what npm packs; the gate decides whether that was
+    // meant. They were allowed to disagree once, and the build stayed red
+    // rather than the question getting answered.
+    const gate = read(".github/scripts/tarball-allowlist.mjs");
+    for (const entry of pkg.files) {
+      // A directory in the manifest is a prefix in the gate.
+      const named = gate.includes(`"${entry}/"`) || gate.includes(`"${entry}"`);
+      expect(`${entry}: ${String(named)}`).toBe(`${entry}: true`);
+    }
+
+    for (const name of ["ci.yml", "release.yml"]) {
+      expect(read(`.github/workflows/${name}`)).toContain(
+        "node .github/scripts/tarball-allowlist.mjs pack.json",
+      );
+    }
   });
 
   test("no runtime dependency, which is the promise on the first screen", () => {
@@ -453,17 +478,52 @@ describe("the tool passes the dash rule it enforces", () => {
     },
   ];
 
+  /**
+   * A committed eval run holds the faults it planted.
+   *
+   * The seeder's whole job is to put a long dash into a clean paragraph, so the
+   * seeded inputs and the scores that name the edit carry the character by
+   * construction. Naming the directory rather than each file keeps the next run
+   * from having to edit this list.
+   */
+  const allowedDirectories: readonly { readonly directory: string; readonly why: string }[] = [
+    {
+      directory: "bench/results/",
+      why: "A recorded run's seeded inputs carry the faults the seeder planted.",
+    },
+  ];
+
   test("the allowlist names only files that are still there", () => {
     for (const { file } of allowed) {
       expect(existsSync(join(repoRoot, file))).toBe(true);
     }
+    for (const { directory } of allowedDirectories) {
+      expect(existsSync(join(repoRoot, directory))).toBe(true);
+    }
+  });
+
+  test("a run is excluded for its planted faults, not as somewhere to put prose", async () => {
+    // The exclusion covers a recorded run because the seeder plants a long dash
+    // on purpose and the scores quote the edit back. That is the machine's own
+    // record of what it did. Anything in a run that a person reads, the tables
+    // above all, passes the rule like every other document in the repository.
+    const tracked = (await Bun.$`git ls-files bench/results`.cwd(repoRoot).text())
+      .split("\n")
+      .filter((path) => path !== "");
+    expect(tracked.length).toBeGreaterThan(0);
+
+    const carrying = tracked.filter((path) => LONG_DASH.test(readFileSync(join(repoRoot, path), "utf8")));
+    const written = carrying.filter((path) => !/\/(inputs|raw)\/[^/]+\.json$/.test(path) && !path.endsWith("/scores.json"));
+
+    expect(written).toEqual([]);
   });
 
   test("no other tracked file carries one", async () => {
     const exempt = new Set(allowed.map((entry) => entry.file));
     const tracked = (await Bun.$`git ls-files`.cwd(repoRoot).text())
       .split("\n")
-      .filter((path) => path !== "" && !exempt.has(path));
+      .filter((path) => path !== "" && !exempt.has(path))
+      .filter((path) => !allowedDirectories.some((entry) => path.startsWith(entry.directory)));
 
     const offenders: string[] = [];
     for (const path of tracked) {

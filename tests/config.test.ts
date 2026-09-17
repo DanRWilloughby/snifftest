@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -216,6 +216,28 @@ describe("resolveRuleset failures", () => {
     );
   });
 
+  test("a discovered ruleset that is a symbolic link is refused, and says what to do", () => {
+    // Nobody typed this path: it was found by looking in the directory. A link
+    // there reads a file from somewhere else under a name that says the rules
+    // are local.
+    const dir = sandbox();
+    const elsewhere = write(dir, "elsewhere.yaml", PROJECT_RULES);
+    symlinkSync(elsewhere, join(dir, PROJECT_RULES_FILE));
+
+    expect(() => resolveRuleset({ cwd: dir })).toThrow(ConfigError);
+    expect(() => resolveRuleset({ cwd: dir })).toThrow(/symbolic link/);
+    expect(() => resolveRuleset({ cwd: dir })).toThrow(/--rules/);
+  });
+
+  test("a ruleset named with --rules is the caller's own business, link or not", () => {
+    const dir = sandbox();
+    const elsewhere = write(dir, "elsewhere.yaml", PROJECT_RULES);
+    const link = join(dir, "named.yaml");
+    symlinkSync(elsewhere, link);
+
+    expect(resolveRuleset({ cwd: dir, rulesPath: "named.yaml" }).ruleset.rules).toHaveLength(1);
+  });
+
   test("a ruleset outside the YAML subset keeps its line number", () => {
     const dir = sandbox();
     write(dir, "bad.yaml", "version: 1\nrules:\n\t- id: a\n");
@@ -263,7 +285,26 @@ describe("which rules a run uses, once tags are read", () => {
   });
 
   test("--only marketing asks for the tag by name, which is how it is switched on", () => {
-    expect(ids(tagged, { only: ["marketing"] })).toEqual(["first_x_that"]);
+    // The countable rules stay: they send nothing and cost nothing, so a
+    // narrowing meant to cut what a model is asked about has no reason to
+    // stop them catching an em dash.
+    expect(ids(tagged, { only: ["marketing"] })).toEqual(["dash_present", "first_x_that"]);
+  });
+
+  test("a tag no rule carries is a usage error naming the tags that exist", () => {
+    expect(() => selectRules(tagged, { only: ["marketting"] })).toThrow(/no rule carries the tag/);
+    expect(() => selectRules(tagged, { only: ["marketting"] })).toThrow(/marketing/);
+    expect(() => selectRules(tagged, { skip: ["housse"] })).toThrow(/no rule carries the tag/);
+  });
+
+  test("a countable rule still goes out under --only when --skip names its tag", () => {
+    // `first_x_that` is a countable rule carrying the tag. `--only` would keep
+    // it for being countable; `--skip` names it and takes it out anyway.
+    const everything = { ...tagged, off_by_default: [] };
+    expect(ids(everything, { only: ["marketing"] })).toContain("first_x_that");
+    expect(ids(everything, { only: ["marketing"], skip: ["marketing"] })).not.toContain(
+      "first_x_that",
+    );
   });
 
   test("--skip takes a tag out even when nothing sits out by default", () => {
@@ -273,7 +314,9 @@ describe("which rules a run uses, once tags are read", () => {
   });
 
   test("--skip wins over --only when a tag is named in both", () => {
-    expect(ids(tagged, { only: ["marketing"], skip: ["marketing"] })).toEqual([]);
+    // `dash_present` carries no tag at all, so nothing names it either way and
+    // it keeps running; the rule both flags name goes out.
+    expect(ids(tagged, { only: ["marketing"], skip: ["marketing"] })).toEqual(["dash_present"]);
   });
 
   test("a child ruleset writing off_by_default: [] turns the tag back on", () => {

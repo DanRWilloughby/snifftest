@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { type AnswerCache, openCache } from "../src/cache.ts";
 
 import {
+  MINIMUM_ARM_BUDGET_MS,
+  OUT_OF_TIME_REASON,
   chunkDocument,
   classifyChunk,
   flagsFrom,
@@ -802,6 +804,40 @@ describe("the judgment arm when the service falters", () => {
     };
   }
 
+  test("the arm stops asking once its overall budget is gone, and says so", async () => {
+    // The breaker catches a service that fails. A service that answers every
+    // request slowly has nothing to catch it, and a hook with a few hundred
+    // paragraphs in front of it had no ceiling at all.
+    const chunks = chunkDocument(draft, "d.md");
+    const { client, calls } = scripted([0.9, 0.2, 0.3, 0.25, 0.1]);
+
+    let clock = 0;
+    const result = await runJudgmentArm(chunks, rules, client, {
+      // Two paragraphs go out, then the clock jumps past the whole budget.
+      now: () => {
+        clock += 1;
+        return clock <= 2 ? 0 : MINIMUM_ARM_BUDGET_MS * 100;
+      },
+    });
+
+    expect(calls()).toBeLessThan(5);
+    expect(result.stopped?.reason).toBe(OUT_OF_TIME_REASON);
+    expect(result.stopped?.notSent).toBeGreaterThan(0);
+    expect(result.skipped.every((row) => row.reason === OUT_OF_TIME_REASON)).toBe(true);
+    // Whatever was answered before the budget ran out is still reported.
+    expect(result.readings.length).toBe(calls());
+  });
+
+  test("a run inside its budget is never cut short by it", async () => {
+    const chunks = chunkDocument(draft, "d.md");
+    const { client, calls } = scripted([0.9, 0.2, 0.3, 0.25, 0.1]);
+
+    const result = await runJudgmentArm(chunks, rules, client, { now: () => 0 });
+
+    expect(calls()).toBe(5);
+    expect(result.stopped).toBeUndefined();
+  });
+
   test("a 503 on one request keeps every answer received before it", async () => {
     const chunks = chunkDocument(draft, "d.md");
     const down = new JevHttpError(503, "jev returned 503: model_unavailable");
@@ -988,6 +1024,57 @@ describe("the judgment arm with answers already paid for", () => {
       await runJudgmentArm(chunks, reworded, second.client, { cache: cache as AnswerCache });
 
       expect(second.calls()).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a rerun after a run of flat middle numbers asks again", async () => {
+    // Jev answers HTTP 200 with about 0.5 for every question on state it cannot
+    // read. Keeping that would report a paragraph as judged and undecided, for
+    // a fortnight, at no cost, with nothing saying it was a replay.
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-cache-"));
+    try {
+      const cache = openCache({ env: { SNIFFTEST_CACHE_DIR: dir } });
+      const chunks = chunkDocument(draft, "d.md");
+
+      const flat = counting({ restating_closer: 0.5 });
+      const bad = await runJudgmentArm(chunks, mixedRules, flat.client, {
+        cache: cache as AnswerCache,
+      });
+      expect(flat.calls()).toBe(3);
+      expect(bad.tally.noJudgment).toBe(3);
+
+      const better = counting({ restating_closer: 0.81 });
+      const rerun = await runJudgmentArm(chunks, mixedRules, better.client, {
+        cache: cache as AnswerCache,
+      });
+
+      expect(better.calls()).toBe(3);
+      expect(rerun.usage.cached).toBe(0);
+      expect(rerun.tally.answered).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a reply that leaves a rule out is asked again rather than reported unanswered", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-cache-"));
+    try {
+      const cache = openCache({ env: { SNIFFTEST_CACHE_DIR: dir } });
+      const chunks = chunkDocument(draft, "d.md");
+
+      const empty = counting({});
+      await runJudgmentArm(chunks, mixedRules, empty.client, { cache: cache as AnswerCache });
+      expect(empty.calls()).toBe(3);
+
+      const answering = counting({ restating_closer: 0.81 });
+      const rerun = await runJudgmentArm(chunks, mixedRules, answering.client, {
+        cache: cache as AnswerCache,
+      });
+
+      expect(answering.calls()).toBe(3);
+      expect(rerun.tally.unanswered).toBe(0);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

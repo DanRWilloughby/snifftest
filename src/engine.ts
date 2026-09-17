@@ -32,7 +32,7 @@
  * are only ever read as code when a fence is drawn there.
  */
 
-import { type AnswerCache, cacheKey } from "./cache.ts";
+import { type AnswerCache, cacheKey, wordingHash } from "./cache.ts";
 import {
   type JevClient,
   JevStateRefusedError,
@@ -292,6 +292,29 @@ export const CONSECUTIVE_FAILURE_LIMIT = 3;
  */
 export const NOT_SENT_REASON = "not sent, because the judgment arm had stopped asking";
 
+/**
+ * How long the whole arm may run, as a budget per paragraph it means to send.
+ *
+ * The breaker catches a service that fails. It does not catch one that answers
+ * every request slowly: four attempts, three backoffs and a ten second timeout
+ * make a worst case of about 47 seconds for one paragraph, and a hook or a CI
+ * job with a few hundred paragraphs in front of it has no ceiling at all. The
+ * budget is the number of paragraphs times this, with a floor so that a single
+ * slow paragraph still gets its full retry ladder.
+ *
+ * It is a budget, not a timeout: the check happens before each request, so a
+ * request already in flight finishes. Nothing is thrown away, the answers
+ * already received are returned, and what went unasked is named.
+ */
+export const PER_PARAGRAPH_BUDGET_MS = 20_000;
+
+/** The smallest whole-arm budget, so one paragraph keeps its retry ladder. */
+export const MINIMUM_ARM_BUDGET_MS = 60_000;
+
+/** Said in the stop line when the budget, rather than the service, ended the arm. */
+export const OUT_OF_TIME_REASON =
+  "the judgment arm ran past its overall budget, so the rest were not sent";
+
 /** Why the arm stopped asking before it ran out of paragraphs. */
 export interface JudgmentStop {
   /** The failure that opened the breaker, as the service put it. */
@@ -393,6 +416,8 @@ const NO_USAGE: JudgmentUsage = {
 export interface JudgmentArmOptions {
   /** Answers already paid for. Left out, nothing is read or written. */
   readonly cache?: AnswerCache;
+  /** The clock, so a test can run the budget out without waiting for it. */
+  readonly now?: () => number;
 }
 
 export async function runJudgmentArm(
@@ -437,6 +462,10 @@ export async function runJudgmentArm(
   let retries = 0;
   let cached = 0;
 
+  const now = options.now ?? Date.now;
+  const deadline =
+    now() + Math.max(MINIMUM_ARM_BUDGET_MS, prose.length * PER_PARAGRAPH_BUDGET_MS);
+
   const skipped: SkippedChunk[] = [];
   let answered = 0;
   let noJudgment = 0;
@@ -460,20 +489,36 @@ export async function runJudgmentArm(
     // about this paragraph. A rerun after an outage therefore pays only for the
     // paragraphs that were never answered.
     const questions = questionsFor(applicable);
+    // The cache is told what is being asked, not only which key it is filed
+    // under, so an entry that leaves a rule out or answers different words is a
+    // miss rather than a question reported as asked and unanswered.
+    const expect =
+      cache === undefined
+        ? undefined
+        : { rules: applicable.map((rule) => rule.id), wording: wordingHash(questions) };
     const key = cache === undefined ? undefined : cacheKey(chunk.text, questions, MODEL);
-    const held = cache === undefined || key === undefined ? undefined : cache.get(key);
+    const held =
+      cache === undefined || key === undefined || expect === undefined
+        ? undefined
+        : cache.get(key, expect);
 
     let nouls: Readonly<Record<string, number>>;
     if (held !== undefined) {
       cached += 1;
       nouls = held.nouls;
     } else {
+      // The budget is consulted here, beside the breaker, and for the same
+      // reason: an answer already on disk costs no time either.
+      if (!halted && now() >= deadline) {
+        halted = true;
+        stopped = { reason: OUT_OF_TIME_REASON, after: 0, notSent: 0 };
+      }
       if (halted) {
         notSent += 1;
         skipped.push({
           file: chunk.file,
           line: chunk.line,
-          reason: NOT_SENT_REASON,
+          reason: stopped?.reason === OUT_OF_TIME_REASON ? OUT_OF_TIME_REASON : NOT_SENT_REASON,
         });
         continue;
       }
@@ -511,8 +556,11 @@ export async function runJudgmentArm(
       latencyMs += answer.latencyMs;
       retries += Math.max(0, answer.attempts - 1);
       nouls = answer.nouls;
-      if (cache !== undefined && key !== undefined) {
-        cache.set(key, { model: answer.model, nouls: answer.nouls });
+      if (cache !== undefined && key !== undefined && expect !== undefined) {
+        // What served this answer, so an entry from a version the alias no
+        // longer points at is a miss for the rest of the run.
+        cache.noteServed(answer.model);
+        cache.set(key, { model: answer.model, nouls: answer.nouls }, expect);
       }
     }
 

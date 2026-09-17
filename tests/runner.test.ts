@@ -168,6 +168,11 @@ function fetchDirectories(hostile: Hostile): string[] {
   return [...recorded(hostile).matchAll(/^cwd=(.*)$/gm)].map((match) => match[1] as string);
 }
 
+/** Every directory an upward walk for a local install ended in. */
+function stoppedAt(hostile: Hostile): string[] {
+  return [...recorded(hostile).matchAll(/^stopped=(.*)$/gm)].map((match) => match[1] as string);
+}
+
 function hijacked(hostile: Hostile): boolean {
   return existsSync(hostile.marker);
 }
@@ -258,5 +263,127 @@ describe("the pre-commit hook", () => {
     for (const directory of directories) {
       expect(directory.startsWith(hostile.dir)).toBe(false);
     }
+  });
+});
+
+/**
+ * The walk *upward* from the scratch directory.
+ *
+ * npm resolves a local install by walking up the directory tree from the
+ * working directory, not by looking in it. Standing in a scratch directory is
+ * therefore only half the fix: a `node_modules/snifftest` at the matching
+ * version anywhere *above* that directory is still what runs. On Linux
+ * `mktemp -d` sits under a world-writable `/tmp`, where any local user can
+ * plant one; on a self-hosted runner `RUNNER_TEMP` survives between jobs, so
+ * one fork's pull request can plant it and the next job hands it the key.
+ *
+ * The fix is an empty `node_modules` inside the scratch directory, which ends
+ * the walk somewhere the script owns. What is asserted below is that property
+ * and not npm's implementation of it: the fetcher on PATH performs the same
+ * upward walk npm documents, and says which of the two it found. A test that
+ * ran the real npm would need a registry, a cache and a network.
+ */
+describe("a snifftest planted above the scratch directory", () => {
+  /** A fetcher that resolves the way npm documents: upward, first match wins. */
+  const walkingRecorder = `#!/bin/sh
+{
+  printf 'runner=%s\\n' "$(basename "$0")"
+  printf 'cwd=%s\\n' "$(pwd -P)"
+  printf 'args=%s\\n' "$*"
+} >> "$SNIFFTEST_TEST_RECORD"
+
+at=$(pwd -P)
+while :; do
+  if [ -d "$at/node_modules" ]; then
+    if [ -x "$at/node_modules/snifftest/bin/run.sh" ]; then
+      exec "$at/node_modules/snifftest/bin/run.sh" "$@"
+    fi
+    # A node_modules without this package in it still ends the walk, which is
+    # what npm does and the whole reason the empty directory works.
+    printf 'stopped=%s\\n' "$at" >> "$SNIFFTEST_TEST_RECORD"
+    break
+  fi
+  [ "$at" != "/" ] || break
+  at=$(dirname "$at")
+done
+printf 'reached=registry\\n' >> "$SNIFFTEST_TEST_RECORD"
+exit 0
+`;
+
+  /** A temporary directory with a hostile package planted at its top. */
+  function plantedTemp(hostile: Hostile): string {
+    const home = mkdtempSync(join(tmpdir(), "snifftest-plant-"));
+    temporary.push(home);
+    const planted = join(home, "node_modules", "snifftest", "bin");
+    mkdirSync(planted, { recursive: true });
+    writeFileSync(
+      join(home, "node_modules", "snifftest", "package.json"),
+      `${JSON.stringify({ name: "snifftest", version: "0.1.0" }, null, 2)}\n`,
+    );
+    script(
+      join(planted, "run.sh"),
+      `#!/bin/sh\nprintf 'HIJACKED %s\\n' "$*" >> "$SNIFFTEST_TEST_MARKER"\nexit 0\n`,
+    );
+    script(join(hostile.stubs, "npx"), walkingRecorder);
+    script(join(hostile.stubs, "bunx"), walkingRecorder);
+    return realpathSync(home);
+  }
+
+  test("the skill's run.sh stops the walk inside its own scratch directory", () => {
+    const hostile = hostileTree();
+    const home = plantedTemp(hostile);
+
+    const result = run(hostile.dir, ["sh", runScript, "--", "notes.md"], {
+      ...hostile.env,
+      TMPDIR: home,
+    });
+
+    expect(hijacked(hostile)).toBe(false);
+    expect(result.stdout).not.toContain("HIJACKED");
+    expect(recorded(hostile)).toContain("reached=registry");
+    // The walk ended where the fetch was made, not at the plant above it.
+    expect(stoppedAt(hostile)).toEqual(fetchDirectories(hostile));
+    for (const at of stoppedAt(hostile)) expect(at.startsWith(home)).toBe(false);
+  });
+
+  test("the pre-commit hook stops the walk inside its own scratch directory", () => {
+    const hostile = hostileTree();
+    const git = (args: string[]): Ran => run(hostile.dir, ["git", ...args], hostile.env);
+    git(["init", "-q", "-b", "main"]);
+    git(["config", "user.email", "hook@example.test"]);
+    git(["config", "user.name", "Hook Test"]);
+    git(["config", "commit.gpgsign", "false"]);
+    git(["config", "core.hooksPath", ".git/hooks"]);
+    mkdirSync(join(hostile.dir, ".git", "hooks"), { recursive: true });
+    const installed = join(hostile.dir, ".git", "hooks", "pre-commit");
+    cpSync(hookSource, installed);
+    chmodSync(installed, 0o755);
+    writeFileSync(join(hostile.dir, ".gitignore"), "node_modules\n");
+    git(["add", ".snifftest.yaml", "notes.md", ".gitignore"]);
+
+    const home = plantedTemp(hostile);
+    const commit = run(hostile.dir, ["git", "commit", "-q", "-m", "first"], {
+      ...hostile.env,
+      TMPDIR: home,
+    });
+
+    expect(hijacked(hostile)).toBe(false);
+    expect(commit.stdout).not.toContain("HIJACKED");
+    expect(recorded(hostile)).toContain("reached=registry");
+    expect(stoppedAt(hostile)).toEqual(fetchDirectories(hostile));
+    for (const at of stoppedAt(hostile)) expect(at.startsWith(home)).toBe(false);
+  });
+
+  test("nothing a fetched package declares is allowed to run", () => {
+    const hostile = hostileTree();
+    // With no bunx anywhere, the npx branch is the one that runs.
+    rmSync(join(hostile.stubs, "bunx"), { force: true });
+
+    run(hostile.dir, ["sh", runScript, "--", "notes.md"], {
+      ...hostile.env,
+      PATH: `${hostile.stubs}:/usr/bin:/bin`,
+    });
+
+    expect(recorded(hostile)).toContain("--ignore-scripts");
   });
 });

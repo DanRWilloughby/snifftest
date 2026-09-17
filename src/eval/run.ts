@@ -18,8 +18,8 @@
  * nothing sent.
  */
 
-import { classifyChunk, runRegexArm } from "../engine.ts";
-import { questionsFromRules, type JevClient } from "../jev.ts";
+import { CONSECUTIVE_FAILURE_LIMIT, classifyChunk, isProseLike, runRegexArm } from "../engine.ts";
+import { JevStateRefusedError, isTransientFailure, questionsFromRules, type JevClient } from "../jev.ts";
 import { type Chunk, type Ruleset, isJudgmentRule, isRegexRule } from "../types.ts";
 import {
   type BaseDocument,
@@ -62,6 +62,8 @@ export interface RawRecord {
 
 export interface RawRun {
   readonly model: string;
+  /** What actually served an answer, or null when nothing did. */
+  readonly served_model: string | null;
   readonly endpoint_model_requested: string;
   readonly question_ids: readonly string[];
   readonly usd_per_input_token: number;
@@ -88,6 +90,25 @@ export interface EvalOutcome {
   readonly raw?: RawRun;
   /** Failures, counted and carried, never swallowed. */
   readonly failures: readonly { readonly doc: string; readonly reason: string }[];
+  /**
+   * What the judgment arm actually did, so a report cannot print a recall of
+   * zero from a run where nothing was ever answered.
+   */
+  readonly judgment?: JudgmentRun;
+}
+
+/** The judgment arm's own tally, separate from the numbers scored off it. */
+export interface JudgmentRun {
+  /** Cells the service answered with a usable probability. */
+  readonly answered: number;
+  /** Paragraphs sent. */
+  readonly sent: number;
+  /** Blocks not sent because they are structure, not prose. */
+  readonly structure: number;
+  /** Why the arm stopped asking, when it did. */
+  readonly stopped: string | null;
+  /** Paragraphs not sent after it stopped. */
+  readonly notSent: number;
 }
 
 const MODEL_REQUESTED = "jev-latest";
@@ -136,11 +157,13 @@ export async function runEval(options: RunEvalOptions): Promise<EvalOutcome> {
   const failures: { doc: string; reason: string }[] = [];
   let raw: RawRun | undefined;
 
+  let judgment: JudgmentRun | undefined;
   if (options.client !== undefined) {
     const judged = await armC(documents, ruleset, options.client, now);
     observations.push(judged.observation);
     raw = judged.raw;
     failures.push(...judged.failures);
+    judgment = judged.judgment;
   }
 
   return {
@@ -152,6 +175,7 @@ export async function runEval(options: RunEvalOptions): Promise<EvalOutcome> {
     scores: scoreAll(observations, classes, thresholds, facts),
     ...(raw === undefined ? {} : { raw }),
     failures,
+    ...(judgment === undefined ? {} : { judgment }),
   };
 }
 
@@ -237,6 +261,7 @@ interface ArmCResult {
   readonly observation: ArmObservation;
   readonly raw: RawRun;
   readonly failures: readonly { readonly doc: string; readonly reason: string }[];
+  readonly judgment: JudgmentRun;
 }
 
 async function armC(
@@ -253,11 +278,23 @@ async function armC(
   const judged: JudgedDocument[] = [];
   const records: RawRecord[] = [];
   const failures: { doc: string; reason: string }[] = [];
-  let servedModel = MODEL_REQUESTED;
+  let servedModel: string | undefined;
+  // The same breaker `check` runs. A dead or refusing service otherwise costs
+  // four attempts and three backoffs per paragraph across a whole corpus, about
+  // two hours, to produce a report whose headline says the judgment arm caught
+  // nothing.
+  let answered = 0;
+  let sent = 0;
+  let structure = 0;
+  let consecutive = 0;
+  let halted = false;
+  let stopped: string | null = null;
+  let notSent = 0;
 
   for (const doc of documents) {
     const started = now();
-    const flags = runRegexArm([chunkOf(doc)], ruleset);
+    const chunk = chunkOf(doc);
+    const flags = runRegexArm([chunk], ruleset);
     const hit = new Set(flags.map((flag) => flag.rule));
     for (const rule of countable) {
       cells.push({ doc: doc.id, rule: rule.id, probability: hit.has(rule.id) ? 1 : 0, answered: true });
@@ -272,7 +309,15 @@ async function armC(
     let usageReported = true;
     let error: string | null = null;
 
-    if (judgment.length > 0) {
+    // A heading, a table row, a link definition or an HTML comment is not
+    // something `check` sends, so this arm does not send one either. An eval
+    // that asked about them would measure a product nobody ships and pay for
+    // it. They stay in the corpus, scored by the countable rules alone.
+    const prose = isProseLike(chunk);
+    if (!prose) structure += 1;
+
+    if (judgment.length > 0 && prose && !halted) {
+      sent += 1;
       try {
         const answer = await client.ask({ state: doc.text, questions });
         nouls = { ...answer.nouls };
@@ -283,12 +328,29 @@ async function armC(
         attempts = answer.attempts;
         usageReported = answer.usageReported;
         servedModel = answer.model;
+        consecutive = 0;
       } catch (failure) {
         error = failure instanceof Error ? failure.message : String(failure);
         latencyMs = now() - started;
         attempts = 1;
         failures.push({ doc: doc.id, reason: error });
+        // A local refusal is about this paragraph and says nothing about the
+        // service, so it never counts towards the breaker.
+        if (!(failure instanceof JevStateRefusedError)) {
+          if (!isTransientFailure(failure)) {
+            halted = true;
+            stopped = error;
+          } else {
+            consecutive += 1;
+            if (consecutive >= CONSECUTIVE_FAILURE_LIMIT) {
+              halted = true;
+              stopped = error;
+            }
+          }
+        }
       }
+    } else if (judgment.length > 0 && prose && halted) {
+      notSent += 1;
     }
 
     let unanswered = 0;
@@ -299,6 +361,7 @@ async function armC(
         cells.push({ doc: doc.id, rule: rule.id, probability: 0, answered: false });
         continue;
       }
+      answered += 1;
       cells.push({ doc: doc.id, rule: rule.id, probability, answered: true });
     }
 
@@ -321,7 +384,7 @@ async function armC(
       id: doc.id,
       kind: doc.kind,
       truth: doc.truth ?? null,
-      model: servedModel,
+      model: servedModel ?? MODEL_REQUESTED,
       nouls,
       usage: { input_tokens: inputTokens, output_tokens: outputTokens },
       latency_s: Math.round(latencyMs) / 1000,
@@ -340,13 +403,15 @@ async function armC(
       cells,
     },
     raw: {
-      model: servedModel,
+      model: servedModel ?? MODEL_REQUESTED,
+      served_model: servedModel ?? null,
       endpoint_model_requested: MODEL_REQUESTED,
       question_ids: judgment.map((rule) => rule.id),
       usd_per_input_token: USD_PER_INPUT_TOKEN,
       records,
     },
     failures,
+    judgment: { answered, sent, structure, stopped, notSent },
   };
 }
 

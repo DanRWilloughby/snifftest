@@ -78,6 +78,18 @@ jobs:
           fi
           cat release-notes.md
 
+      - name: The package carries only what the allowlist names
+        # Before the publish, because this is the workflow that ships. CI runs
+        # the same script on the same allowlist; a release that skipped it would
+        # be the one tarball nobody checked.
+        run: |
+          set -euo pipefail
+          # --ignore-scripts: the bin is built by the step above, and a
+          # lifecycle script's own output on stdout would not be JSON.
+          npm pack --dry-run --ignore-scripts --json > pack.json
+          node .github/scripts/tarball-allowlist.mjs pack.json
+          rm -f pack.json
+
       - name: The tarball about to be published actually runs
         # The last thing before the publish, because a version that prints
         # nothing and exits 0 cannot be unpublished from anybody's CI. This

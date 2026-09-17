@@ -17,6 +17,9 @@
  * on screen are the ones a real run measured.
  */
 
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve } from "node:path";
+
 import { packagedRulesPath, resolveRuleset } from "../config.ts";
 import type { CliDeps } from "../cli.ts";
 import { requestConsent } from "../consent.ts";
@@ -24,6 +27,7 @@ import { ENDPOINT, type JevClient, KEY_ENV, createJevClient } from "../jev.ts";
 import { isJudgmentRule } from "../types.ts";
 import type { PageConfig } from "./page.ts";
 import { type LoadedReplay, createReplayClient, loadReplay } from "./replay.ts";
+import { RecordError, newestCommittedRunDate, recordReplay, runDatesOnDisk } from "./record.ts";
 import { createScorer } from "./score.ts";
 import { DEFAULT_PORT, LOOPBACK, type ServeHandle, startServer } from "./server.ts";
 
@@ -54,12 +58,19 @@ interface ServeArgs {
   readonly rulesPath?: string;
   readonly threshold?: number;
   readonly assumeYes: boolean;
+  /** Where a recording is written. Set, the page never starts. */
+  readonly record?: string;
+  /** The date the recording says its numbers belong to, when it is not looked up. */
+  readonly runDate?: string;
+  /** Drafts to walk, for `--record`. */
+  readonly drafts: readonly string[];
 }
 
 export async function serve(deps: CliDeps, hooks: ServeHooks = {}): Promise<number> {
   let handle: ServeHandle;
   try {
     const args = parseServeArgs(deps.argv.slice(1));
+    if (args.record !== undefined) return await record(deps, args);
     const replay = args.replay === undefined ? undefined : loadReplay(args.replay, { cwd: deps.cwd });
 
     // A replay is a recording of the shipped rules, so it is played against
@@ -96,6 +107,100 @@ export async function serve(deps: CliDeps, hooks: ServeHooks = {}): Promise<numb
   await stopSignal(hooks.signal);
   await handle.close();
   return OK;
+}
+
+// --- recording a replay ---------------------------------------------------------
+
+/**
+ * `serve --record <out.json> <draft.md>...`, which walks the drafts live and
+ * writes what came back. The page is never started: this is the run that makes
+ * a replay, not a replay of one.
+ */
+async function record(deps: CliDeps, args: ServeArgs): Promise<number> {
+  if (args.drafts.length === 0) {
+    deps.writeError("--record needs at least one draft to walk: snifftest serve --record out.json draft.md");
+    return FAILURE;
+  }
+  if (args.replay !== undefined) {
+    deps.writeError("--record makes a recording and --replay plays one back, so they cannot be asked for together.");
+    return FAILURE;
+  }
+
+  const rulesPath = args.rulesPath ?? packagedRulesPath();
+  const { ruleset } = resolveRuleset({
+    cwd: deps.cwd,
+    rulesPath,
+    ...(deps.defaultRulesPath === undefined ? {} : { defaultRulesPath: deps.defaultRulesPath }),
+  });
+
+  const runDate = args.runDate ?? runDateFor(deps);
+  if (runDate === null) {
+    const onDisk = runDatesOnDisk(join(deps.cwd, "bench", "results"));
+    deps.writeError(
+      "no committed run under bench/results, so there is no dated run for these numbers to belong to." +
+        (onDisk.length === 0
+          ? " Run the bench, commit its results, then record."
+          : ` Uncommitted runs are there (${onDisk.join(", ")}); commit one, or name a date with --run-date.`),
+    );
+    return FAILURE;
+  }
+
+  const drafts = [];
+  for (const path of args.drafts) {
+    const full = isAbsolute(path) ? path : resolve(deps.cwd, path);
+    try {
+      drafts.push({ name: path, text: readFileSync(full, "utf8") });
+    } catch (error) {
+      deps.writeError(`${path} could not be read (${error instanceof Error ? error.message : String(error)}).`);
+      return FAILURE;
+    }
+  }
+
+  const key = deps.env[KEY_ENV]?.trim() ?? "";
+  const judgmentRuleIds = ruleset.rules.filter(isJudgmentRule).map((rule) => rule.id);
+  const live = await liveClient(deps, args, judgmentRuleIds, key);
+  if (live.client === undefined) {
+    deps.writeError("a recording is the judgment rules' answers, so it cannot be made without them.");
+    return FAILURE;
+  }
+
+  let recorded;
+  try {
+    recorded = await recordReplay({
+      ruleset,
+      client: live.client,
+      drafts,
+      runDate,
+      note: `Recorded by snifftest serve --record over ${drafts.map((draft) => draft.name).join(", ")}.`,
+    });
+  } catch (error) {
+    if (error instanceof RecordError) {
+      deps.writeError(error.message);
+      return FAILURE;
+    }
+    throw error;
+  }
+
+  const out = isAbsolute(args.record ?? "") ? (args.record ?? "") : resolve(deps.cwd, args.record ?? "");
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, `${JSON.stringify(recorded.file, null, 1)}\n`, "utf8");
+
+  deps.write(
+    `recorded ${recorded.asked} paragraph states over ${recorded.prefixes} sentence boundaries, ` +
+      `against the run of ${runDate}`,
+  );
+  deps.write(`wrote ${args.record ?? out}`);
+  return OK;
+}
+
+/** The dated run a recording's numbers belong beside, or null when there is none. */
+function runDateFor(deps: CliDeps): string | null {
+  try {
+    return newestCommittedRunDate(deps.cwd);
+  } catch (error) {
+    if (error instanceof RecordError) return null;
+    throw error;
+  }
 }
 
 // --- live mode: the key, then the question ------------------------------------
@@ -184,6 +289,9 @@ function parseServeArgs(argv: readonly string[]): ServeArgs {
   let rulesPath: string | undefined;
   let threshold: number | undefined;
   let assumeYes = false;
+  let recordTo: string | undefined;
+  let runDate: string | undefined;
+  const drafts: string[] = [];
 
   const valueFor = (index: number, name: string): string => {
     const value = argv[index];
@@ -225,24 +333,48 @@ function parseServeArgs(argv: readonly string[]): ServeArgs {
         }
         break;
       }
+      case "--record":
+        recordTo = valueFor(++i, "--record");
+        break;
+      case "--run-date": {
+        const value = valueFor(++i, "--run-date");
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          throw new ServeUsageError(`--run-date takes a date as YYYY-MM-DD, not "${value}".`);
+        }
+        runDate = value;
+        break;
+      }
       case "--yes":
       case "-y":
         assumeYes = true;
         break;
       default:
+        if (!argument.startsWith("-")) {
+          drafts.push(argument);
+          break;
+        }
         throw new ServeUsageError(
-          `snifftest serve does not take "${argument}". It takes --port, --replay, --rules, --threshold and --yes.`,
+          `snifftest serve does not take "${argument}". It takes --port, --replay, --record, --run-date, --rules, --threshold and --yes.`,
         );
     }
+  }
+
+  if (drafts.length > 0 && recordTo === undefined) {
+    throw new ServeUsageError(
+      `snifftest serve takes no file to open; it opens a page you type into. To walk a draft and write a recording, use --record <out.json> ${drafts[0] ?? "<draft.md>"}.`,
+    );
   }
 
   return {
     port,
     assumeYes,
+    drafts,
     ...(host === undefined ? {} : { host }),
     ...(replay === undefined ? {} : { replay }),
     ...(rulesPath === undefined ? {} : { rulesPath }),
     ...(threshold === undefined ? {} : { threshold }),
+    ...(recordTo === undefined ? {} : { record: recordTo }),
+    ...(runDate === undefined ? {} : { runDate }),
   };
 }
 
