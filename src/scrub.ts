@@ -31,14 +31,16 @@ export function scrubSecrets(text: string, secrets: readonly string[]): string {
   for (const secret of secrets) {
     if (secret.length < MIN_SECRET_LENGTH) continue;
 
-    // Longest match first, so a truncated key is replaced once, at its full
-    // surviving length, rather than leaving a tail behind.
+    // Longest match first, so a copy is replaced at its full surviving length
+    // rather than leaving a tail behind. Every shorter length is then tried as
+    // well, without stopping at the first one that matched: one failure body
+    // can quote the same key twice at two different truncations — once in full
+    // and once cut off by the service's own logging cap — and stopping early
+    // replaced the long copy and left the short one in the message.
     const floor = Math.min(secret.length, MIN_SECRET_FRAGMENT);
     for (let end = secret.length; end >= floor; end--) {
       const fragment = secret.slice(0, end);
-      if (!out.includes(fragment)) continue;
-      out = out.split(fragment).join(HIDDEN);
-      break;
+      if (out.includes(fragment)) out = out.split(fragment).join(HIDDEN);
     }
   }
 

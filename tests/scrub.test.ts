@@ -37,6 +37,24 @@ describe("scrubSecrets", () => {
     expect(out.split(HIDDEN)).toHaveLength(2);
   });
 
+  test("removes a whole copy and a truncated copy in the same message", () => {
+    // The shape a failure body actually arrives in: the service quotes the
+    // request once in full and once cut off by its own logging cap. Stopping at
+    // the first length that matched used to leave the shorter copy behind.
+    const half = fakeKey.slice(0, 24);
+    const out = scrubSecrets(`sent: ${fakeKey} ... also seen: ${half}"}`, [fakeKey]);
+
+    expect(out).not.toContain(half);
+    expect(out).toBe(`sent: ${HIDDEN} ... also seen: ${HIDDEN}"}`);
+  });
+
+  test("removes three copies at three different truncations", () => {
+    const text = [fakeKey, fakeKey.slice(0, 30), fakeKey.slice(0, 18)].join(" | ");
+    const out = scrubSecrets(text, [fakeKey]);
+
+    expect(out).toBe([HIDDEN, HIDDEN, HIDDEN].join(" | "));
+  });
+
   test("returns the text unchanged when no secret is present", () => {
     expect(scrubSecrets("nothing to see", [fakeKey])).toBe("nothing to see");
   });
