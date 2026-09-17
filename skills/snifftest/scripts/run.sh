@@ -15,8 +15,10 @@
 #                        decides whether it may send: it asks, or exits 3 when
 #                        it cannot ask, unless the user already said yes on this
 #                        machine and it remembered.
-#   SNIFFTEST_SEND=1     already in the environment, put there by the user or by
-#                        a CI job. Read here, never written here.
+#   SNIFFTEST_SEND=…     already in the environment, put there by the user or by
+#                        a CI job. It names the destinations it answers for, and
+#                        `1` is the shorthand for the one `check` uses. Read
+#                        here, never written here.
 #
 # This script never answers the sending question for anyone. It adds no flag
 # that skips the question, and it does not touch the key, which the tool reads
@@ -62,15 +64,56 @@ for argument in "$@"; do
 $argument"
 done
 
+# --- which snifftest, and where it is run from -------------------------------
+#
+# An agent points this script at a repository somebody else wrote, so the tree
+# being checked is hostile input and two ordinary conveniences hand it a shell.
+#
+# A package manager asked for `snifftest@<version>` while standing in a
+# repository runs that repository's own `node_modules/snifftest` and never
+# reaches a registry. Measured offline, with the registry pointed at a dead
+# port: standing inside such a checkout ran the committed binary; standing
+# outside it refused to connect and ran nothing. So the fetch is made from a
+# scratch directory, and `--root` tells the checker which tree it is about.
+#
+# `command -v snifftest` reaches a checkout's own `node_modules/.bin`, which is
+# on PATH whenever a package script or a hook manager put it there. A candidate
+# that resolves inside the tree is refused for the same reason.
+
+root=$(pwd -P)
+
+scratch=$(mktemp -d 2>/dev/null || mktemp -d -t snifftest) || {
+  echo "snifftest: no temporary directory available." >&2
+  exit 2
+}
+trap 'rm -rf "$scratch"' EXIT HUP INT TERM
+
+inside_root() {
+  candidate=$(cd "$(dirname "$1")" 2>/dev/null && pwd -P) || return 1
+  case $candidate in
+    "$root" | "$root"/*) return 0 ;;
+  esac
+  return 1
+}
+
 run_snifftest() {
   if [ -n "${SNIFFTEST_BIN:-}" ]; then
-    "$SNIFFTEST_BIN" "$@"
-  elif command -v snifftest >/dev/null 2>&1; then
-    snifftest "$@"
+    (cd "$scratch" && "$SNIFFTEST_BIN" "$@")
+    return $?
+  fi
+
+  found=$(command -v snifftest 2>/dev/null) || found=''
+  if [ -n "$found" ] && inside_root "$found"; then
+    echo "snifftest: ignoring the snifftest inside this tree; it is the code being checked." >&2
+    found=''
+  fi
+
+  if [ -n "$found" ]; then
+    (cd "$scratch" && "$found" "$@")
   elif command -v bunx >/dev/null 2>&1; then
-    bunx "snifftest@$SNIFFTEST_VERSION" "$@"
+    (cd "$scratch" && bunx "snifftest@$SNIFFTEST_VERSION" "$@")
   elif command -v npx >/dev/null 2>&1; then
-    npx --yes "snifftest@$SNIFFTEST_VERSION" "$@"
+    (cd "$scratch" && npx --yes "snifftest@$SNIFFTEST_VERSION" "$@")
   else
     echo "snifftest: no snifftest, bunx or npx on PATH." >&2
     return 2
@@ -79,9 +122,21 @@ run_snifftest() {
 
 set -- check
 
-if [ "$judge" = "0" ] && [ "${SNIFFTEST_SEND:-0}" != "1" ]; then
+# SNIFFTEST_SEND names the destinations it answers for, and `1` is the
+# shorthand for the one `check` uses. Anything that names something is a
+# request for the judgment pass; the tool still decides whether the answer
+# actually covers where this run would send.
+case "${SNIFFTEST_SEND:-}" in
+  "" | 0) asked_to_send=0 ;;
+  *) asked_to_send=1 ;;
+esac
+
+if [ "$judge" = "0" ] && [ "$asked_to_send" = "0" ]; then
   set -- "$@" --dry-run
 fi
+
+# The run happens outside the tree, so the tree is named rather than stood in.
+set -- "$@" --root "$root"
 
 # Newline is the only separator, so a path with a space in it survives.
 old_ifs=$IFS

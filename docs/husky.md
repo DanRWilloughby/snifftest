@@ -59,7 +59,7 @@ SNIFFTEST_SKIP=1 git commit -m "…"
 | Variable | Effect |
 | --- | --- |
 | `SNIFFTEST_SKIP=1` | Skip the hook entirely for this commit. |
-| `SNIFFTEST_SEND=1` | Run the judgment rules too. Needs `TYPESAFE_API_KEY`. |
+| `SNIFFTEST_SEND=1` | Run the judgment rules too. Needs `TYPESAFE_API_KEY`. The value names the destinations it answers for, and `1` is the shorthand for TypeSafe, which is the only place this hook sends. |
 | `TYPESAFE_API_KEY` | The key the judgment rules are sent with. Read from the environment only. |
 | `SNIFFTEST_STRICT=1` | Treat a broken or missing checker as a reason to block the commit. |
 | `SNIFFTEST_THRESHOLD` | The probability at or above which a judgment counts as a flag. |
@@ -68,6 +68,26 @@ SNIFFTEST_SKIP=1 git commit -m "…"
 
 Set `SNIFFTEST_SEND=1` without a key and the hook says so and runs the free
 rules. It never sends on a guess.
+
+An answer given this way covers the destinations it names and no others, so a
+job that sets it for this hook has not also answered for anything else that
+would send your text somewhere.
+
+### Which checker runs
+
+Two of the ordinary ways to find a program would let the repository you are
+committing to choose one for you, so the hook refuses both.
+
+A `snifftest` on your `PATH` that lives inside the repository is ignored, and
+the pinned version is fetched instead. `node_modules/.bin` is on `PATH`
+whenever a package script or a hook manager put it there, and a repository you
+cloned can commit a `node_modules/snifftest` of its own.
+
+The fetch is made from a scratch directory rather than from your working tree,
+because a package manager asked for `snifftest@<version>` while standing in a
+repository runs that repository's own copy and never reaches a registry. The
+checker is then told which tree to read with `--root`, so the paths it prints
+are the paths you staged.
 
 ### Speed
 
@@ -183,3 +203,16 @@ token passed in as `github-token`.
 | 1 | At least one flag at or above the threshold. |
 | 2 | The checker could not do its job. |
 | 3 | The judgment rules needed a yes before sending, and did not get one. |
+
+Codes 2 and 3 are the tool reporting on itself, so neither is ever read as a
+verdict on your prose. The hook says which part failed and then does two
+things. If the countable rules had already flagged something, it blocks on
+that, because those rules ran here, on the staged text, and their result does
+not depend on the part that failed. If nothing was flagged, it steps aside and
+lets the commit through, unless `SNIFFTEST_STRICT=1` says to treat a failure as
+a failure.
+
+The Action does the same in its own way. Its job summary and its pull request
+comment carry a different heading for findings, for a checker that could not
+finish, and for a run that was never answered, so nothing that went wrong with
+the tool is posted under a sentence about the writing.

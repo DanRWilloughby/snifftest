@@ -11,10 +11,19 @@
  * wants five colons instead of three writes the one rule it disagrees with and
  * inherits the rest. Merging by position would silently reorder a ruleset the
  * moment the base grew a rule.
+ *
+ * Where `extends:` may point depends on how the ruleset was found, because that
+ * is what decides whose file it is. A path on the command line is the user
+ * naming a file, so its chain may go anywhere they can read. A `.snifftest.yaml`
+ * found by looking around came with whatever repository the tool was pointed at,
+ * so its chain is confined to that file's own directory tree, plus the packaged
+ * default. The target's contents are never echoed, but a file that parses has
+ * its top-level key names read back as warnings, and in a CI job that is a
+ * public log; naming the key names of a file somebody else chose is enough.
  */
 
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateRuleset } from "./rules.ts";
@@ -97,7 +106,9 @@ export function resolveRuleset(options: ResolveRulesetOptions): ResolvedRuleset 
   const start = startingFile(options, defaultPath);
   const sources: string[] = [];
   const warnings: string[] = [];
-  const ruleset = load(start, defaultPath, sources, warnings, 0);
+  // The confinement root, or nothing when the user named the file themselves.
+  const confineTo = options.rulesPath === undefined ? realDirectory(start) : undefined;
+  const ruleset = load(start, defaultPath, sources, warnings, 0, confineTo);
   return { ruleset, sources, warnings };
 }
 
@@ -152,6 +163,26 @@ export function selectRules(ruleset: Ruleset, selection: TagSelection = {}): Sel
   return { ruleset: { ...ruleset, rules }, dropped };
 }
 
+/** The real directory a file sits in, so a symbolic link cannot widen a root. */
+function realDirectory(file: string): string {
+  try {
+    return realpathSync(dirname(file));
+  } catch {
+    return dirname(file);
+  }
+}
+
+/** Whether a path, followed through any links, is the root or sits under it. */
+function within(target: string, root: string): boolean {
+  let real: string;
+  try {
+    real = realpathSync(target);
+  } catch {
+    return false;
+  }
+  return real === root || real.startsWith(root.endsWith(sep) ? root : root + sep);
+}
+
 function startingFile(options: ResolveRulesetOptions, defaultPath: string): string {
   if (options.rulesPath !== undefined) {
     const named = absolute(options.rulesPath, options.cwd);
@@ -180,6 +211,7 @@ function load(
   sources: string[],
   warnings: string[],
   depth: number,
+  confineTo: string | undefined,
 ): Ruleset {
   if (depth > MAX_EXTENDS_DEPTH) {
     throw new ConfigError(`${file}: extends is nested more than ${MAX_EXTENDS_DEPTH} deep`);
@@ -194,10 +226,10 @@ function load(
   for (const key of unknownKeys(doc)) {
     warnings.push(`${file}: unknown key "${key}", which this version of snifftest does not read.`);
   }
-  const inherited = extendsTarget(doc, file, defaultPath);
+  const inherited = extendsTarget(doc, file, defaultPath, confineTo);
   if (inherited === undefined) return own;
 
-  return merge(load(inherited, defaultPath, sources, warnings, depth + 1), own);
+  return merge(load(inherited, defaultPath, sources, warnings, depth + 1, confineTo), own);
 }
 
 function unknownKeys(doc: YamlValue): string[] {
@@ -205,7 +237,12 @@ function unknownKeys(doc: YamlValue): string[] {
   return Object.keys(doc).filter((key) => !KNOWN_KEYS.includes(key));
 }
 
-function extendsTarget(doc: YamlValue, file: string, defaultPath: string): string | undefined {
+function extendsTarget(
+  doc: YamlValue,
+  file: string,
+  defaultPath: string,
+  confineTo: string | undefined,
+): string | undefined {
   if (typeof doc !== "object" || doc === null || Array.isArray(doc)) return undefined;
   const value = doc["extends"];
   if (value === undefined || value === null) return undefined;
@@ -223,6 +260,11 @@ function extendsTarget(doc: YamlValue, file: string, defaultPath: string): strin
   const target = absolute(value.trim(), dirname(file));
   if (!existsSync(target)) {
     throw new ConfigError(`${file}: extends ${value.trim()}, which is not there`);
+  }
+  if (confineTo !== undefined && !within(target, confineTo)) {
+    throw new ConfigError(
+      `${file}: extends ${value.trim()}, which is outside ${confineTo}. A ruleset found in the working directory may only extend files under it, or "${DEFAULT_TOKEN}". Name the file with --rules to read it anyway.`,
+    );
   }
   return target;
 }

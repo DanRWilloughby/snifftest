@@ -31,9 +31,9 @@
  *
  * Four attempts, doubling backoff, on the statuses that a second try can plausibly
  * fix (429 and the 5xx family). A 4xx that is not 429 is a request problem: a
- * bad key retried four times is four times the wait and the same answer. Ported
- * from the T1 harness `run_jev.py`, which is where the measured numbers came
- * from.
+ * bad key retried four times is four times the wait and the same answer. The
+ * ladder is carried over from the measurement harness this was spiked with,
+ * which is where the numbers came from.
  */
 
 import { scrubSecrets } from "./scrub.ts";

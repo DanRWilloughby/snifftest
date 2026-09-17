@@ -78,6 +78,31 @@ jobs:
           fi
           cat release-notes.md
 
+      - name: The tarball about to be published actually runs
+        # The last thing before the publish, because a version that prints
+        # nothing and exits 0 cannot be unpublished from anybody's CI. This
+        # installs what is about to ship and runs it through the symbolic link
+        # a package manager writes, which is the path every user takes.
+        run: |
+          set -euo pipefail
+          npm pack --silent > packed.txt
+          tarball="$(tail -n 1 packed.txt)"
+          smoke="$(mktemp -d)"
+          npm install --silent --prefix "$smoke" "./${tarball}"
+          bin="$smoke/node_modules/.bin/snifftest"
+
+          test -n "$("$bin" --version)"
+          printf 'A sentence with a long dash \xe2\x80\x94 in the middle of it, and enough other words after it to read as a paragraph.\n' > "$smoke/draft.md"
+          status=0
+          "$bin" check --dry-run -- "$smoke/draft.md" > "$smoke/out.txt" 2>&1 || status=$?
+          cat "$smoke/out.txt"
+          if [ "$status" != "1" ]; then
+            echo "::error::the packed bin exited $status on prose that trips a rule; nothing was published."
+            exit 1
+          fi
+
+          rm -rf "$smoke" "$tarball" packed.txt
+
       - name: Publish to npm with provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

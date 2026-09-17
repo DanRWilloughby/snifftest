@@ -55,6 +55,9 @@ outputs:
   report:
     description: Path on the runner to the checker's output.
     value: ${{ steps.run.outputs.report }}
+  verdict:
+    description: findings, clean, failure or consent. What the exit code means, in a word.
+    value: ${{ steps.run.outputs.verdict }}
 
 runs:
   using: composite
@@ -93,6 +96,21 @@ runs:
 
         send="$SNIFFTEST_SEND_INPUT"
 
+        # The fork test below reads a field that only a pull-request-shaped
+        # event has, so on any other event it is empty and decides nothing. An
+        # event this Action has not been reasoned about is therefore an event
+        # whose fork guard is not running, and the honest answer to that is the
+        # free rules rather than a guess. A comment event, for one, runs in the
+        # base repository's context with its secrets and does not end in
+        # _target, so the refusal above does not cover it either.
+        case "${GITHUB_EVENT_NAME:-}" in
+          pull_request | push | workflow_dispatch | schedule | merge_group) ;;
+          *)
+            echo "::notice::Sniff Test has no fork guard for a ${GITHUB_EVENT_NAME:-nameless} event: countable rules only."
+            send=false
+            ;;
+        esac
+
         # A pull request from a fork is somebody else's branch running against
         # our workflow. It gets the free rules, whatever the caller asked for.
         if [ "${SNIFFTEST_IS_FORK:-}" = "true" ]; then
@@ -116,7 +134,10 @@ runs:
         SNIFFTEST_RULES: ${{ inputs.rules }}
         SNIFFTEST_THRESHOLD: ${{ inputs.threshold }}
         SNIFFTEST_SEND: ${{ steps.guard.outputs.send == 'true' && '1' || '0' }}
-        TYPESAFE_API_KEY: ${{ inputs.api-key }}
+        # Only when something may actually be sent. A key in the environment of
+        # the step that runs a checker over a fork's own files is a key with
+        # nothing to do and somewhere to go.
+        TYPESAFE_API_KEY: ${{ steps.guard.outputs.send == 'true' && inputs.api-key || '' }}
       run: |
         set -uo pipefail
 
@@ -125,7 +146,22 @@ runs:
         [ -z "$SNIFFTEST_RULES" ] || args+=(--rules "$SNIFFTEST_RULES")
         [ -z "$SNIFFTEST_THRESHOLD" ] || args+=(--threshold "$SNIFFTEST_THRESHOLD")
 
+        # The tree being checked, named rather than stood in. Relative paths and
+        # the project's own ruleset are found here.
+        args+=(--root "$GITHUB_WORKSPACE")
+
         report="${RUNNER_TEMP:-/tmp}/snifftest-report.txt"
+
+        # The fetch is made from a scratch directory, never from the checkout.
+        # `npx --yes snifftest@<version>` run inside a repository resolves that
+        # repository's own node_modules/snifftest and never reaches a registry,
+        # so on a pull request from a fork it would run the fork's code here,
+        # with this environment. Measured offline, with the registry pointed at
+        # a dead port: standing inside such a checkout ran the committed binary;
+        # standing outside it refused to connect and ran nothing.
+        fetch="${RUNNER_TEMP:-/tmp}/snifftest-fetch"
+        mkdir -p "$fetch"
+        cd "$fetch"
 
         status=0
         # shellcheck disable=SC2086 -- paths are space separated on purpose.
@@ -133,14 +169,41 @@ runs:
           > "$report" 2>&1 || status=$?
 
         cat "$report"
+
+        # What the exit code means, in a word, because three of the four codes
+        # are not about the prose at all. A checker that could not finish, or a
+        # run nobody answered the sending question for, reported under a
+        # sentence about the writing is a false accusation the writer cannot
+        # argue with. Every surface below chooses its wording from this.
+        case "$status" in
+          0) verdict=clean ;;
+          1) verdict=findings ;;
+          3) verdict=consent ;;
+          *) verdict=failure ;;
+        esac
+
         echo "exit-code=$status" >> "$GITHUB_OUTPUT"
         echo "report=$report" >> "$GITHUB_OUTPUT"
+        echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
 
-        if [ "$status" = "0" ]; then
-          echo "### Sniff Test: nothing tripped" >> "$GITHUB_STEP_SUMMARY"
-        else
+        case "$verdict" in
+          clean)
+            echo "### Sniff Test: nothing tripped" >> "$GITHUB_STEP_SUMMARY"
+            ;;
+          findings)
+            heading="### Sniff Test: the prose trips the rules below"
+            ;;
+          consent)
+            heading="### Sniff Test: the judgment rules were not run"
+            ;;
+          *)
+            heading="### Sniff Test: the checker could not finish. This is the tool, not the prose."
+            ;;
+        esac
+
+        if [ "$verdict" != "clean" ]; then
           {
-            echo "### Sniff Test"
+            echo "$heading"
             echo ""
             echo '```'
             cat "$report"
@@ -155,6 +218,7 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github-token }}
         SNIFFTEST_REPORT: ${{ steps.run.outputs.report }}
+        SNIFFTEST_VERDICT: ${{ steps.run.outputs.verdict }}
         SNIFFTEST_PR: ${{ github.event.pull_request.number }}
       run: |
         set -euo pipefail
@@ -163,9 +227,25 @@ runs:
         # probability, and the message the ruleset wrote. No sentence of the
         # draft is ever read out of the file and into a comment, which is the
         # whole reason this step posts a report rather than a diff.
+        #
+        # The opening line is chosen by what actually happened. Posting "flagged
+        # the prose" over a 401, a timeout or an unanswered sending question
+        # tells an author their writing was judged when it never was.
+        case "${SNIFFTEST_VERDICT:-failure}" in
+          findings)
+            opening="**Sniff Test** flagged the prose in this pull request."
+            ;;
+          consent)
+            opening="**Sniff Test** did not run the judgment rules: nothing was sent, because the sending question was not answered. Nothing below is a judgment on the prose."
+            ;;
+          *)
+            opening="**Sniff Test** could not finish. This is the checker failing, not a finding about the prose."
+            ;;
+        esac
+
         body="${RUNNER_TEMP:-/tmp}/snifftest-comment.md"
         {
-          echo "**Sniff Test** flagged the prose in this pull request."
+          echo "$opening"
           echo ""
           echo '```'
           head -c 60000 "$SNIFFTEST_REPORT"

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { runRegexArm } from "../src/engine.ts";
-import { RulesetError, checkRegexRule, parseRuleset } from "../src/rules.ts";
+import { PATTERN_TEXT_CAP, RulesetError, checkRegexRule, parseRuleset } from "../src/rules.ts";
 import type { BuiltinRule, Chunk, JudgmentRule, PatternRule } from "../src/types.ts";
 
 const fixturesDir = join(import.meta.dir, "fixtures", "rules");
@@ -235,6 +235,71 @@ describe("regex checks", () => {
   test("a word that merely contains a listed stem is not a match", () => {
     const rule = builtinRule("slop_vocab", { words: ["realm"] });
     expect(checkRegexRule(rule, "The overwhelming majority agreed.")).toHaveLength(0);
+  });
+});
+
+describe("a hostile pattern is refused when the ruleset is read", () => {
+  // A ruleset supplies regular expressions that run on your machine, and a
+  // repository you cloned supplies both the pattern and the paragraph that
+  // detonates it. `^(a+)+$` against forty characters took half a second here;
+  // fifty never returned. Nothing in JavaScript can interrupt a regex once it
+  // starts, so the only place to stop this is before it runs.
+  function reading(pattern: string): () => unknown {
+    return () =>
+      ruleset(`  - id: hostile\n    kind: regex\n    pattern: "${pattern}"\n    message: "m"\n`);
+  }
+
+  test("the report's own pattern never gets as far as a paragraph", () => {
+    expect(reading("^(a+)+$")).toThrow(RulesetError);
+    expect(reading("^(a+)+$")).toThrow(/nests quantifiers/);
+  });
+
+  test("the shapes that backtrack exponentially are refused together", () => {
+    for (const pattern of ["(a+)+", "(a*)*", "(a?)*", "(?:x|y+)+", "((b+))+", "(\\d{2,4})+"]) {
+      expect(reading(pattern)).toThrow(RulesetError);
+    }
+  });
+
+  test("ordinary patterns are not caught by it", () => {
+    for (const pattern of [
+      "\\bhowever\\b",
+      "(?:foo|bar)+",
+      "(\\d{4})?",
+      "(\\d{4})+",
+      "[a-z]+\\s*,\\s*[a-z]+",
+      "^\\s*> ",
+      "colou?r",
+    ]) {
+      expect(reading(pattern)).not.toThrow();
+    }
+  });
+
+  test("the ruleset that ships passes its own check", () => {
+    const source = readFileSync(join(import.meta.dir, "..", "rules", "default.yaml"), "utf8");
+    expect(() => parseRuleset(source, "rules/default.yaml")).not.toThrow();
+  });
+
+  test("a pattern reads a bounded amount of one paragraph", () => {
+    // The second layer, for the shapes a static check cannot name. It is a
+    // bound on the cost, and it is reported rather than silent.
+    const rule = patternRule("x$");
+    const long = `${"a".repeat(PATTERN_TEXT_CAP + 10)}x`;
+
+    expect(checkRegexRule(rule, long)).toHaveLength(0);
+    expect(checkRegexRule(rule, "ax")).toHaveLength(1);
+  });
+
+  test("a capped paragraph says so, once, and still reports its flags", () => {
+    const parsed = ruleset('  - id: needle\n    kind: regex\n    pattern: "needle"\n    message: "m"\n');
+    const notes: string[] = [];
+    const long = `needle ${"a".repeat(PATTERN_TEXT_CAP + 10)}`;
+
+    const flags = runRegexArm([chunk(long)], parsed, (line) => notes.push(line));
+
+    expect(flags).toHaveLength(1);
+    expect(notes).toHaveLength(1);
+    expect(notes[0]).toContain(String(PATTERN_TEXT_CAP));
+    expect(notes[0]).toContain("needle");
   });
 });
 

@@ -91,10 +91,50 @@ describe("action.yml, as a document", () => {
     // A composite action has no `secrets` context. Any mention of one would be
     // either a mistake or an instruction to the caller in the wrong file.
     expect(actionSource).not.toContain("secrets.");
-    const keyStep = stepById("run");
-    expect(keyStep.env?.TYPESAFE_API_KEY).toBe("${{ inputs.api-key }}");
     const keyEnvNames = [...actionSource.matchAll(/^\s{8}([A-Z_]+):/gm)].map((m) => m[1] as string);
     expect(keyEnvNames.filter((name) => name.endsWith("_API_KEY"))).toEqual(["TYPESAFE_API_KEY"]);
+  });
+
+  test("the key is in no step's environment when the guard turned sending off", () => {
+    // A key present while nothing may be sent is a key with nothing to do and
+    // somewhere to leak from, and the step it sat in is the one that runs the
+    // checker over a fork's own files.
+    const placement = stepById("run").env?.TYPESAFE_API_KEY ?? "";
+    expect(placement).toContain("steps.guard.outputs.send == 'true'");
+    expect(placement).toContain("inputs.api-key");
+    expect(placement).toContain("|| ''");
+
+    // The same expression, evaluated the way GitHub evaluates it.
+    const rendered = (send: string): string => {
+      const match = /^\$\{\{\s*steps\.guard\.outputs\.send == '(\w+)' && inputs\.api-key \|\| '' \}\}$/.exec(
+        placement,
+      );
+      expect(match).not.toBeNull();
+      return send === (match?.[1] as string) ? "the-key" : "";
+    };
+    expect(rendered("true")).toBe("the-key");
+    expect(rendered("false")).toBe("");
+  });
+
+  test("never fetches the checker while standing in the checkout", () => {
+    // `npx snifftest@<version>` run inside a repository runs that repository's
+    // own node_modules/snifftest and never reaches a registry. On a fork's pull
+    // request that is the fork's code, on this runner, with this environment.
+    const run = stepById("run").run ?? "";
+    // The command itself, not the comment above it that names what it avoids.
+    const fetch = /^[ \t]*npx --yes/m.exec(run);
+    expect(fetch).not.toBeNull();
+    const fetchAt = fetch?.index ?? -1;
+
+    const before = run.slice(0, fetchAt);
+    expect(before).toContain('cd "$fetch"');
+    expect(before).toContain('fetch="${RUNNER_TEMP:-/tmp}/snifftest-fetch"');
+    // Whatever else the step does, it never walks back into the workspace.
+    expect(run).not.toMatch(/cd\s+"?\$GITHUB_WORKSPACE/);
+  });
+
+  test("names the workspace as the tree being checked, rather than standing in it", () => {
+    expect(stepById("run").run).toContain('args+=(--root "$GITHUB_WORKSPACE")');
   });
 
   test("never names the event that would run it with the base repository's secrets", () => {
@@ -118,6 +158,19 @@ describe("action.yml, as a document", () => {
     expect(guard.env?.SNIFFTEST_IS_FORK).toBe("${{ github.event.pull_request.head.repo.fork }}");
     expect(guard.run).toContain('"${SNIFFTEST_IS_FORK:-}" = "true"');
     expect(guard.run).toContain("send=false");
+  });
+
+  test("forces the free rules on an event whose fork guard does not apply", () => {
+    // The fork test reads a pull-request-shaped field, so on any other event it
+    // is empty and decides nothing. An event nobody reasoned about is an event
+    // with no guard on it, and a comment event runs in the base repository's
+    // context with its secrets while not ending in _target.
+    const guard = stepById("guard").run ?? "";
+    const clause = guard.slice(guard.indexOf('case "${GITHUB_EVENT_NAME:-}" in'));
+    expect(clause).toContain("pull_request | push | workflow_dispatch");
+    const allowed = clause.slice(0, clause.indexOf("*)"));
+    expect(allowed).not.toContain("issue_comment");
+    expect(clause.slice(clause.indexOf("*)"))).toContain("send=false");
   });
 
   test("fails loudly when send is on and no key was passed", () => {
@@ -150,6 +203,38 @@ describe("action.yml, as a document", () => {
     // `message` comes from the ruleset, so no sentence of the draft travels.
     expect(comment).toContain("$SNIFFTEST_REPORT");
     expect(comment).not.toMatch(/\bcat\b[^\n]*\$SNIFFTEST_PATHS/);
+  });
+
+  test("says in one word what happened, and only findings mean the prose", () => {
+    // Three of the four exit codes are about the tool rather than the writing.
+    // A 401, a timeout or an unanswered sending question posted under "flagged
+    // the prose" is an accusation the author cannot argue with.
+    const run = stepById("run").run ?? "";
+    expect(run).toContain("1) verdict=findings ;;");
+    expect(run).toContain("3) verdict=consent ;;");
+    expect(run).toContain("*) verdict=failure ;;");
+    expect(action.outputs.verdict.value).toContain("steps.run.outputs.verdict");
+  });
+
+  test("the job summary heads a tool failure and a missing answer differently", () => {
+    const run = stepById("run").run ?? "";
+    const summary = run.slice(run.indexOf('case "$verdict" in'));
+    expect(summary).toContain("nothing tripped");
+    expect(summary).toContain("trips the rules below");
+    expect(summary).toContain("the judgment rules were not run");
+    expect(summary).toContain("could not finish");
+  });
+
+  test("the comment opens on what happened, not on a fixed verdict", () => {
+    const comment = stepById("comment").run ?? "";
+    const openings = comment.slice(comment.indexOf('case "${SNIFFTEST_VERDICT:-failure}" in'));
+    // The prose sentence is reachable only through the findings branch.
+    const findings = openings.slice(openings.indexOf("findings)"), openings.indexOf("consent)"));
+    expect(findings).toContain("flagged the prose");
+    expect(openings.slice(openings.indexOf("consent)"))).not.toContain("flagged the prose");
+    expect(openings).toContain("nothing was sent");
+    expect(openings).toContain("not a finding about the prose");
+    expect(stepById("comment").env?.SNIFFTEST_VERDICT).toContain("steps.run.outputs.verdict");
   });
 
   test("ends on the exit code the check produced", () => {
