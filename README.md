@@ -278,8 +278,12 @@ a `.gitignore`, because they carry your prose in full.
 
 `snifftest bench` asks a panel of general models the same questions over the
 same corpus, through OpenRouter and one direct Anthropic call, and puts cost,
-speed and accuracy side by side. It asks for consent per destination, and a yes
-given for TypeSafe is never a yes for anyone else.
+speed and accuracy side by side. An OpenAI row can be called directly too, on
+OpenAI's own API with `OPENAI_API_KEY`, so a model can be measured without an
+OpenRouter account and its latency is the provider's rather than a proxy's.
+`bench/panel-direct.yaml` is a panel of nothing but direct rows. It asks for
+consent per destination, and a yes given for TypeSafe is never a yes for anyone
+else.
 
 The run committed under `bench/results/2026-09-17/` is the eval over the
 packaged corpus with eight seeds per rule. The panel rows below come from a
@@ -344,7 +348,7 @@ the corpus and where every paragraph came from.
 | `TYPESAFE_API_KEY` | The key the judgment rules are sent with. Read from the environment and nowhere else. |
 | `SNIFFTEST_SEND` | Answer the send question in CI without remembering it. `1` means TypeSafe, which is where `check` sends and nowhere else. |
 | `SNIFFTEST_CACHE_DIR` | Where cached answers live. `off` for none. |
-| `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY` | Used by `bench` only. |
+| `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` | Used by `bench` only. Each one is the key its own rows are called with, and a panel row whose key is missing says so rather than running. |
 
 `snifftest --help` lists the options for `eval` and `bench` as well.
 

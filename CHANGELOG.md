@@ -47,6 +47,11 @@ rather than shipping an empty one.
 - `snifftest bench` asks a panel of general models the same questions over the
   same corpus and puts cost, speed and accuracy side by side, with consent
   asked per destination.
+- A bench row can be called on OpenAI's own API with `OPENAI_API_KEY`, so an
+  OpenAI model can be measured without an OpenRouter account and its latency is
+  the provider's rather than a proxy's. `bench/panel-direct.yaml` is a panel of
+  nothing but direct rows, and `SNIFFTEST_SEND=openai` answers the send question
+  for that destination and no other.
 - `snifftest serve` opens a local page where you type and the nose reacts,
   live or from a recorded replay that needs no key. `serve --record` writes
   that replay from a live run, with the measured time and cost of each answer.

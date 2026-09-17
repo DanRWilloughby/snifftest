@@ -31,6 +31,7 @@ const ALLOWED = [
   { path: "dist/", why: "The built bin, which is what `bin` points at." },
   { path: "rules/", why: "The default ruleset, read at run time when nobody names one." },
   { path: "bench/panel.yaml", why: "The panel `bench` falls back to outside a clone." },
+  { path: "bench/panel-direct.yaml", why: "The same panel called on each provider's own API." },
   { path: "bench/prices/", why: "The dated prices `bench` costs a run with." },
   { path: "examples/CORPUS.md", why: "What the shipped corpus is and how it was written." },
   { path: "examples/corpus/", why: "The corpus `bench` seeds from outside a clone." },
