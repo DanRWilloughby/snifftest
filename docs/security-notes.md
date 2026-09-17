@@ -62,11 +62,26 @@ re-opened by new evidence, never by being raised again.
   without meaning to, and in a repository that is a record of which paragraphs
   were sent for judgment and what came back. It lives under the user's cache
   directory instead, named by `SNIFFTEST_CACHE_DIR` when somebody wants it
-  elsewhere. What it holds is deliberately thin: the paragraph is a hash in a
-  file name, never text on disk, and the file itself carries rule ids,
-  probabilities, a model name and a date. A hash is not the text, though anyone
-  who already has a paragraph can confirm it was checked, which is worth saying
-  rather than calling the thing anonymous.
+  elsewhere. A relative name there is resolved against the home directory, not
+  the working directory, because during a check the working directory is the
+  repository and that is the one place this file may not land. What it holds is
+  deliberately thin: the paragraph is a hash in a file name, never text on disk,
+  and the file itself carries rule ids, probabilities, the wording they
+  answered, a model name and a date. A hash is not the text, though anyone who
+  already has a paragraph can confirm it was checked, which is worth saying
+  rather than calling the thing anonymous; the files are written 0600 inside
+  0700 directories so that anyone is at least only the owner. Each one is
+  written to a sibling temporary file and renamed into place, so a run killed
+  mid-write leaves nothing torn and a symlink planted at the entry's path is
+  replaced rather than followed.
+
+  A shared cache directory is a different matter, and worth naming: point
+  `SNIFFTEST_CACHE_DIR` at a restored CI cache that a fork's job can write and
+  a poisoned entry reads back as a judgment nobody paid for. The reader
+  validates hard, so an entry can only carry probabilities in range for the
+  exact paragraph, questions and wording it claims to answer, but the numbers
+  themselves would be the attacker's. Keep the cache per user, or turn it off in
+  CI with `SNIFFTEST_CACHE_DIR=off`.
 
 ## Owner actions
 
