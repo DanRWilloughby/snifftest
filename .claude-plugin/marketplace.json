@@ -1,0 +1,20 @@
+{
+  "name": "snifftest",
+  "owner": { "name": "Daniel Willoughby", "url": "https://github.com/DanRWilloughby" },
+  "metadata": {
+    "description": "Sniff Test, a prose linter for your house rules.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "snifftest",
+      "source": "./",
+      "description": "Check a draft against your house writing rules and get back which rule it trips, on which line, and how sure the checker is. The countable rules are regular expressions and run locally. The judgment rules are a model call you opt into once.",
+      "version": "0.1.0",
+      "author": { "name": "Daniel Willoughby" },
+      "license": "MIT",
+      "category": "productivity",
+      "keywords": ["writing", "linter", "prose", "editing", "style-guide"]
+    }
+  ]
+}
