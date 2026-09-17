@@ -1,0 +1,80 @@
+name: Bug report
+description: The checker did something wrong.
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you paste anything: this issue is public. Do not paste a key, a
+        token, or a draft you would not publish. A short made-up sentence that
+        reproduces the problem is worth more than a real one.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What the checker did.
+      placeholder: It flagged a sentence that does not trip the rule.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: The smallest text that reproduces it
+      description: >-
+        A sentence or two, and the command you ran. Made up is better than real.
+      render: text
+    validations:
+      required: true
+
+  - type: input
+    id: command
+    attributes:
+      label: The command
+      placeholder: snifftest check --dry-run draft.md
+    validations:
+      required: true
+
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Which rules were running
+      options:
+        - Countable rules only (--dry-run, nothing sent)
+        - Countable and judgment rules (text was sent to TypeSafe)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The output of `snifftest --version`.
+    validations:
+      required: true
+
+  - type: input
+    id: runtime
+    attributes:
+      label: How you ran it
+      placeholder: bunx on macOS 15, or npx on Node 22, or the GitHub Action
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before you submit
+      options:
+        - label: There is no key, token or private draft anywhere in this issue.
+          required: true

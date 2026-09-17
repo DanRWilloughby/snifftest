@@ -1,0 +1,31 @@
+version: 2
+
+updates:
+  # The two dev dependencies. There are no runtime dependencies to update, and
+  # that is the point of the package, so this list should stay short.
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+    versioning-strategy: increase
+    labels:
+      - dependencies
+
+  # The actions the workflows use. They are pinned to a commit, which is the
+  # only pin a tag cannot be moved out from under, so something has to tell us
+  # when a pinned commit falls behind. Dependabot rewrites the SHA and the
+  # trailing version comment together.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(actions)"
+    labels:
+      - dependencies
