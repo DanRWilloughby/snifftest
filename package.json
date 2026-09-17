@@ -3,6 +3,14 @@
   "version": "0.0.0",
   "description": "Does the draft pass the sniff test? A prose linter for your house rules.",
   "license": "MIT",
+  "homepage": "https://github.com/DanRWilloughby/snifftest#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DanRWilloughby/snifftest.git"
+  },
+  "bugs": {
+    "url": "https://github.com/DanRWilloughby/snifftest/issues"
+  },
   "bin": {
     "snifftest": "dist/snifftest.js"
   },
