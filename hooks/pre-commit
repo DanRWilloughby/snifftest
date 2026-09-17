@@ -64,7 +64,13 @@ $extract"
   fi
 done
 
-printf '%s\n' "$extract" | tr '\n' '\0' | git checkout-index -z --stdin --prefix="$tmp/" || {
+# The staged files go in one subdirectory and the captured output in another, so
+# nothing the hook writes can ever be mistaken for something you staged.
+tree="$tmp/tree"
+out="$tmp/stdout"
+err="$tmp/stderr"
+
+printf '%s\n' "$extract" | tr '\n' '\0' | git checkout-index -z --stdin --prefix="$tree/" || {
   echo "snifftest: could not read the staged files; skipping the check." >&2
   exit 0
 }
@@ -109,20 +115,44 @@ set -- "$@" -- $staged
 IFS=$old_ifs
 
 # Paths are reported relative to the extraction root, which makes them read the
-# same as the repository-relative paths you staged.
-(cd "$tmp" && run_snifftest "$@")
+# same as the repository-relative paths you staged. Output is captured rather
+# than streamed because the decision below depends on reading it.
+(cd "$tree" && run_snifftest "$@") > "$out" 2> "$err"
 status=$?
 
+cat "$out"
+cat "$err" >&2
+
 # --- what the exit code means -----------------------------------------------
+
+# A flag as the checker prints one: path, line, rule id, probability, message.
+FLAG_LINE='^[^[:space:]]+:[0-9]+ [^[:space:]]+ [01]\.[0-9][0-9] '
+
+# The checker never got as far as an opinion about the prose. Anything that
+# fetches the package can fail this way — an unpublished or mistyped version, a
+# registry that is down, a proxy that says no — and every one of those exits 1,
+# which is also the code for "your draft trips a rule". Blaming the prose for a
+# 404 is the worst thing this hook could do, so the output decides, not the code.
+not_run() {
+  echo "snifftest: the checker did not run (exit $1). The commit was not blocked." >&2
+  echo "           Its output is above. If it could not fetch the package, check" >&2
+  echo "           SNIFFTEST_VERSION, or install snifftest and put it on PATH." >&2
+  echo "           Set SNIFFTEST_STRICT=1 to treat this as a failure." >&2
+  [ "${SNIFFTEST_STRICT:-0}" = "1" ] && exit 1
+  exit 0
+}
 
 case $status in
   0)
     exit 0
     ;;
   1)
-    echo "snifftest: the staged prose trips the rules above." >&2
-    echo "           Fix it, or commit anyway with SNIFFTEST_SKIP=1 or --no-verify." >&2
-    exit 1
+    if grep -Eq "$FLAG_LINE" "$out"; then
+      echo "snifftest: the staged prose trips the rules above." >&2
+      echo "           Fix it, or commit anyway with SNIFFTEST_SKIP=1 or --no-verify." >&2
+      exit 1
+    fi
+    not_run "$status"
     ;;
   3)
     echo "snifftest: the judgment rules need a yes before anything is sent." >&2

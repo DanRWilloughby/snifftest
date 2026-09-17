@@ -8,11 +8,14 @@
 # on the checked-out revision building itself: `dist/` is not in git, so a git
 # checkout has no executable until something builds one, and a hook that half
 # installs is worse than one that names what it needs.
+#
+# Both entries end in `--`. pre-commit appends the staged filenames, and a file
+# named `-notes.md` would otherwise arrive looking like an option.
 
 - id: snifftest
   name: Sniff Test
   description: Check staged prose against your house rules. Countable rules only; nothing leaves your machine.
-  entry: snifftest check --dry-run
+  entry: snifftest check --dry-run --
   language: node
   additional_dependencies: ["snifftest@0.1.0"]
   types_or: [markdown, plain-text]
@@ -23,7 +26,7 @@
     Also runs the rules that need reading, which sends the text to TypeSafe.
     Needs TYPESAFE_API_KEY and SNIFFTEST_SEND=1 in your environment. Listed
     under the manual stage so it never runs on a commit you did not ask it to.
-  entry: snifftest check
+  entry: snifftest check --
   language: node
   additional_dependencies: ["snifftest@0.1.0"]
   types_or: [markdown, plain-text]

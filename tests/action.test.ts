@@ -173,6 +173,11 @@ describe(".pre-commit-hooks.yaml", () => {
     expect(free?.types_or).toEqual(["markdown", "plain-text"]);
   });
 
+  test("every entry ends the options, so a filename starting with a dash is a path", () => {
+    const hooks = preCommitHooks as { id: string; entry: string }[];
+    for (const hook of hooks) expect(hook.entry.trimEnd().endsWith(" --")).toBe(true);
+  });
+
   test("both hooks pin the version they install", () => {
     const hooks = preCommitHooks as { id: string; additional_dependencies?: string[] }[];
     for (const hook of hooks) {
