@@ -25,7 +25,10 @@
 #
 # Environment
 #   SNIFFTEST_SKIP=1        skip the hook entirely
-#   SNIFFTEST_SEND=1        run the judgment rules too (needs TYPESAFE_API_KEY)
+#   SNIFFTEST_SEND=1        run the judgment rules too (needs TYPESAFE_API_KEY).
+#                           The value names where you are answering for, and 1
+#                           is the shorthand for TypeSafe, which is the only
+#                           place this hook ever sends.
 #   SNIFFTEST_STRICT=1      treat a tool failure as a reason to block the commit
 #   SNIFFTEST_THRESHOLD=…   the probability at or above which a judgment counts
 #   SNIFFTEST_VERSION=…     the version fetched when snifftest is not installed
@@ -128,11 +131,19 @@ run_snifftest() {
 
 set -- check
 
-if [ "${SNIFFTEST_SEND:-0}" = "1" ] && [ -n "${TYPESAFE_API_KEY:-}" ]; then
+# SNIFFTEST_SEND names the destinations it answers for. `1` is the shorthand
+# for TypeSafe, which is the only place `check` sends, and it is what this hook
+# documents; a longer list is somebody answering for a bench run elsewhere.
+case "${SNIFFTEST_SEND:-}" in
+  "" | 0) asked_to_send=0 ;;
+  *) asked_to_send=1 ;;
+esac
+
+if [ "$asked_to_send" = "1" ] && [ -n "${TYPESAFE_API_KEY:-}" ]; then
   : # SNIFFTEST_SEND is already in the environment; the CLI reads it as the yes.
 else
-  if [ "${SNIFFTEST_SEND:-0}" = "1" ]; then
-    echo "snifftest: SNIFFTEST_SEND=1 but TYPESAFE_API_KEY is empty. Running the free rules only." >&2
+  if [ "$asked_to_send" = "1" ]; then
+    echo "snifftest: SNIFFTEST_SEND is set but TYPESAFE_API_KEY is empty. Running the free rules only." >&2
   fi
   set -- "$@" --dry-run
 fi

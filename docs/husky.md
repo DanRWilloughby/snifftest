@@ -59,7 +59,7 @@ SNIFFTEST_SKIP=1 git commit -m "…"
 | Variable | Effect |
 | --- | --- |
 | `SNIFFTEST_SKIP=1` | Skip the hook entirely for this commit. |
-| `SNIFFTEST_SEND=1` | Run the judgment rules too. Needs `TYPESAFE_API_KEY`. |
+| `SNIFFTEST_SEND=1` | Run the judgment rules too. Needs `TYPESAFE_API_KEY`. The value names the destinations it answers for, and `1` is the shorthand for TypeSafe, which is the only place this hook sends. |
 | `TYPESAFE_API_KEY` | The key the judgment rules are sent with. Read from the environment only. |
 | `SNIFFTEST_STRICT=1` | Treat a broken or missing checker as a reason to block the commit. |
 | `SNIFFTEST_THRESHOLD` | The probability at or above which a judgment counts as a flag. |
@@ -68,6 +68,10 @@ SNIFFTEST_SKIP=1 git commit -m "…"
 
 Set `SNIFFTEST_SEND=1` without a key and the hook says so and runs the free
 rules. It never sends on a guess.
+
+An answer given this way covers the destinations it names and no others, so a
+job that sets it for this hook has not also answered for anything else that
+would send your text somewhere.
 
 ### Which checker runs
 
