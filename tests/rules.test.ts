@@ -4,12 +4,30 @@ import { join } from "node:path";
 
 import { runRegexArm } from "../src/engine.ts";
 import { RulesetError, checkRegexRule, parseRuleset } from "../src/rules.ts";
-import type { Chunk, JudgmentRule, RegexRule } from "../src/types.ts";
+import type { BuiltinRule, Chunk, JudgmentRule, PatternRule } from "../src/types.ts";
 
 const fixturesDir = join(import.meta.dir, "fixtures", "rules");
 
-function regexRule(extra: Partial<RegexRule>): RegexRule {
-  return { id: "test_rule", kind: "regex", message: "Something smells.", ...extra };
+function builtinRule(builtin: string, extra: Partial<Omit<BuiltinRule, "source">> = {}): BuiltinRule {
+  return {
+    id: "test_rule",
+    kind: "regex",
+    message: "Something smells.",
+    source: "builtin",
+    builtin,
+    ...extra,
+  };
+}
+
+function patternRule(pattern: string, flags?: string): PatternRule {
+  return {
+    id: "test_rule",
+    kind: "regex",
+    message: "Something smells.",
+    source: "pattern",
+    pattern,
+    ...(flags === undefined ? {} : { flags }),
+  };
 }
 
 function ruleset(body: string): ReturnType<typeof parseRuleset> {
@@ -31,8 +49,10 @@ describe("parseRuleset", () => {
 
     const [colon, cost] = parsed.rules;
     expect(colon?.kind).toBe("regex");
-    expect((colon as RegexRule).builtin).toBe("colon_count");
-    expect((colon as RegexRule).min).toBe(3);
+    const builtin = colon as BuiltinRule;
+    expect(builtin.source).toBe("builtin");
+    expect(builtin.builtin).toBe("colon_count");
+    expect(builtin.min).toBe(3);
     expect(colon?.seed).toEqual({ transform: "add_colons", count: 3 });
 
     const judgment = cost as JudgmentRule;
@@ -77,6 +97,11 @@ describe("parseRuleset", () => {
     expect(() =>
       ruleset('  - id: broken\n    kind: regex\n    message: "m"\n    pattern: "([a"\n'),
     ).toThrow(/rule "broken"/);
+    expect(() =>
+      ruleset(
+        '  - id: flagged_builtin\n    kind: regex\n    message: "m"\n    builtin: dash_present\n    flags: "i"\n',
+      ),
+    ).toThrow(/rule "flagged_builtin".*flags belong to a pattern/);
   });
 
   test("rejects a duplicate rule id, a missing message and an unknown kind", () => {
@@ -95,29 +120,29 @@ describe("parseRuleset", () => {
 
 describe("regex checks", () => {
   test("a rule with its own pattern reports one match per occurrence", () => {
-    const rule = regexRule({ pattern: "very\\s+\\w+", flags: "i" });
+    const rule = patternRule("very\\s+\\w+", "i");
     const matches = checkRegexRule(rule, "It was very good and Very fast.");
     expect(matches.map((m) => m.index)).toEqual([7, 21]);
   });
 
   test("dash_present catches em and en dashes but not a hyphen", () => {
-    const rule = regexRule({ builtin: "dash_present" });
+    const rule = builtinRule("dash_present");
     expect(checkRegexRule(rule, "the window July 21–25")).toHaveLength(1);
     expect(checkRegexRule(rule, "the refusal — and I did not plan for it")).toHaveLength(1);
     expect(checkRegexRule(rule, "a prompt-to-app tool, twenty-four hours")).toHaveLength(0);
   });
 
   test("colon_count fires at its minimum and not below, under either spelling", () => {
-    const strict = regexRule({ builtin: "colon_count", min: 3 });
+    const strict = builtinRule("colon_count", { min: 3 });
     expect(checkRegexRule(strict, "one: two: three: four")).toHaveLength(1);
     expect(checkRegexRule(strict, "one: two: three")).toHaveLength(0);
 
-    const alias = regexRule({ builtin: "colon_heavy" });
+    const alias = builtinRule("colon_heavy");
     expect(checkRegexRule(alias, "one: two: three: four")).toHaveLength(1);
   });
 
   test("sentence_rhythm fires when sentence lengths are too uniform", () => {
-    const rule = regexRule({ builtin: "sentence_rhythm" });
+    const rule = builtinRule("sentence_rhythm");
     const uniform =
       "The team shipped the feature today. The team wrote the tests first. The team read the code twice. The team merged the branch later.";
     const varied =
@@ -128,28 +153,26 @@ describe("regex checks", () => {
   });
 
   test("sentence_rhythm stays quiet when there are too few sentences to judge", () => {
-    const rule = regexRule({ builtin: "sentence_rhythm" });
+    const rule = builtinRule("sentence_rhythm");
     expect(checkRegexRule(rule, "One short line. Another short line.")).toHaveLength(0);
   });
 
   test("banned_words is empty by default and matches whole words when given some", () => {
-    expect(checkRegexRule(regexRule({ builtin: "banned_words" }), "synergy abounds")).toHaveLength(
-      0,
-    );
+    expect(checkRegexRule(builtinRule("banned_words"), "synergy abounds")).toHaveLength(0);
 
-    const rule = regexRule({ builtin: "banned_words", words: ["synergy", "circle back"] });
+    const rule = builtinRule("banned_words", { words: ["synergy", "circle back"] });
     expect(checkRegexRule(rule, "Synergy means we circle back.")).toHaveLength(2);
     expect(checkRegexRule(rule, "The synergyless approach.")).toHaveLength(0);
   });
 
   test("slop_vocab carries a default list that a rule can replace", () => {
-    const rule = regexRule({ builtin: "slop_vocab" });
+    const rule = builtinRule("slop_vocab");
     expect(checkRegexRule(rule, "We delve into the rich tapestry of the landscape.")).toHaveLength(
       3,
     );
     expect(checkRegexRule(rule, "We read the draft and cut two lines.")).toHaveLength(0);
 
-    const narrowed = regexRule({ builtin: "slop_vocab", words: ["tapestry"] });
+    const narrowed = builtinRule("slop_vocab", { words: ["tapestry"] });
     expect(checkRegexRule(narrowed, "We delve into the rich tapestry.")).toHaveLength(1);
   });
 });
