@@ -1,0 +1,28 @@
+# Exercises every construct the strict subset supports.
+version: 1
+threshold: 0.7
+enabled: true
+notes: null
+rules:
+  - id: colon_heavy
+    kind: regex
+    builtin: colon_count
+    min: 3
+    message: "Three colons in one paragraph. Pick one."
+    seed: { transform: add_colons, count: 3 }
+  - id: naked_cost_figure
+    kind: judgment
+    what: |
+      The paragraph states what something cost to make or run
+      without naming the price a customer pays.
+    not_for: >
+      A cost quoted together with the price
+      and a comparison.
+    examples:
+      - "This report cost us $1.30 in API calls."
+      - 'It ran us about four dollars of compute.'
+    criteria:
+      true: "A production cost appears with no customer price beside it."
+      false: "Every cost figure is accompanied by the price."
+    message: "A cost with no price next to it."
+    seed: { splice: ["It cost us about four dollars of compute to make this."] }

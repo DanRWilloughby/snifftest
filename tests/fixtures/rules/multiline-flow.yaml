@@ -1,0 +1,5 @@
+version: 1
+rules:
+  - id: colon_heavy
+    seed: { transform: add_colons,
+            count: 3 }
