@@ -43,9 +43,11 @@ import {
   type Chunk,
   type ChunkKind,
   type Flag,
+  type JudgmentRule,
   type Ruleset,
   isJudgmentRule,
   isRegexRule,
+  rulesForChunk,
 } from "./types.ts";
 
 export interface ChunkOptions {
@@ -336,8 +338,20 @@ export async function runJudgmentArm(
     };
   }
 
-  const questions = questionsFromRules(rules);
   const messages = new Map(rules.map((rule) => [rule.id, rule.message]));
+  // One question set per shape of chunk, built once. A whole block asks about
+  // every rule; a piece of a cut block leaves out the rules about a sentence it
+  // does not hold, which is both the honest question and the cheaper one.
+  const questionSets = new Map<string, ReturnType<typeof questionsFromRules>>();
+  const askedAbout = (chunk: Chunk): readonly JudgmentRule[] => rulesForChunk(rules, chunk);
+  const questionsFor = (applicable: readonly JudgmentRule[]): ReturnType<typeof questionsFromRules> => {
+    const key = applicable.map((rule) => rule.id).join("\u0000");
+    const held = questionSets.get(key);
+    if (held !== undefined) return held;
+    const built = questionsFromRules(applicable);
+    questionSets.set(key, built);
+    return built;
+  };
   const readings: JudgmentReading[] = [];
   let requests = 0;
   let inputTokens = 0;
@@ -350,6 +364,9 @@ export async function runJudgmentArm(
   let answered = 0;
   let noJudgment = 0;
   let halted = false;
+  // Counted as the loop goes, because a piece of a cut block is not asked about
+  // every rule, so the old paragraphs-times-rules product would overstate it.
+  let asked = 0;
 
   for (const [index, chunk] of prose.entries()) {
     if (halted) {
@@ -361,9 +378,13 @@ export async function runJudgmentArm(
       continue;
     }
 
+    const applicable = askedAbout(chunk);
+    if (applicable.length === 0) continue;
+    asked += applicable.length;
+
     let answer;
     try {
-      answer = await client.ask({ state: chunk.text, questions });
+      answer = await client.ask({ state: chunk.text, questions: questionsFor(applicable) });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
       skipped.push({ file: chunk.file, line: chunk.line, reason });
@@ -381,7 +402,7 @@ export async function runJudgmentArm(
     latencyMs += answer.latencyMs;
     retries += Math.max(0, answer.attempts - 1);
 
-    for (const rule of rules) {
+    for (const rule of applicable) {
       const probability = answer.nouls[rule.id];
       // A rule the service did not answer is left out rather than scored zero:
       // "not answered" and "answered low" are different facts. The range is
@@ -404,7 +425,6 @@ export async function runJudgmentArm(
     }
   }
 
-  const asked = prose.length * rules.length;
   return {
     readings,
     usage: { requests, inputTokens, outputTokens, estimatedCostUsd, latencyMs, retries },
@@ -652,6 +672,15 @@ function countNewlines(text: string): number {
   return count;
 }
 
+/**
+ * Cut an over-long block into sendable pieces, each knowing where it sits.
+ *
+ * A piece of a paragraph is not a paragraph. Its first sentence is the block's
+ * opening only if it is the first piece, and its last sentence is the block's
+ * ending only if it is the last. Numbering the pieces here is what lets the
+ * judgment arm leave a rule about openings out of every piece but one, instead
+ * of asking each piece about an opening it does not have.
+ */
 function splitLong(chunk: Chunk, maxChars: number): Chunk[] {
   if (chunk.text.length <= maxChars) return [chunk];
 
@@ -668,7 +697,9 @@ function splitLong(chunk: Chunk, maxChars: number): Chunk[] {
   }
   if (groupEnd > groupStart) out.push(...hardSplit(chunk, groupStart, groupEnd, maxChars));
 
-  return out.length === 0 ? [chunk] : out;
+  if (out.length === 0) return [chunk];
+  if (out.length === 1) return out;
+  return out.map((piece, index) => ({ ...piece, part: { index: index + 1, of: out.length } }));
 }
 
 /** A single sentence longer than the cap still has to fit; cut it on the cap. */

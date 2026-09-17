@@ -20,7 +20,7 @@
  * someone into agreeing to a request it was never going to make.
  */
 
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, extname, isAbsolute, join, relative, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
@@ -53,7 +53,13 @@ import { readAnthropicCatalog } from "./bench/anthropic.ts";
 import { createJevAdapter, jevCatalog } from "./bench/jev-adapter.ts";
 import { type BenchDocument, runBench } from "./bench/run.ts";
 import { type JoinedArm, buildBenchReport, writeBenchReport } from "./bench/tables.ts";
-import { ConfigError, type ResolvedRuleset, resolveRuleset, selectRules } from "./config.ts";
+import {
+  ConfigError,
+  type ResolvedRuleset,
+  packagedPath,
+  resolveRuleset,
+  selectRules,
+} from "./config.ts";
 import { type Destination, type Env, TYPESAFE_DESTINATION, requestConsent } from "./consent.ts";
 import {
   type JudgmentArmResult,
@@ -451,7 +457,14 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
   warnAbout(deps, resolved);
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
 
-  const files = collectFiles(options.paths, deps.cwd);
+  // A stranger who installed the package has no corpus of this project's own on
+  // disk, and the seeded corpus is what makes the numbers reproducible. So a
+  // run with no paths uses the one that ships, and says that it did.
+  const shipped = options.paths.length === 0 ? packagedCorpus() : undefined;
+  if (shipped !== undefined) {
+    deps.writeError(`no paths given, so the corpus that ships with this install was used: ${shipped}`);
+  }
+  const files = collectFiles(shipped === undefined ? options.paths : [shipped], deps.cwd);
   const candidates: BaseDocument[] = [];
   for (const draft of readDrafts(deps, files)) {
     for (const chunk of chunkDocument(draft.text, draft.shown, { maxChars: STATE_GUARD_CHARS })) {
@@ -731,7 +744,7 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
   const threshold = options.threshold ?? ruleset.threshold ?? DEFAULT_THRESHOLD;
   const runDate = today();
 
-  const panelFile = at(options.panelPath ?? join("bench", "panel.yaml"), deps.cwd);
+  const panelFile = panelPath(deps, options);
   const panel = parsePanel(readDraft(panelFile), display(panelFile, deps.cwd));
 
   const priceTables = new Map<Provider, PriceTable>();
@@ -908,6 +921,31 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
   return EXIT.ok;
 }
 
+/**
+ * The panel file: the one named, the one in this directory, or the one shipped.
+ *
+ * `bench` used to look only in the working directory, so the command worked
+ * from a clone of this repo and nowhere else. The panel is configuration rather
+ * than data, so falling back to the copy inside the package is honest, and the
+ * run says which file it read.
+ */
+function panelPath(deps: CliDeps, options: Options): string {
+  if (options.panelPath !== undefined) return at(options.panelPath, deps.cwd);
+  const here = at(join("bench", "panel.yaml"), deps.cwd);
+  if (existsSync(here)) return here;
+  const shipped = packagedPath("bench", "panel.yaml");
+  if (existsSync(shipped)) return shipped;
+  throw new UsageError(
+    `no panel file: there is no ${display(here, deps.cwd)} and none shipped with this install. Name one with --panel <file>.`,
+  );
+}
+
+/** The seeded corpus that ships in the package, for a run outside a clone. */
+function packagedCorpus(): string | undefined {
+  const corpus = packagedPath("examples", "corpus");
+  return existsSync(corpus) ? corpus : undefined;
+}
+
 interface BenchCorpus {
   readonly documents: readonly BenchDocument[];
   readonly counts: { clean: number; seeded: number; seed: number; perRule: number };
@@ -933,9 +971,13 @@ function benchCorpus(deps: CliDeps, options: Options, ruleset: Ruleset): BenchCo
   }
 
   if (options.paths.length === 0) {
+    const shipped = packagedCorpus();
     throw new UsageError(
       "snifftest bench needs a corpus: either --eval <dir> (an eval results directory, whose " +
-        "arms are joined into the table) or one or more files to seed.",
+        "arms are joined into the table) or one or more files to seed" +
+        (shipped === undefined
+          ? "."
+          : `. The corpus this project benches with ships with the install, at ${shipped}.`),
     );
   }
 
@@ -1257,7 +1299,10 @@ function parseArgs(argv: readonly string[]): Options {
     }
   }
 
-  if ((first === "check" || (first === "eval" && twins === undefined)) && paths.length === 0) {
+  // `eval` with no paths falls back to the seeded corpus that ships with the
+  // package, so the command works from an install and not only from a clone.
+  // `check` has no such fallback: there is no draft of someone else's to check.
+  if (first === "check" && paths.length === 0) {
     throw new UsageError(`snifftest ${first} needs at least one file or directory.`);
   }
 

@@ -90,8 +90,21 @@ describe("what the published tarball may contain", () => {
     scripts: Record<string, string>;
   };
 
-  test("the allowlist is exactly the four things a user needs", () => {
-    expect(pkg.files).toEqual(["dist", "rules", "README.md", "LICENSE"]);
+  test("the allowlist is exactly what the commands need and nothing else", () => {
+    // The corpus, the fault bank, the panel and the price files are here
+    // because `eval` and `bench` read them. Without them both commands work
+    // from a clone of this repo and from nowhere else, which is not what they
+    // are described as. `bench/results/` is deliberately not named: a run's own
+    // output is not part of the tool.
+    expect(pkg.files).toEqual([
+      "dist",
+      "rules",
+      "examples",
+      "bench/panel.yaml",
+      "bench/prices",
+      "README.md",
+      "LICENSE",
+    ]);
   });
 
   test("no runtime dependency, which is the promise on the first screen", () => {

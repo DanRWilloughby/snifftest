@@ -14,10 +14,13 @@ import {
   type Ruleset,
   type Seed,
   type SeedPosition,
+  type SentenceOfInterest,
   CHUNK_KINDS,
   SEED_POSITIONS,
+  SENTENCES_OF_INTEREST,
   isChunkKind,
   isSeedPosition,
+  isSentenceOfInterest,
 } from "./types.ts";
 import { type YamlValue, parseYaml } from "./yaml.ts";
 
@@ -292,7 +295,13 @@ function validateRegexRule(
 function validateJudgmentBody(
   entry: Readonly<Record<string, YamlValue>>,
   where: string,
-): { what: string; not_for?: string; examples?: readonly string[]; criteria: { true: string; false: string } } {
+): {
+  what: string;
+  not_for?: string;
+  examples?: readonly string[];
+  sentence?: SentenceOfInterest;
+  criteria: { true: string; false: string };
+} {
   const what = entry.what;
   if (typeof what !== "string" || what.trim() === "") {
     throw new RulesetError(`${where}: what must be a non-empty string describing the defect`);
@@ -319,10 +328,18 @@ function validateJudgmentBody(
     throw new RulesetError(`${where}: criteria.false must be a non-empty string`);
   }
 
+  const sentence = entry.sentence;
+  if (sentence !== undefined && sentence !== null && !isSentenceOfInterest(sentence)) {
+    throw new RulesetError(
+      `${where}: sentence is ${SENTENCES_OF_INTEREST.join(" or ")}, or is left out when the rule is not about a position`,
+    );
+  }
+
   return {
     what,
     ...(typeof notFor === "string" ? { not_for: notFor } : {}),
     ...(examples === undefined ? {} : { examples }),
+    ...(isSentenceOfInterest(sentence) ? { sentence } : {}),
     criteria: { true: criteria.true, false: criteria.false },
   };
 }
