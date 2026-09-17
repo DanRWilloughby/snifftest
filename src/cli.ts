@@ -141,6 +141,8 @@ interface Options {
   readonly modelsPath?: string;
   /** An `eval` results directory: its corpus is reused and its arms are joined. */
   readonly evalDir?: string;
+  /** The tree this run is about, when the process is not standing in it. */
+  readonly root?: string;
 }
 
 // --- the entry point ------------------------------------------------------
@@ -166,16 +168,51 @@ export async function runCli(deps: CliDeps): Promise<number> {
   }
 
   try {
-    if (options.command === "check") return await check(deps, options);
-    if (options.command === "rules") return rules(deps, options);
-    if (options.command === "eval") return await evaluate(deps, options);
-    if (options.command === "bench") return await bench(deps, options);
+    const scoped = rooted(deps, options);
+    if (options.command === "check") return await check(scoped, options);
+    if (options.command === "rules") return rules(scoped, options);
+    if (options.command === "eval") return await evaluate(scoped, options);
+    if (options.command === "bench") return await bench(scoped, options);
     throw new UsageError(
       `"snifftest ${options.command}" is planned but not built yet. Today there is check, rules, eval and bench.`,
     );
   } catch (error) {
     return fail(deps, error);
   }
+}
+
+/**
+ * `--root <dir>`: the tree this run is about, when the process is standing
+ * somewhere else on purpose.
+ *
+ * The shells that fetch this tool have to run the fetch from a directory
+ * outside the checkout they are checking. A package manager asked for
+ * `snifftest@<version>` while standing in a repository runs that repository's
+ * own `node_modules/snifftest` instead of going to a registry, which on a
+ * fork's pull request is somebody else's code on your runner, with your
+ * environment. Moving the working directory out is the fix; this flag is how
+ * the run still knows which tree it is checking, so ruleset discovery, relative
+ * paths and the paths printed in the flags all read as they always did.
+ *
+ * It replaces the working directory for everything the command does, and for
+ * nothing else: where the consent answer is kept is a property of the person,
+ * not of the tree, and it is not touched here.
+ */
+function rooted(deps: CliDeps, options: Options): CliDeps {
+  if (options.root === undefined) return deps;
+
+  const root = isAbsolute(options.root) ? options.root : resolve(deps.cwd, options.root);
+  let stats;
+  try {
+    stats = statSync(root);
+  } catch {
+    throw new UsageError(`no directory at ${options.root}`);
+  }
+  if (!stats.isDirectory()) {
+    throw new UsageError(`--root takes a directory, and ${options.root} is not one.`);
+  }
+
+  return { ...deps, cwd: root };
 }
 
 // --- check ----------------------------------------------------------------
@@ -865,6 +902,7 @@ function parseArgs(argv: readonly string[]): Options {
   let modelsPath: string | undefined;
   let evalDir: string | undefined;
   let repeats: number | undefined;
+  let root: string | undefined;
 
   for (let i = 1; i < argv.length; i++) {
     const argument = argv[i] ?? "";
@@ -915,6 +953,9 @@ function parseArgs(argv: readonly string[]): Options {
       case "--repeats":
         repeats = wholeNumber(valueFor(argv, ++i, "--repeats"), "--repeats", 1);
         break;
+      case "--root":
+        root = valueFor(argv, ++i, "--root");
+        break;
       default:
         throw new UsageError(`unknown option "${argument}". Try snifftest --help.`);
     }
@@ -939,6 +980,7 @@ function parseArgs(argv: readonly string[]): Options {
     ...(modelsPath === undefined ? {} : { modelsPath }),
     ...(evalDir === undefined ? {} : { evalDir }),
     ...(repeats === undefined ? {} : { repeats }),
+    ...(root === undefined ? {} : { root }),
   };
 }
 
@@ -1132,6 +1174,8 @@ function helpLines(): string[] {
     "",
     "Options",
     "  --rules <path>      use this ruleset instead of .snifftest.yaml or the built-in one",
+    "  --root <dir>        the tree being checked, when it is not the directory you are in;",
+    "                      relative paths and the ruleset are found there, not here",
     "  --threshold <0-1>   the probability at or above which a judgment counts as a flag",
     "  --format text|json  how to print the flags (default text)",
     "  --dry-run           run the countable rules only; nothing leaves the machine",

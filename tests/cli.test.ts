@@ -136,6 +136,46 @@ describe("check, dry run", () => {
   });
 });
 
+describe("--root", () => {
+  // The shells that fetch this tool run it from a scratch directory, because a
+  // package manager asked for it while standing in the tree being checked runs
+  // that tree's own copy. So the tree has to be nameable from outside.
+  test("finds the project ruleset and the relative paths there, not here", async () => {
+    const tree = sandbox();
+    writeFileSync(
+      join(tree, ".snifftest.yaml"),
+      "version: 1\nrules:\n  - id: dash_present\n    kind: regex\n    builtin: dash_present\n    message: \"An em dash.\"\n",
+    );
+    writeFileSync(join(tree, "post.md"), "A sentence broken \u2014 right here.\n");
+
+    const result = await run({
+      argv: ["check", "--dry-run", "--root", tree, "--", "post.md"],
+      cwd: sandbox(),
+    });
+
+    expect(result.code).toBe(EXIT.flags);
+    // Reported the way the caller staged it, not as an absolute path.
+    expect(result.out).toBe("post.md:1 dash_present 1.00 An em dash.");
+  });
+
+  test("a root that is not a directory is a usage failure, not a silent fallback", async () => {
+    const tree = sandbox();
+    writeFileSync(join(tree, "post.md"), "A clean sentence.\n");
+
+    const missing = await run({
+      argv: ["check", "--dry-run", "--root", join(tree, "nowhere"), "--", "post.md"],
+    });
+    const file = await run({
+      argv: ["check", "--dry-run", "--root", join(tree, "post.md"), "--", "post.md"],
+    });
+
+    expect(missing.code).toBe(EXIT.failure);
+    expect(missing.err).toContain("no directory at");
+    expect(file.code).toBe(EXIT.failure);
+    expect(file.err).toContain("--root takes a directory");
+  });
+});
+
 describe("consent", () => {
   test("no stored answer and no terminal prints the disclosure, sends nothing, and exits 3", async () => {
     const seen: JevRequest[] = [];

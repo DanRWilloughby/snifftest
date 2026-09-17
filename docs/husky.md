@@ -69,6 +69,22 @@ SNIFFTEST_SKIP=1 git commit -m "…"
 Set `SNIFFTEST_SEND=1` without a key and the hook says so and runs the free
 rules. It never sends on a guess.
 
+### Which checker runs
+
+Two of the ordinary ways to find a program would let the repository you are
+committing to choose one for you, so the hook refuses both.
+
+A `snifftest` on your `PATH` that lives inside the repository is ignored, and
+the pinned version is fetched instead. `node_modules/.bin` is on `PATH`
+whenever a package script or a hook manager put it there, and a repository you
+cloned can commit a `node_modules/snifftest` of its own.
+
+The fetch is made from a scratch directory rather than from your working tree,
+because a package manager asked for `snifftest@<version>` while standing in a
+repository runs that repository's own copy and never reaches a registry. The
+checker is then told which tree to read with `--root`, so the paths it prints
+are the paths you staged.
+
 ### Speed
 
 The hook looks for `snifftest` on your `PATH` first, then falls back to `bunx`

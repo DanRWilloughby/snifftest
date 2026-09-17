@@ -116,7 +116,10 @@ runs:
         SNIFFTEST_RULES: ${{ inputs.rules }}
         SNIFFTEST_THRESHOLD: ${{ inputs.threshold }}
         SNIFFTEST_SEND: ${{ steps.guard.outputs.send == 'true' && '1' || '0' }}
-        TYPESAFE_API_KEY: ${{ inputs.api-key }}
+        # Only when something may actually be sent. A key in the environment of
+        # the step that runs a checker over a fork's own files is a key with
+        # nothing to do and somewhere to go.
+        TYPESAFE_API_KEY: ${{ steps.guard.outputs.send == 'true' && inputs.api-key || '' }}
       run: |
         set -uo pipefail
 
@@ -125,7 +128,22 @@ runs:
         [ -z "$SNIFFTEST_RULES" ] || args+=(--rules "$SNIFFTEST_RULES")
         [ -z "$SNIFFTEST_THRESHOLD" ] || args+=(--threshold "$SNIFFTEST_THRESHOLD")
 
+        # The tree being checked, named rather than stood in. Relative paths and
+        # the project's own ruleset are found here.
+        args+=(--root "$GITHUB_WORKSPACE")
+
         report="${RUNNER_TEMP:-/tmp}/snifftest-report.txt"
+
+        # The fetch is made from a scratch directory, never from the checkout.
+        # `npx --yes snifftest@<version>` run inside a repository resolves that
+        # repository's own node_modules/snifftest and never reaches a registry,
+        # so on a pull request from a fork it would run the fork's code here,
+        # with this environment. Measured offline, with the registry pointed at
+        # a dead port: standing inside such a checkout ran the committed binary;
+        # standing outside it refused to connect and ran nothing.
+        fetch="${RUNNER_TEMP:-/tmp}/snifftest-fetch"
+        mkdir -p "$fetch"
+        cd "$fetch"
 
         status=0
         # shellcheck disable=SC2086 -- paths are space separated on purpose.

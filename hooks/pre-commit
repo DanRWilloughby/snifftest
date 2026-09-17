@@ -77,15 +77,50 @@ printf '%s\n' "$extract" | tr '\n' '\0' | git checkout-index -z --stdin --prefix
 
 # --- what to run ------------------------------------------------------------
 
+# A repository you are committing to is usually one you wrote, but a first
+# commit in a repository you cloned is not, and two ordinary conveniences hand
+# that repository a shell.
+#
+# `command -v snifftest` reaches its `node_modules/.bin`, which is on PATH
+# whenever a package script or a hook manager put it there. And a package
+# manager asked for `snifftest@<version>` while standing in a checkout runs that
+# checkout's own `node_modules/snifftest` without ever reaching a registry. So a
+# candidate that resolves inside the repository is refused, and the fetch is
+# made from a scratch directory with the tree named by `--root` instead.
+
+guard=$(git rev-parse --show-toplevel 2>/dev/null) || guard=''
+[ -z "$guard" ] || guard=$(cd "$guard" && pwd -P)
+
+scratch="$tmp/fetch"
+mkdir -p "$scratch"
+
+inside_guard() {
+  [ -n "$guard" ] || return 1
+  candidate=$(cd "$(dirname "$1")" 2>/dev/null && pwd -P) || return 1
+  case $candidate in
+    "$guard" | "$guard"/*) return 0 ;;
+  esac
+  return 1
+}
+
 run_snifftest() {
   if [ -n "${SNIFFTEST_BIN:-}" ]; then
-    "$SNIFFTEST_BIN" "$@"
-  elif command -v snifftest >/dev/null 2>&1; then
-    snifftest "$@"
+    (cd "$scratch" && "$SNIFFTEST_BIN" "$@")
+    return $?
+  fi
+
+  found=$(command -v snifftest 2>/dev/null) || found=''
+  if [ -n "$found" ] && inside_guard "$found"; then
+    echo "snifftest: ignoring the snifftest inside this repository; it is what you are committing." >&2
+    found=''
+  fi
+
+  if [ -n "$found" ]; then
+    (cd "$scratch" && "$found" "$@")
   elif command -v bunx >/dev/null 2>&1; then
-    bunx "snifftest@$SNIFFTEST_VERSION" "$@"
+    (cd "$scratch" && bunx "snifftest@$SNIFFTEST_VERSION" "$@")
   elif command -v npx >/dev/null 2>&1; then
-    npx --yes "snifftest@$SNIFFTEST_VERSION" "$@"
+    (cd "$scratch" && npx --yes "snifftest@$SNIFFTEST_VERSION" "$@")
   else
     return 127
   fi
@@ -106,6 +141,11 @@ if [ -n "${SNIFFTEST_THRESHOLD:-}" ]; then
   set -- "$@" --threshold "$SNIFFTEST_THRESHOLD"
 fi
 
+# The staged copies are what is checked, and the run happens outside them, so
+# the extraction root is named rather than stood in. Paths still print the way
+# you staged them, because they are still reported relative to that root.
+set -- "$@" --root "$tree"
+
 # Newline is the only separator, so a path with a space in it survives.
 old_ifs=$IFS
 IFS='
@@ -114,10 +154,9 @@ IFS='
 set -- "$@" -- $staged
 IFS=$old_ifs
 
-# Paths are reported relative to the extraction root, which makes them read the
-# same as the repository-relative paths you staged. Output is captured rather
-# than streamed because the decision below depends on reading it.
-(cd "$tree" && run_snifftest "$@") > "$out" 2> "$err"
+# Output is captured rather than streamed because the decision below depends on
+# reading it.
+run_snifftest "$@" > "$out" 2> "$err"
 status=$?
 
 cat "$out"
