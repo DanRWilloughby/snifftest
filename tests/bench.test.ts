@@ -1297,7 +1297,9 @@ describe("snifftest bench", () => {
     );
     const withKeys: CliDeps = {
       ...benchRun.deps,
-      env: { OPENROUTER_API_KEY: "or-key-0123456789abcdefghij", SNIFFTEST_SEND: "1" },
+      // The environment answer names the destination it answers for. `1` is the
+      // shorthand for the one `check` uses and never covers a bench provider.
+      env: { OPENROUTER_API_KEY: "or-key-0123456789abcdefghij", SNIFFTEST_SEND: "OpenRouter" },
     };
 
     expect(await runCli(withKeys)).toBe(EXIT.ok);

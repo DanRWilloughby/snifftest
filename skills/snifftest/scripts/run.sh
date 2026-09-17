@@ -15,8 +15,10 @@
 #                        decides whether it may send: it asks, or exits 3 when
 #                        it cannot ask, unless the user already said yes on this
 #                        machine and it remembered.
-#   SNIFFTEST_SEND=1     already in the environment, put there by the user or by
-#                        a CI job. Read here, never written here.
+#   SNIFFTEST_SEND=…     already in the environment, put there by the user or by
+#                        a CI job. It names the destinations it answers for, and
+#                        `1` is the shorthand for the one `check` uses. Read
+#                        here, never written here.
 #
 # This script never answers the sending question for anyone. It adds no flag
 # that skips the question, and it does not touch the key, which the tool reads
@@ -120,7 +122,16 @@ run_snifftest() {
 
 set -- check
 
-if [ "$judge" = "0" ] && [ "${SNIFFTEST_SEND:-0}" != "1" ]; then
+# SNIFFTEST_SEND names the destinations it answers for, and `1` is the
+# shorthand for the one `check` uses. Anything that names something is a
+# request for the judgment pass; the tool still decides whether the answer
+# actually covers where this run would send.
+case "${SNIFFTEST_SEND:-}" in
+  "" | 0) asked_to_send=0 ;;
+  *) asked_to_send=1 ;;
+esac
+
+if [ "$judge" = "0" ] && [ "$asked_to_send" = "0" ]; then
   set -- "$@" --dry-run
 fi
 

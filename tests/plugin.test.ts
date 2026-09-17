@@ -144,7 +144,12 @@ describe("the bundled script", () => {
 
   test("runs the countable rules unless something else asked for the others", () => {
     expect(runScript).toContain("--dry-run");
-    expect(runScript).toContain('"${SNIFFTEST_SEND:-0}" != "1"');
+    // Anything that names a destination is a request for the judgment pass.
+    // The script does not decide whether the answer covers this run; the tool
+    // does, which is why the test pins the empty and 0 cases and nothing else.
+    expect(runScript).toContain('case "${SNIFFTEST_SEND:-}" in');
+    expect(runScript).toContain('"" | 0) asked_to_send=0 ;;');
+    expect(runScript).toContain("*) asked_to_send=1 ;;");
   });
 
   test("reads the sending answer and never writes one", () => {
