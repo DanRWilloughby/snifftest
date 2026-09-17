@@ -5,18 +5,31 @@
  * come from the same object, so the table in a README and the file a script
  * parses cannot drift apart.
  *
- * Two rules hold everywhere in here. A number that was not measured is printed
- * as `n/a`, never as zero, because a zero is a claim. And the run's own awkward
- * parts are printed in the same document as the headline table rather than in a
- * footnote nobody regenerates: rules that could not be seeded, paragraphs that
- * were dropped, requests that failed.
+ * Four rules hold everywhere in here.
+ *
+ * A number that was not measured is printed as `n/a`, never as zero, because a
+ * zero is a claim.
+ *
+ * No rate is printed without the k and the n it came from, and no rate is
+ * printed to more than two decimal places, because three decimals on three
+ * trials is a precision nobody measured. Under ten trials, only k of n is
+ * printed and the rate is left out entirely.
+ *
+ * Recall is split into countable rules and judgment rules and never pooled as
+ * the headline, because the seeder guarantees the countable half. Where a
+ * pooled figure appears it says pooled in the column.
+ *
+ * And the run's own awkward parts are printed in the same document as the
+ * headline table rather than in a footnote nobody regenerates: rules that
+ * could not be seeded, paragraphs that were dropped, requests that failed.
  */
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 
+import { PRICE_BASIS } from "../jev.ts";
 import type { EvalOutcome, RawRun } from "./run.ts";
-import type { ArmScore } from "./score.ts";
+import type { ArmScore, ClassScore, Interval } from "./score.ts";
 import type { SeededDocument } from "./seed.ts";
 
 export interface ReportOptions {
@@ -33,6 +46,15 @@ export interface EvalReport {
   readonly threshold: number;
   readonly seed: number;
   readonly per_rule: number;
+  /** 1 is the ruleset's own splice lists; 2 is the seed bank. */
+  readonly seed_version: number;
+  /** Near misses planted in clean paragraphs, and whether any arm flagged them. */
+  readonly hard_negatives: readonly {
+    readonly id: string;
+    readonly rule: string;
+    readonly why: string;
+    readonly flagged_by: readonly string[];
+  }[];
   readonly thresholds: readonly number[];
   readonly ruleset_sources: readonly string[];
   readonly corpus_paths: readonly string[];
@@ -55,6 +77,11 @@ export interface EvalReport {
   readonly arms: Record<string, ArmScore>;
   readonly seeding: readonly SeededDocument[];
   readonly failures: readonly { readonly doc: string; readonly reason: string }[];
+  /**
+   * Where the dollar figures come from: measured usage, an unsourced price.
+   * Printed beside the cost column so a reader can weigh it.
+   */
+  readonly cost_basis: typeof PRICE_BASIS;
 }
 
 export function buildReport(outcome: EvalOutcome, options: ReportOptions): EvalReport {
@@ -66,6 +93,17 @@ export function buildReport(outcome: EvalOutcome, options: ReportOptions): EvalR
     threshold: options.threshold,
     seed: seeding.seedValue,
     per_rule: seeding.perRule,
+    seed_version: seeding.seedVersion,
+    hard_negatives: seeding.negatives.map((row) => ({
+      id: row.id,
+      rule: row.rule,
+      why: row.why,
+      flagged_by: Object.values(outcome.scores)
+        .filter((arm) =>
+          arm.false_positives_at_0_7.some((flag) => flag.doc === row.id && flag.rule === row.rule),
+        )
+        .map((arm) => arm.label),
+    })),
     thresholds: outcome.thresholds,
     ruleset_sources: options.rulesetSources ?? [],
     corpus_paths: options.corpusPaths ?? [],
@@ -86,6 +124,7 @@ export function buildReport(outcome: EvalOutcome, options: ReportOptions): EvalR
     arms: outcome.scores,
     seeding: seeding.seeded,
     failures: outcome.failures,
+    cost_basis: PRICE_BASIS,
   };
 }
 
@@ -99,8 +138,9 @@ export function renderMarkdown(report: EvalReport): string {
   lines.push(`# snifftest eval, ${report.run_date}`);
   lines.push("");
   lines.push(
-    `${report.corpus.seeded} seeded paragraphs and ${report.corpus.clean} clean ones, ` +
-      `${report.per_rule} seeds per rule, seed value ${report.seed}. ` +
+    `${report.corpus.seeded} seeded paragraphs, ${report.corpus.clean} clean ones and ` +
+      `${report.hard_negatives.length} near misses, which are counted as clean. ` +
+      `${report.per_rule} seeds per rule, seed value ${report.seed}, seed version ${report.seed_version}. ` +
       `Served by ${report.served_model ?? "no model, since no arm made a call"}. ` +
       `Flags count at ${at}.`,
   );
@@ -112,21 +152,61 @@ export function renderMarkdown(report: EvalReport): string {
   );
   lines.push("");
 
-  // --- headline
+  // --- headline, split by the class of rule
   lines.push("## Headline");
   lines.push("");
   lines.push(
-    `| Arm | Recall @${at} | FP per clean cell | FP per negative cell | Clean paragraphs flagged | Median ms | $ per 100 documents |`,
+    "| Arm | Countable rules caught | Judgment rules caught | Judgment recall | " +
+      "Clean paragraphs flagged | False alarms per paragraph | Median ms |",
   );
   lines.push("|---|---|---|---|---|---|---|");
   for (const arm of arms) {
     const overall = arm.overall[at];
+    const countable = overall?.countable;
+    const judgment = overall?.judgment;
     lines.push(
-      `| ${arm.label} | ${num(overall?.recall)} | ${num(overall?.fp_rate_per_clean_cell)} | ` +
-        `${num(overall?.fp_rate_per_negative_cell)} | ${num(overall?.fp_clean_documents_with_any_flag)} | ` +
-        `${round(arm.summary.median_latency_ms, 0)} | ${money(arm.summary.usd_per_100_documents)} |`,
+      `| ${arm.label} | ${classCell(countable)} | ${classCell(judgment)} | ` +
+        `${rateWithInterval(judgment?.recall, judgment?.hits, judgment?.positives, judgment?.interval)} | ` +
+        `${overall === undefined ? "n/a" : `${overall.fp_clean_paragraphs} of ${overall.clean_paragraphs}`} | ` +
+        `${rateWithInterval(
+          overall === undefined ? null : ratioOf(overall.fp_clean_paragraphs, overall.clean_paragraphs),
+          overall?.fp_clean_paragraphs,
+          overall?.clean_paragraphs,
+          overall?.fp_paragraph_interval,
+        )} | ` +
+        `${round(arm.summary.median_latency_ms, 0)} |`,
     );
   }
+  lines.push("");
+  lines.push(
+    "Countable rules are the regular expressions. A seeded countable fault is one the pattern " +
+      "itself defines, and the seeder throws away any it does not catch, so that column is a " +
+      "count and not a measurement of skill. Judgment rules are the ones a model answers, and " +
+      "only that column carries a recall figure. The false-alarm rate is per clean paragraph, " +
+      "which is the unit a reader meets: a rate of 0.04 on an eight-paragraph post is about a " +
+      "one-in-three chance of at least one false flag somewhere in it.",
+  );
+  lines.push("");
+  lines.push("Pooled and per-cell figures, which are the flattering ones, are below.");
+  lines.push("");
+  lines.push("| Arm | Pooled recall | FP per fireable clean cell | FP per clean cell | FP per negative cell |");
+  lines.push("|---|---|---|---|---|");
+  for (const arm of arms) {
+    const overall = arm.overall[at];
+    lines.push(
+      `| ${arm.label} | ${rateWithInterval(overall?.recall, overall?.hits, overall?.positives, null)} | ` +
+        `${cellRate(overall?.fp_rate_per_fireable_clean_cell, overall?.fp_cells, overall?.fireable_clean_cells)} | ` +
+        `${cellRate(overall?.fp_rate_per_clean_cell, overall?.fp_cells, overall?.clean_cells)} | ` +
+        `${num(overall?.fp_rate_per_negative_cell)} |`,
+    );
+  }
+  lines.push("");
+  lines.push(
+    "A fireable clean cell is one belonging to a rule that could have fired on a clean " +
+      "paragraph at all. Rules the arm never answered, and rules whose clean paragraphs were " +
+      "pre-filtered for them, are out of that denominator; they are still in the plain " +
+      "per-clean-cell column beside it, which is why the two differ.",
+  );
   lines.push("");
 
   // --- per arm
@@ -134,35 +214,65 @@ export function renderMarkdown(report: EvalReport): string {
     lines.push(`## Arm ${arm.label}`);
     lines.push("");
     lines.push(
-      `${arm.summary.documents} documents, ${arm.summary.requests} requests, ` +
+      `${arm.summary.documents} paragraphs, ${arm.summary.requests} requests, ` +
         `${arm.summary.retries} retried, ${arm.summary.unanswered} rules unanswered. ` +
         `Median ${round(arm.summary.median_latency_ms, 0)} ms, p95 ${round(arm.summary.p95_latency_ms, 0)} ms, ` +
-        `${money(arm.summary.usd_total)} in total and ${money(arm.summary.usd_per_document)} per document.`,
+        `${money(arm.summary.usd_total)} in total, ${money(arm.summary.usd_per_paragraph)} per paragraph ` +
+        `and ${money(arm.summary.usd_per_100_paragraphs)} per 100 paragraphs sent.`,
     );
+    if (arm.summary.paragraphs_without_usage > 0) {
+      lines.push("");
+      lines.push(
+        `${arm.summary.paragraphs_without_usage} of those requests came back with no usage, so ` +
+          "every dollar figure for this arm is unmeasured rather than zero.",
+      );
+    }
     lines.push("");
 
     lines.push(
-      `| Rule | n | ${report.thresholds.map((t) => `R@${t}`).join(" | ")} | ${report.thresholds
-        .map((t) => `FP@${t}`)
+      `| Rule | Seeds | ${report.thresholds.map((t) => `Caught @${t}`).join(" | ")} | ${report.thresholds
+        .map((t) => `False alarms @${t}`)
         .join(" | ")} |`,
     );
     lines.push("|---".repeat(2 + report.thresholds.length * 2) + "|");
     for (const rule of report.classes) {
       const row = arm.per_rule[rule];
       if (row === undefined) continue;
-      const recalls = report.thresholds.map((t) => num(row.at[String(t)]?.recall));
-      const fps = report.thresholds.map((t) => num(row.at[String(t)]?.fp_rate_clean));
+      const recalls = report.thresholds.map((t) => {
+        const at7 = row.at[String(t)];
+        return rateWithInterval(at7?.recall, at7?.hits, row.n_positive, at7?.interval);
+      });
+      const fps = report.thresholds.map((t) => {
+        const at7 = row.at[String(t)];
+        return rateWithInterval(at7?.fp_rate_clean, at7?.fps, row.n_clean, null);
+      });
       lines.push(`| ${rule} | ${row.n_positive} | ${recalls.join(" | ")} | ${fps.join(" | ")} |`);
     }
     lines.push("");
+    lines.push(
+      `Every cell is k of n. A rate is printed beside it only where n is ${RATE_FLOOR} or more, ` +
+        "because a rate over three seeds is one of four possible numbers and reads as a " +
+        "measurement it is not.",
+    );
+    lines.push("");
 
-    lines.push(`| Threshold | Recall | FP per clean cell | Off-rule flags | Clean paragraphs flagged |`);
-    lines.push("|---|---|---|---|---|");
+    lines.push(
+      "| Threshold | Judgment rules caught | Pooled recall | FP per fireable clean cell | " +
+        "Off-rule flags | Clean paragraphs flagged |",
+    );
+    lines.push("|---|---|---|---|---|---|");
     for (const threshold of report.thresholds) {
       const overall = arm.overall[String(threshold)];
       lines.push(
-        `| ${threshold} | ${num(overall?.recall)} | ${num(overall?.fp_rate_per_clean_cell)} | ` +
-          `${overall?.off_rule_flags ?? 0} | ${num(overall?.fp_clean_documents_with_any_flag)} |`,
+        `| ${threshold} | ${classCell(overall?.judgment)} | ` +
+          `${rateWithInterval(overall?.recall, overall?.hits, overall?.positives, null)} | ` +
+          `${cellRate(
+            overall?.fp_rate_per_fireable_clean_cell,
+            overall?.fp_cells,
+            overall?.fireable_clean_cells,
+          )} | ` +
+          `${overall?.off_rule_flags ?? 0} | ` +
+          `${overall === undefined ? "n/a" : `${overall.fp_clean_paragraphs} of ${overall.clean_paragraphs}`} |`,
       );
     }
     lines.push("");
@@ -220,6 +330,25 @@ export function renderMarkdown(report: EvalReport): string {
     lines.push("");
   }
 
+  if (report.hard_negatives.length > 0) {
+    lines.push("## Hard negatives");
+    lines.push("");
+    lines.push(
+      "Each of these is a clean paragraph with a sentence planted in it that sits close to one " +
+        "rule and is not a defect. A flag on one is a false positive, and it is the false " +
+        "positive worth knowing about, because it is the one a careful writer would meet.",
+    );
+    lines.push("");
+    lines.push("| Paragraph | Near | Why it is not a defect | Flagged by |");
+    lines.push("|---|---|---|---|");
+    for (const row of report.hard_negatives) {
+      lines.push(
+        `| ${row.id} | ${row.rule} | ${row.why} | ${row.flagged_by.length === 0 ? "nobody" : row.flagged_by.join(", ")} |`,
+      );
+    }
+    lines.push("");
+  }
+
   if (report.corpus.skipped.length > 0) {
     lines.push("Rules that could not be fully seeded:");
     lines.push("");
@@ -233,6 +362,24 @@ export function renderMarkdown(report: EvalReport): string {
   lines.push(
     "The seeds are synthetic splices and mechanical edits, so these recall figures are an " +
       "upper bound on what the same rules would catch in defects that occurred naturally.",
+  );
+  lines.push("");
+  lines.push("## What a paragraph is, and what a dollar figure rests on");
+  lines.push("");
+  lines.push(
+    "The unit everywhere above is a paragraph: one blank-line block of a Markdown file, and " +
+      `one request carrying all ${report.classes.length} questions about it. A cost per 100 ` +
+      "paragraphs is a cost per 100 requests, so the bill for a document is that rate times " +
+      "the paragraphs it holds, and it grows with the number of rules in the ruleset as well.",
+  );
+  lines.push("");
+  lines.push(
+    `Token counts are ${report.cost_basis.usage}. The price used is ` +
+      `${perMillion(report.cost_basis.usd_per_input_token)} per million input tokens and ` +
+      `${perMillion(report.cost_basis.usd_per_output_token)} per million output tokens, from ` +
+      `${report.cost_basis.source ?? "no published source that anyone has recorded"}` +
+      `${report.cost_basis.verified_on === null ? " and carrying no date" : `, checked on ${report.cost_basis.verified_on}`}. ` +
+      "Read the dollar columns as arithmetic on measured usage at a price nobody here has verified.",
   );
   lines.push("");
 
@@ -325,9 +472,54 @@ function write(path: string, body: string): void {
 
 // --- formatting -----------------------------------------------------------
 
+/** Below this many trials a rate is not printed at all, only k of n. */
+const RATE_FLOOR = 10;
+
 /** A measured ratio, or `n/a`. Never a zero standing in for "not measured". */
 function num(value: number | null | undefined): string {
-  return value === null || value === undefined ? "n/a" : value.toFixed(3);
+  return value === null || value === undefined ? "n/a" : value.toFixed(2);
+}
+
+function ratioOf(k: number, n: number): number | null {
+  return n === 0 ? null : k / n;
+}
+
+/** One class of rule: k of n, said as a count, because that is what it is. */
+function classCell(score: ClassScore | undefined): string {
+  if (score === undefined || score.positives === 0) return "n/a";
+  const how = score.by_construction ? " (by construction)" : "";
+  return `${score.hits} of ${score.positives}${how}`;
+}
+
+/**
+ * k of n first, then the rate, then the interval, and never a rate on its own.
+ *
+ * Under ten trials the rate is left out: one of four possible values printed to
+ * two decimals is a number that looks measured and is not.
+ */
+function rateWithInterval(
+  rate: number | null | undefined,
+  k: number | undefined,
+  n: number | undefined,
+  interval: Interval | null | undefined,
+): string {
+  if (k === undefined || n === undefined || n === 0) return "n/a";
+  const counted = `${k} of ${n}`;
+  if (n < RATE_FLOOR) return counted;
+  if (rate === null || rate === undefined) return counted;
+  const range = interval == null ? "" : ` (${interval.low.toFixed(2)} to ${interval.high.toFixed(2)})`;
+  return `${counted}, ${rate.toFixed(2)}${range}`;
+}
+
+/** A per-cell rate, which always prints its denominator because that is the argument. */
+function cellRate(rate: number | null | undefined, k: number | undefined, n: number | undefined): string {
+  if (k === undefined || n === undefined || n === 0) return "n/a";
+  if (n < RATE_FLOOR || rate === null || rate === undefined) return `${k} of ${n}`;
+  return `${k} of ${n}, ${rate.toFixed(2)}`;
+}
+
+function perMillion(usdPerToken: number): string {
+  return `$${(usdPerToken * 1_000_000).toFixed(3)}`;
 }
 
 function money(value: number | null | undefined): string {

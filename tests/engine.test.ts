@@ -1,9 +1,20 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { chunkDocument, flagsFrom, mergeFlags, runJudgmentArm, runRegexArm } from "../src/engine.ts";
-import type { JevClient, JevRequest, JevResult } from "../src/jev.ts";
+import { type AnswerCache, openCache } from "../src/cache.ts";
+
+import {
+  chunkDocument,
+  classifyChunk,
+  flagsFrom,
+  isProseLike,
+  mergeFlags,
+  runJudgmentArm,
+  runRegexArm,
+} from "../src/engine.ts";
+import { JevHttpError, type JevClient, type JevRequest, type JevResult } from "../src/jev.ts";
 import { parseRuleset } from "../src/rules.ts";
 import type { Flag } from "../src/types.ts";
 
@@ -23,6 +34,12 @@ const pair = parseRuleset(
   "rules/pair.yaml",
 );
 
+/** The shipped ruleset, so the shapes are checked against what people get. */
+const defaults = parseRuleset(
+  readFileSync(join(here, "..", "rules", "default.yaml"), "utf8"),
+  "rules/default.yaml",
+);
+
 describe("chunkDocument", () => {
   test("splits on blank lines and records the first line of each paragraph", () => {
     const chunks = chunkDocument(text("flagged.md"), "flagged.md");
@@ -36,8 +53,8 @@ describe("chunkDocument", () => {
   test("treats a run of blank lines as one break and ignores trailing whitespace", () => {
     const chunks = chunkDocument("one\n\n\n\ntwo\n   \n", "d.md");
     expect(chunks).toHaveLength(2);
-    expect(chunks[0]).toEqual({ file: "d.md", line: 1, text: "one" });
-    expect(chunks[1]).toEqual({ file: "d.md", line: 5, text: "two" });
+    expect(chunks[0]).toEqual({ file: "d.md", line: 1, text: "one", kind: "prose" });
+    expect(chunks[1]).toEqual({ file: "d.md", line: 5, text: "two", kind: "prose" });
   });
 
   test("returns nothing for an empty document", () => {
@@ -53,6 +70,53 @@ describe("chunkDocument", () => {
     expect(chunks.every((c) => c.text.length <= 120)).toBe(true);
     expect(chunks.every((c) => c.line === 1)).toBe(true);
     expect(chunks.map((c) => c.text).join(" ")).toBe(sentence.repeat(6).trim());
+  });
+});
+
+describe("what a block is", () => {
+  const structure = text("structure.md");
+  const chunks = chunkDocument(structure, "structure.md");
+
+  test("every Markdown shape is named for what it is", () => {
+    expect(chunks.map((c) => c.kind)).toEqual([
+      "front_matter",
+      "heading",
+      "html_comment",
+      "table",
+      "list",
+      "block_quote",
+      "prose",
+      "prose",
+      "prose",
+      "prose",
+      "link_definition",
+    ]);
+  });
+
+  test("only writing is worth a paid question", () => {
+    expect(chunks.filter(isProseLike).map((c) => c.kind)).toEqual([
+      "list",
+      "block_quote",
+      "prose",
+      "prose",
+      "prose",
+      "prose",
+    ]);
+  });
+
+  test("a list too short to hold a sentence is not asked about", () => {
+    const [short] = chunkDocument("- one\n- two\n- three\n", "d.md");
+    expect(short?.kind).toBe("list");
+    expect(short === undefined ? true : isProseLike(short)).toBe(false);
+  });
+
+  test("three dashes in the middle of a file are a break, not front matter", () => {
+    expect(classifyChunk("---\nname: x\n---", 40)).toBe("prose");
+    expect(classifyChunk("---\nname: x\n---", 1)).toBe("front_matter");
+  });
+
+  test("the default ruleset stays quiet on every one of those shapes", () => {
+    expect(runRegexArm(chunks, defaults)).toEqual([]);
   });
 });
 
@@ -113,6 +177,7 @@ describe("runJudgmentArm", () => {
           inputTokens: 50,
           outputTokens: 0,
           estimatedCostUsd: 50 * 0.042e-6,
+          usageReported: true,
           latencyMs: 7,
           attempts: 2,
         };
@@ -124,13 +189,16 @@ describe("runJudgmentArm", () => {
     const seen: JevRequest[] = [];
     const chunks = chunkDocument(text("flagged.md"), "flagged.md");
 
-    const result = await runJudgmentArm(chunks, mixed, client({ restating_closer: 0.4 }, seen));
+    const prose = chunks.filter(isProseLike);
+    const result = await runJudgmentArm(chunks, mixed, client({ restating_closer: 0.11 }, seen));
 
-    expect(seen).toHaveLength(chunks.length);
+    expect(prose.length).toBeLessThan(chunks.length);
+    expect(seen).toHaveLength(prose.length);
     expect(Object.keys(seen[0]?.questions ?? {})).toEqual(["restating_closer"]);
-    expect(result.usage.requests).toBe(chunks.length);
-    expect(result.usage.inputTokens).toBe(50 * chunks.length);
-    expect(result.usage.retries).toBe(chunks.length);
+    expect(result.usage.requests).toBe(prose.length);
+    expect(result.usage.inputTokens).toBe(50 * prose.length);
+    expect(result.usage.retries).toBe(prose.length);
+    expect(result.tally.structure).toBe(chunks.length - prose.length);
   });
 
   test("returns every reading, so a caller can calibrate below the threshold", async () => {
@@ -146,6 +214,7 @@ describe("runJudgmentArm", () => {
         rule: "restating_closer",
         probability: 0.11,
         message: "A closer that only restates. Cut it.",
+        noJudgment: false,
       },
     ]);
     expect(flagsFrom(result.readings, 0.7)).toEqual([]);
@@ -166,8 +235,8 @@ describe("runJudgmentArm", () => {
 
   test("flagsFrom keeps a reading at the threshold and drops the one below it", () => {
     const readings = [
-      { file: "d.md", line: 1, rule: "a", probability: 0.7, message: "m" },
-      { file: "d.md", line: 2, rule: "b", probability: 0.69, message: "m" },
+      { file: "d.md", line: 1, rule: "a", probability: 0.7, message: "m", noJudgment: false },
+      { file: "d.md", line: 2, rule: "b", probability: 0.69, message: "m", noJudgment: false },
     ];
 
     expect(flagsFrom(readings, 0.7)).toEqual([
@@ -296,6 +365,7 @@ describe("fenced code blocks", () => {
           inputTokens: 1,
           outputTokens: 0,
           estimatedCostUsd: 0,
+          usageReported: true,
           latencyMs: 1,
           attempts: 1,
         };
@@ -340,8 +410,8 @@ describe("fenced code blocks", () => {
     const chunks = chunkDocument(document, "d.md");
 
     expect(chunks).toEqual([
-      { file: "d.md", line: 1, text: "Prose one." },
-      { file: "d.md", line: 5, text: "Prose two." },
+      { file: "d.md", line: 1, text: "Prose one.", kind: "prose" },
+      { file: "d.md", line: 5, text: "Prose two.", kind: "prose" },
     ]);
   });
 });
@@ -590,6 +660,7 @@ describe("inline code spans", () => {
           inputTokens: 1,
           outputTokens: 0,
           estimatedCostUsd: 0,
+          usageReported: true,
           latencyMs: 1,
           attempts: 1,
         };
@@ -604,5 +675,321 @@ describe("inline code spans", () => {
     expect(runRegexArm(chunkDocument(document, "d.md"), pair).map((f) => f.rule)).toEqual([
       "colon_heavy",
     ]);
+  });
+});
+
+// --- a piece of a paragraph is not a paragraph -----------------------------
+
+describe("a paragraph too long to send in one request", () => {
+  const positional = parseRuleset(
+    `version: 1
+threshold: 0.7
+rules:
+  - id: rhetorical_opener
+    kind: judgment
+    sentence: first
+    what: The first sentence is a question asked for effect.
+    criteria:
+      true: "The first sentence is a rhetorical question."
+      false: "The first sentence is a statement."
+    message: "Opens on a question nobody asked."
+  - id: restating_closer
+    kind: judgment
+    sentence: last
+    what: The final sentence only restates the paragraph.
+    criteria:
+      true: "The last sentence adds nothing."
+      false: "The last sentence adds something."
+    message: "The last sentence says it again."
+  - id: stacked_hedging
+    kind: judgment
+    what: Two hedges stacked in one clause.
+    criteria:
+      true: "There are two hedges."
+      false: "There are not."
+    message: "Pick one hedge."
+`,
+    "rules/positional.yaml",
+  );
+
+  const sentence = "This sentence is exactly long enough to matter here. ";
+  const pieces = chunkDocument(sentence.repeat(6).trim(), "d.md", { maxChars: 120 });
+
+  test("its pieces know which one holds the opening and which the ending", () => {
+    expect(pieces.length).toBeGreaterThan(2);
+    expect(pieces[0]?.part).toEqual({ index: 1, of: pieces.length });
+    expect(pieces.at(-1)?.part).toEqual({ index: pieces.length, of: pieces.length });
+    // A block that fits is not a piece of anything and carries no part at all.
+    expect(chunkDocument("One short line.\n", "d.md")[0]?.part).toBeUndefined();
+  });
+
+  test("a rule about the opening is asked of the first piece only", async () => {
+    const seen: JevRequest[] = [];
+    await runJudgmentArm(pieces, positional, client({ stacked_hedging: 0.1 }, seen));
+
+    expect(seen).toHaveLength(pieces.length);
+    expect(Object.keys(seen[0]?.questions ?? {})).toEqual(["rhetorical_opener", "stacked_hedging"]);
+    expect(Object.keys(seen[1]?.questions ?? {})).toEqual(["stacked_hedging"]);
+    expect(Object.keys(seen.at(-1)?.questions ?? {})).toEqual(["restating_closer", "stacked_hedging"]);
+  });
+
+  test("the tally counts the questions that were asked, not paragraphs times rules", async () => {
+    const seen: JevRequest[] = [];
+    const result = await runJudgmentArm(pieces, positional, client({ stacked_hedging: 0.1 }, seen));
+
+    const expected = pieces.length + 2;
+    expect(result.tally.asked).toBe(expected);
+    expect(result.tally.asked).toBeLessThan(pieces.length * 3);
+    expect(result.tally.answered + result.tally.noJudgment + result.tally.unanswered).toBe(expected);
+  });
+
+  function client(nouls: Readonly<Record<string, number>>, seen: JevRequest[]): JevClient {
+    return {
+      async ask(request: JevRequest): Promise<JevResult> {
+        seen.push(request);
+        return {
+          model: "jev-test",
+          nouls,
+          inputTokens: 10,
+          outputTokens: 0,
+          estimatedCostUsd: 0,
+          usageReported: true,
+          latencyMs: 3,
+          attempts: 1,
+        };
+      },
+    };
+  }
+});
+
+describe("the judgment arm when the service falters", () => {
+  const rules = mixedRules;
+  const draft = [
+    "The first paragraph is ordinary prose and says its thing plainly.",
+    "",
+    "The second paragraph is also ordinary and also says its thing.",
+    "",
+    "The third paragraph carries on in the same voice as the others.",
+    "",
+    "The fourth paragraph says a little more and then stops there.",
+    "",
+    "The fifth paragraph closes the draft without any flourish at all.",
+    "",
+  ].join("\n");
+
+  /** A gateway that answers, or fails, according to a script of one entry per call. */
+  function scripted(script: readonly (number | Error)[]): { client: JevClient; calls: () => number } {
+    let call = 0;
+    return {
+      calls: () => call,
+      client: {
+        async ask(): Promise<JevResult> {
+          const step = script[call] ?? script[script.length - 1];
+          call += 1;
+          if (step instanceof Error) throw step;
+          return {
+            model: "jev-test",
+            nouls: { restating_closer: step ?? 0 },
+            inputTokens: 50,
+            outputTokens: 0,
+            estimatedCostUsd: 50 * 0.042e-6,
+            usageReported: true,
+            latencyMs: 7,
+            attempts: 1,
+          };
+        },
+      },
+    };
+  }
+
+  test("a 503 on one request keeps every answer received before it", async () => {
+    const chunks = chunkDocument(draft, "d.md");
+    const down = new JevHttpError(503, "jev returned 503: model_unavailable");
+    const { client, calls } = scripted([0.9, 0.2, down, 0.3, 0.25]);
+
+    const result = await runJudgmentArm(chunks, rules, client);
+
+    // The one that failed is named and counted; the two before it are still
+    // readings, and the arm carried on to the two after it.
+    expect(calls()).toBe(5);
+    expect(result.readings).toHaveLength(4);
+    expect(result.tally.answered).toBe(4);
+    expect(result.tally.unanswered).toBe(1);
+    expect(result.tally.asked).toBe(5);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]?.reason).toContain("503");
+    expect(result.stopped).toBeUndefined();
+  });
+
+  test("three failures in a row stop the arm, and what was answered is kept", async () => {
+    const chunks = chunkDocument(draft, "d.md");
+    const down = new JevHttpError(503, "jev returned 503: model_unavailable");
+    const { client, calls } = scripted([0.9, down, down, down, 0.4]);
+
+    const result = await runJudgmentArm(chunks, rules, client);
+
+    // Four calls, not five: the fourth paragraph opened the breaker and the
+    // fifth was never sent.
+    expect(calls()).toBe(4);
+    expect(result.readings).toHaveLength(1);
+    expect(result.stopped?.after).toBe(3);
+    expect(result.stopped?.notSent).toBe(1);
+    expect(result.stopped?.reason).toContain("503");
+    expect(result.tally.asked).toBe(5);
+    expect(result.tally.answered).toBe(1);
+    expect(result.tally.unanswered).toBe(4);
+  });
+
+  test("an answer between two failures resets the count, so the arm carries on", async () => {
+    const chunks = chunkDocument(draft, "d.md");
+    const down = new JevHttpError(503, "jev returned 503: model_unavailable");
+    const { client, calls } = scripted([down, down, 0.8, down, down]);
+
+    const result = await runJudgmentArm(chunks, rules, client);
+
+    expect(calls()).toBe(5);
+    expect(result.stopped).toBeUndefined();
+    expect(result.tally.answered).toBe(1);
+  });
+
+  test("a bad key stops the arm at once, because the next paragraph gets the same answer", async () => {
+    const chunks = chunkDocument(draft, "d.md");
+    const { client, calls } = scripted([new JevHttpError(401, "jev returned 401: bad key")]);
+
+    const result = await runJudgmentArm(chunks, rules, client);
+
+    expect(calls()).toBe(1);
+    expect(result.stopped?.after).toBe(1);
+    expect(result.stopped?.notSent).toBe(4);
+    expect(result.tally.asked).toBe(5);
+    expect(result.tally.unanswered).toBe(5);
+  });
+});
+
+describe("the judgment arm with answers already paid for", () => {
+  const draft = [
+    "The first paragraph is ordinary prose and says its thing plainly.",
+    "",
+    "The second paragraph is also ordinary and also says its thing.",
+    "",
+    "The third paragraph closes the draft without any flourish at all.",
+    "",
+  ].join("\n");
+
+  function counting(nouls: Readonly<Record<string, number>>): { client: JevClient; calls: () => number } {
+    let call = 0;
+    return {
+      calls: () => call,
+      client: {
+        async ask(): Promise<JevResult> {
+          call += 1;
+          return {
+            model: "jev-test",
+            nouls,
+            inputTokens: 50,
+            outputTokens: 0,
+            estimatedCostUsd: 50 * 0.042e-6,
+            usageReported: true,
+            latencyMs: 7,
+            attempts: 1,
+          };
+        },
+      },
+    };
+  }
+
+  test("a second run over the same draft asks for nothing and reads the same", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-cache-"));
+    try {
+      const cache = openCache({ env: { SNIFFTEST_CACHE_DIR: dir } });
+      expect(cache).toBeDefined();
+      const chunks = chunkDocument(draft, "d.md");
+
+      const first = counting({ restating_closer: 0.81 });
+      const one = await runJudgmentArm(chunks, mixedRules, first.client, { cache: cache as AnswerCache });
+
+      // A gateway that must never be reached, so a hit is the only way through.
+      const second = counting({ restating_closer: 0.11 });
+      const two = await runJudgmentArm(chunks, mixedRules, second.client, { cache: cache as AnswerCache });
+
+      expect(first.calls()).toBe(3);
+      expect(second.calls()).toBe(0);
+      expect(two.readings.map((row) => row.probability)).toEqual(
+        one.readings.map((row) => row.probability),
+      );
+      expect(two.usage.requests).toBe(0);
+      expect(two.usage.cached).toBe(3);
+      expect(two.usage.estimatedCostUsd).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("after an outage the rerun pays only for the paragraphs that were never answered", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-cache-"));
+    try {
+      const cache = openCache({ env: { SNIFFTEST_CACHE_DIR: dir } });
+      const chunks = chunkDocument(draft, "d.md");
+      const down = new JevHttpError(503, "jev returned 503: model_unavailable");
+
+      let call = 0;
+      const flaky: JevClient = {
+        async ask(): Promise<JevResult> {
+          call += 1;
+          // The first paragraph is answered and paid for; the service falls
+          // over before the other two, which is the run from the field.
+          if (call > 1) throw down;
+          return {
+            model: "jev-test",
+            nouls: { restating_closer: 0.77 },
+            inputTokens: 50,
+            outputTokens: 0,
+            estimatedCostUsd: 50 * 0.042e-6,
+            usageReported: true,
+            latencyMs: 7,
+            attempts: 1,
+          };
+        },
+      };
+
+      const outage = await runJudgmentArm(chunks, mixedRules, flaky, { cache: cache as AnswerCache });
+      expect(outage.readings).toHaveLength(1);
+
+      const back = counting({ restating_closer: 0.12 });
+      const rerun = await runJudgmentArm(chunks, mixedRules, back.client, { cache: cache as AnswerCache });
+
+      // Two requests, not three: the paragraph answered before the outage is
+      // read off the disk.
+      expect(back.calls()).toBe(2);
+      expect(rerun.usage.cached).toBe(1);
+      expect(rerun.tally.answered).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a rule reworded is a different question, so the old answer is never used", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-cache-"));
+    try {
+      const cache = openCache({ env: { SNIFFTEST_CACHE_DIR: dir } });
+      const chunks = chunkDocument(draft, "d.md");
+
+      const first = counting({ restating_closer: 0.81 });
+      await runJudgmentArm(chunks, mixedRules, first.client, { cache: cache as AnswerCache });
+
+      const reworded = parseRuleset(
+        readFileSync(join(here, "fixtures", "rules", "mixed.yaml"), "utf8").replace(
+          "The closing sentence only restates what the paragraph already said.",
+          "The closing sentence repeats the paragraph and adds nothing to it.",
+        ),
+        "rules/mixed.yaml",
+      );
+      const second = counting({ restating_closer: 0.11 });
+      await runJudgmentArm(chunks, reworded, second.client, { cache: cache as AnswerCache });
+
+      expect(second.calls()).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

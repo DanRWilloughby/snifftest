@@ -34,8 +34,8 @@ function ruleset(body: string): ReturnType<typeof parseRuleset> {
   return parseRuleset(`version: 1\nrules:\n${body}`, "rules/test.yaml");
 }
 
-function chunk(text: string): Chunk {
-  return { file: "draft.md", line: 1, text };
+function chunk(text: string, kind: Chunk["kind"] = "prose"): Chunk {
+  return { file: "draft.md", line: 1, text, kind };
 }
 
 describe("parseRuleset", () => {
@@ -125,11 +125,18 @@ describe("regex checks", () => {
     expect(matches.map((m) => m.index)).toEqual([7, 21]);
   });
 
-  test("dash_present catches em and en dashes but not a hyphen", () => {
+  test("dash_present catches a prose dash but not a hyphen", () => {
     const rule = builtinRule("dash_present");
-    expect(checkRegexRule(rule, "the window July 21\u201325")).toHaveLength(1);
     expect(checkRegexRule(rule, "the refusal \u2014 and I did not plan for it")).toHaveLength(1);
+    expect(checkRegexRule(rule, "the window \u2013 as we planned it")).toHaveLength(1);
     expect(checkRegexRule(rule, "a prompt-to-app tool, twenty-four hours")).toHaveLength(0);
+  });
+
+  test("dash_present leaves a number range alone, because a range is not a dash for effect", () => {
+    const rule = builtinRule("dash_present");
+    expect(checkRegexRule(rule, "pages 10\u201320 and the years 2019\u20132024")).toHaveLength(0);
+    // The em dash is never a range, so it is still a flag between numerals.
+    expect(checkRegexRule(rule, "pages 10\u201420")).toHaveLength(1);
   });
 
   test("colon_count fires at its minimum and not below, under either spelling", () => {
@@ -143,13 +150,24 @@ describe("regex checks", () => {
 
   test("sentence_rhythm fires when sentence lengths are too uniform", () => {
     const rule = builtinRule("sentence_rhythm");
-    const uniform =
-      "The team shipped the feature today. The team wrote the tests first. The team read the code twice. The team merged the branch later.";
+    const uniform = new Array(6)
+      .fill("The team shipped the feature on the Tuesday of that particular week.")
+      .join(" ");
     const varied =
       "We shipped. The team spent the better part of a week reading the code before anyone touched a line of it, and that turned out to be the whole trick. Then we merged. Done.";
 
     expect(checkRegexRule(rule, uniform)).toHaveLength(1);
     expect(checkRegexRule(rule, varied)).toHaveLength(0);
+  });
+
+  test("sentence_rhythm stays quiet on a short status paragraph", () => {
+    const rule = builtinRule("sentence_rhythm");
+    const status =
+      "We shipped the fix on Tuesday morning. The build went green at noon. " +
+      "The release went out at four. Nobody noticed a thing.";
+
+    expect(checkRegexRule(rule, status)).toHaveLength(0);
+    expect(checkRegexRule(builtinRule("sentence_rhythm", { min_words: 10 }), status)).toHaveLength(1);
   });
 
   test("sentence_rhythm stays quiet when there are too few sentences to judge", () => {
@@ -174,6 +192,49 @@ describe("regex checks", () => {
 
     const narrowed = builtinRule("slop_vocab", { words: ["tapestry"] });
     expect(checkRegexRule(narrowed, "We delve into the rich tapestry.")).toHaveLength(1);
+  });
+
+  test("slop_vocab matches the inflections its own description promises", () => {
+    const rule = builtinRule("slop_vocab");
+    const inflected = [
+      "He delves into it.",
+      "It runs seamlessly.",
+      "She is navigating the release.",
+      "They keep showcasing the same three slides.",
+      "Unlocking the next stage took a week.",
+      "The realms overlapped.",
+      "A pivotal week.",
+    ];
+    for (const line of inflected) {
+      expect(checkRegexRule(rule, line)).toHaveLength(1);
+    }
+
+    // The promise is the stem plus ordinary suffixes, not every derivation
+    // English can build. "intricacies" is a different word and is not caught.
+    expect(checkRegexRule(rule, "The intricacies were the point.")).toHaveLength(0);
+  });
+
+  test("slop_vocab leaves a listed word alone where it is doing its literal job", () => {
+    const rule = builtinRule("slop_vocab");
+    expect(checkRegexRule(rule, "Her sister is a landscape architect in Leeds.")).toHaveLength(0);
+    expect(checkRegexRule(rule, "Navigate to the folder and open it.")).toHaveLength(0);
+    expect(checkRegexRule(rule, "Unlock the door before the delivery arrives.")).toHaveLength(0);
+
+    // The exception is the phrase, not the word: the word alone still counts.
+    expect(checkRegexRule(rule, "The landscape of the market shifted.")).toHaveLength(1);
+  });
+
+  test("a rule may replace the exception list with its own", () => {
+    const rule = builtinRule("slop_vocab", { words: ["delve"], except: [] });
+    expect(checkRegexRule(rule, "Her sister is a landscape architect.")).toHaveLength(0);
+
+    const strict = builtinRule("slop_vocab", { words: ["landscape"], except: [] });
+    expect(checkRegexRule(strict, "Her sister is a landscape architect.")).toHaveLength(1);
+  });
+
+  test("a word that merely contains a listed stem is not a match", () => {
+    const rule = builtinRule("slop_vocab", { words: ["realm"] });
+    expect(checkRegexRule(rule, "The overwhelming majority agreed.")).toHaveLength(0);
   });
 });
 

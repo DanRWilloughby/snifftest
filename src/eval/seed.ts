@@ -37,6 +37,7 @@
  */
 
 import { checkRegexRule } from "../rules.ts";
+import { type SeedBank, faultsFor } from "./bank.ts";
 import {
   type RegexRule,
   type Rule,
@@ -125,11 +126,38 @@ export interface SkippedRule {
 export interface SeedOptions {
   readonly seed?: number;
   readonly perRule?: number;
+  /**
+   * Where a judgment rule's faults come from.
+   *
+   * 1 is the ruleset's own `splice` list, which is what every run before the
+   * bank existed used, so passing 1 reproduces those corpora exactly. 2 uses
+   * the seed bank when one is supplied and falls back to the rule's own list
+   * for any rule the bank does not carry.
+   */
+  readonly seedVersion?: 1 | 2;
+  readonly bank?: SeedBank;
+}
+
+/** The default, which is the bank when one is supplied. */
+export const DEFAULT_SEED_VERSION = 2;
+
+/** A near miss planted in a clean paragraph, which must not be flagged. */
+export interface HardNegative {
+  readonly id: string;
+  readonly base_id: string;
+  readonly base_file: string;
+  /** The rule this sentence sits near and must not trip. */
+  readonly rule: string;
+  readonly why: string;
+  readonly text: string;
 }
 
 export interface SeedCorpusResult {
   readonly seedValue: number;
   readonly perRule: number;
+  readonly seedVersion: number;
+  /** Near misses, one per hard negative the bank carries, counted as clean. */
+  readonly negatives: readonly HardNegative[];
   readonly clean: readonly BaseDocument[];
   readonly dropped: readonly DroppedBase[];
   readonly seeded: readonly SeededDocument[];
@@ -167,6 +195,8 @@ export function seedCorpus(
 ): SeedCorpusResult {
   const seedValue = options.seed ?? DEFAULT_SEED;
   const perRule = Math.max(1, options.perRule ?? DEFAULT_PER_RULE);
+  const seedVersion = options.seedVersion ?? DEFAULT_SEED_VERSION;
+  const bank = seedVersion === 1 ? undefined : options.bank;
   const countable = ruleset.rules.filter(isRegexRule);
 
   const clean: BaseDocument[] = [];
@@ -199,13 +229,18 @@ export function seedCorpus(
     const order = shuffled(clean, random);
     const made: SeededDocument[] = [];
     const refusals: string[] = [];
+    // One sentence per seed, until the bank runs out. Three seeds drawn with
+    // replacement from a list of ten repeated a sentence twice on the first
+    // corpus this ran over, and a recall figure over one sentence used twice
+    // is a figure about that sentence.
+    const used = new Set<string>();
 
     for (const candidate of order) {
       if (made.length === perRule) break;
       let text: string;
       let edit: SeedEdit;
       try {
-        const planted = plant(rule, candidate.text, random);
+        const planted = plant(rule, candidate.text, random, unused(faultList(bank, rule.id, candidate.text), used));
         text = planted.text;
         edit = planted.edit;
       } catch (error) {
@@ -224,6 +259,7 @@ export function seedCorpus(
         continue;
       }
 
+      if (edit.kind === "splice") used.add(edit.sentence);
       ordinal += 1;
       made.push({
         id: `S${String(ordinal).padStart(2, "0")}`,
@@ -249,7 +285,75 @@ export function seedCorpus(
     }
   }
 
-  return { seedValue, perRule, clean, dropped, seeded, skipped };
+  const negatives = plantNegatives(bank, ruleset, clean, seedValue);
+  return { seedValue, perRule, seedVersion, negatives, clean, dropped, seeded, skipped };
+}
+
+/**
+ * The sentences a rule's seeds may be drawn from, in preference order.
+ *
+ * Empty means the rule's own list, which is both the version 1 behaviour and
+ * the fallback for any rule the bank does not carry.
+ */
+function faultList(bank: SeedBank | undefined, ruleId: string, host: string): readonly string[] {
+  const entry = bank?.rules[ruleId];
+  return entry === undefined ? [] : faultsFor(entry, host);
+}
+
+/**
+ * The faults not yet used for this rule, or all of them once they are gone.
+ *
+ * A bank deep enough for the run never repeats. A run asking for more seeds
+ * than the bank holds repeats rather than stopping, because a rule missing
+ * from the corpus is worse than a sentence measured twice.
+ */
+function unused(list: readonly string[], already: ReadonlySet<string>): readonly string[] {
+  const left = list.filter((sentence) => !already.has(sentence));
+  return left.length > 0 ? left : list;
+}
+
+/**
+ * One near miss per hard negative, planted in a clean paragraph.
+ *
+ * These are clean documents with a sentence in them that sits close to a rule
+ * and is not a defect. A flag on one is a false positive like any other, and
+ * the report names which rule it was near, because "the checker flagged a
+ * paragraph" and "the checker cannot tell a scope note from a shrug" are
+ * different findings.
+ */
+function plantNegatives(
+  bank: SeedBank | undefined,
+  ruleset: Ruleset,
+  clean: readonly BaseDocument[],
+  seedValue: number,
+): HardNegative[] {
+  if (bank === undefined || clean.length === 0) return [];
+  const out: HardNegative[] = [];
+  let ordinal = 0;
+
+  for (const rule of ruleset.rules) {
+    const entry = bank.rules[rule.id];
+    if (entry === undefined) continue;
+    const random = generator(seedValue, `${rule.id}:negative`);
+    const order = shuffled(clean, random);
+
+    for (const negative of entry.hard_negatives) {
+      const host = order[out.length % order.length];
+      if (host === undefined) break;
+      if (host.text.includes(negative.text)) continue;
+      ordinal += 1;
+      out.push({
+        id: `N${String(ordinal).padStart(2, "0")}`,
+        base_id: host.id,
+        base_file: host.file,
+        rule: rule.id,
+        why: negative.why,
+        text: splice(host.text, negative.text, "any", random).text,
+      });
+    }
+  }
+
+  return out;
 }
 
 function reasons(refusals: readonly string[]): string {
@@ -270,14 +374,17 @@ interface Planted {
   readonly edit: SeedEdit;
 }
 
-function plant(rule: Rule, text: string, random: Random): Planted {
+function plant(rule: Rule, text: string, random: Random, fromBank: readonly string[] = []): Planted {
   const seed = rule.seed;
   const where = `rule "${rule.id}"`;
   if (seed === undefined) throw new SeedError(`${where}: no seed recipe`);
 
   if ("splice" in seed) {
     const position = seed.position ?? "any";
-    const sentence = pick(seed.splice, random);
+    // The bank's faults come first when there are any, in its own preference
+    // order, and the rule's own list is what a ruleset without a bank uses.
+    const list = fromBank.length > 0 ? fromBank : seed.splice;
+    const sentence = pick(list, random);
     if (sentence === undefined || sentence.trim() === "") {
       throw new SeedError(`${where}: the splice list is empty`);
     }

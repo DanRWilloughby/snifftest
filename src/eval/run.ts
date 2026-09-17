@@ -18,7 +18,7 @@
  * nothing sent.
  */
 
-import { runRegexArm } from "../engine.ts";
+import { classifyChunk, runRegexArm } from "../engine.ts";
 import { questionsFromRules, type JevClient } from "../jev.ts";
 import { type Chunk, type Ruleset, isJudgmentRule, isRegexRule } from "../types.ts";
 import {
@@ -32,6 +32,7 @@ import {
   type ArmScore,
   type Cell,
   type JudgedDocument,
+  type ScoreFacts,
   scoreAll,
   thresholdsWith,
 } from "./score.ts";
@@ -101,6 +102,8 @@ export async function runEval(options: RunEvalOptions): Promise<EvalOutcome> {
   const seeding = seedCorpus(options.candidates, ruleset, {
     ...(options.seed === undefined ? {} : { seed: options.seed }),
     ...(options.perRule === undefined ? {} : { perRule: options.perRule }),
+    ...(options.seedVersion === undefined ? {} : { seedVersion: options.seedVersion }),
+    ...(options.bank === undefined ? {} : { bank: options.bank }),
   });
 
   const documents: EvalDocument[] = [
@@ -109,6 +112,15 @@ export async function runEval(options: RunEvalOptions): Promise<EvalOutcome> {
       kind: "clean" as const,
       text: doc.text,
       source: `${doc.file}:${doc.line}`,
+    })),
+    // A hard negative is a clean paragraph with a near miss in it. It is
+    // positive for nothing, so any flag on it is a false positive, which is
+    // exactly the question it was written to ask.
+    ...seeding.negatives.map((doc) => ({
+      id: doc.id,
+      kind: "clean" as const,
+      text: doc.text,
+      source: `${doc.base_file} near miss for ${doc.rule}`,
     })),
     ...seeding.seeded.map((doc) => ({
       id: doc.id,
@@ -119,6 +131,7 @@ export async function runEval(options: RunEvalOptions): Promise<EvalOutcome> {
     })),
   ];
 
+  const facts = factsFor(ruleset);
   const observations: ArmObservation[] = [armA(documents, classes), armB(documents, ruleset, now)];
   const failures: { doc: string; reason: string }[] = [];
   let raw: RawRun | undefined;
@@ -136,9 +149,37 @@ export async function runEval(options: RunEvalOptions): Promise<EvalOutcome> {
     classes,
     thresholds,
     observations,
-    scores: scoreAll(observations, classes, thresholds),
+    scores: scoreAll(observations, classes, thresholds, facts),
     ...(raw === undefined ? {} : { raw }),
     failures,
+  };
+}
+
+/**
+ * What the seeder guaranteed, so the scorer does not read it as skill.
+ *
+ * Two facts come out of `seedCorpus`. A clean base that the countable arm
+ * flagged is dropped, so no countable rule can fire on the clean set at all.
+ * And a countable seed the rule does not catch is refused, so every countable
+ * positive is one the pattern already matched. Both are honest ways to build a
+ * corpus and dishonest numbers if they are not said out loud.
+ */
+export function factsFor(ruleset: Ruleset): ScoreFacts {
+  const countable = ruleset.rules.filter(isRegexRule);
+  const inert: Record<string, string> = {};
+  for (const rule of countable) {
+    inert[rule.id] = "clean paragraphs were pre-filtered to pass this rule";
+  }
+  for (const rule of countable) {
+    if (rule.source === "builtin" && (rule.words ?? []).length === 0 && rule.builtin === "banned_words") {
+      inert[rule.id] = "its word list is empty, so it cannot fire on anything";
+    }
+  }
+  return {
+    countable: countable.map((rule) => rule.id),
+    judgment: ruleset.rules.filter(isJudgmentRule).map((rule) => rule.id),
+    guaranteed: countable.map((rule) => rule.id),
+    inertOnClean: inert,
   };
 }
 
@@ -228,6 +269,7 @@ async function armC(
     let costUsd = 0;
     let latencyMs = 0;
     let attempts = 0;
+    let usageReported = true;
     let error: string | null = null;
 
     if (judgment.length > 0) {
@@ -239,6 +281,7 @@ async function armC(
         costUsd = answer.estimatedCostUsd;
         latencyMs = answer.latencyMs;
         attempts = answer.attempts;
+        usageReported = answer.usageReported;
         servedModel = answer.model;
       } catch (failure) {
         error = failure instanceof Error ? failure.message : String(failure);
@@ -271,6 +314,7 @@ async function armC(
       requests: judgment.length > 0 ? 1 : 0,
       retries: Math.max(0, attempts - 1),
       unanswered,
+      usageReported,
     });
 
     records.push({
@@ -309,7 +353,10 @@ async function armC(
 // --- shared ---------------------------------------------------------------
 
 function chunkOf(doc: EvalDocument): Chunk {
-  return { file: doc.id, line: 1, text: doc.text };
+  // A document here is one standalone block, so it is classified as one: a
+  // corpus of headings and tables measures what `check` would do to them only
+  // if the arms see the same kinds `check` sees.
+  return { file: doc.id, line: 1, text: doc.text, kind: classifyChunk(doc.text, 1) };
 }
 
 function zeroDocument(doc: EvalDocument): JudgedDocument {
@@ -325,5 +372,8 @@ function zeroDocument(doc: EvalDocument): JudgedDocument {
     requests: 0,
     retries: 0,
     unanswered: 0,
+    // An arm that makes no request has nothing to report usage for, and its
+    // zero cost is a measurement rather than a missing one.
+    usageReported: true,
   };
 }

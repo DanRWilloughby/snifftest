@@ -140,12 +140,14 @@ jobs:
       - name: Sniff Test reads its own prose
         # Dry run: the countable rules only, no key, nothing sent.
         #
-        # docs/ is not in this list yet. The checker counts colons inside fenced
-        # code blocks, so a YAML sample trips `colon_heavy` three times in
-        # docs/husky.md. That is a real finding against the engine, not against
-        # the prose; when the engine stops reading code as sentences, add `docs`
-        # back to the end of this line.
-        run: bun src/bin.ts check --dry-run README.md CONTRIBUTING.md CHANGELOG.md
+        # Every tracked Markdown file, so a rule that misfires on a table or on
+        # front matter is caught here rather than by a stranger. The corpus and
+        # the fixtures are left out: both hold defects on purpose.
+        run: |
+          git ls-files '*.md' \
+            | grep -v '^examples/' \
+            | grep -v '^tests/fixtures/' \
+            | xargs bun src/bin.ts check --dry-run
 
   secret-scan:
     name: Secret scan

@@ -1,9 +1,25 @@
 # Sniff Test, the default ruleset.
 #
-# Fifteen rules that apply to most prose. Five are countable and run as
-# regular expressions on your machine, with nothing sent anywhere. Ten are
-# judgment calls and are answered by the judgment model, one probability
+# Fifteen rules, ten of which apply to most prose and five of which are
+# conventions of copy meant to sell or persuade. Five rules are countable and
+# run as regular expressions on your machine, with nothing sent anywhere. Ten
+# are judgment calls and are answered by the judgment model, one probability
 # per rule per paragraph. A flag names its rule and its probability.
+#
+# The rules tagged `marketing` encode a convention of marketing copy, and they
+# sit out an ordinary run because `off_by_default` names that tag below. Ask
+# for them on a landing page with `--only marketing`, or run everything else
+# and add them with a project file that extends this one and writes
+# `off_by_default: []`. Every rule here is one view of good writing. Disagree
+# with any of them by editing your own copy of the file; that is the feature.
+#
+# A countable rule may name the kinds of block it applies to with `chunks`.
+# The kinds are front_matter, heading, table, link_definition, html_comment,
+# list, block_quote and prose. A rule that names none applies to prose, block
+# quotes, lists and headings, which is everything a person would call writing.
+# The judgment rules are asked about prose, block quotes and lists long enough
+# to hold a sentence, and never about the rest: a heading is not a paragraph,
+# and a request about one costs what a request about a paragraph costs.
 #
 # A `.snifftest.yaml` in your project extends or replaces this file. Copy a
 # rule, change its words, keep its id unique. The `seed` on each rule is how
@@ -21,23 +37,42 @@
 version: 1
 threshold: 0.7
 
+# Tags whose rules sit out a run unless they are asked for by name.
+off_by_default: [marketing]
+
 rules:
   # --- countable rules: regular expressions, no network -------------------
 
   - id: dash_present
     kind: regex
     # The built-in matches two characters: an en dash (U+2013) and an em dash
-    # (U+2014). A plain hyphen in a compound word does not count.
+    # (U+2014). A plain hyphen in a compound word does not count, and neither
+    # does an en dash between numerals, because "pages 10-20" written with the
+    # typographer's dash is a range and this rule is about a writer reaching
+    # for a dash instead of a full stop.
+    #
+    # A block quote is somebody else's text, so its dashes are theirs and the
+    # rule stays out of it. A quotation running inline inside a sentence cannot
+    # be told from the writer's own words without parsing quotation marks that
+    # mean five other things as well, so an inline quotation is still flagged.
     builtin: dash_present
+    chunks: [prose, list, heading]
     message: "A long dash. Give the sentence a full stop instead."
     seed: { transform: insert_em_dash, count: 1 }
 
   - id: colon_heavy
     kind: regex
     # The built-in counts the colon character (U+003A) in the paragraph and
-    # trips at `min` or more. A semicolon is not a colon.
+    # trips at `min` or more. A semicolon is not a colon. The colon in a URL,
+    # the one in a clock time and the ones inside an HTML comment are not
+    # punctuation a reader sees, so they are not counted.
+    #
+    # A list is not one paragraph: four bullets with a colon apiece are four
+    # sentences, and counting them together told a design note to pick one
+    # colon out of four.
     builtin: colon_count
     min: 3
+    chunks: [prose, block_quote]
     message: "Three colons in one paragraph. Pick one."
     seed: { transform: add_colons, count: 3 }
 
@@ -45,18 +80,33 @@ rules:
     kind: regex
     # The built-in splits on (?<=[.!?])\s+, counts words per sentence, and
     # trips when the coefficient of variation (standard deviation over mean)
-    # is below `floor`. Paragraphs shorter than `min_sentences` are skipped.
+    # is below `floor`. Paragraphs with fewer than `min_sentences` sentences
+    # or fewer than `min_words` words are skipped: four six-word sentences are
+    # a status note, and telling its author that every sentence runs to the
+    # same length is telling them their note is a note.
     builtin: sentence_rhythm
     floor: 0.25
     min_sentences: 4
+    min_words: 60
+    chunks: [prose, block_quote]
     message: "Every sentence runs to the same length. The reader nods off by the third."
     seed: { transform: equalize_sentences }
 
   - id: slop_vocab
     kind: regex
-    # The built-in matches any listed word at a word boundary, case-insensitive,
-    # in any inflection that shares the stem as written. Edit the list freely;
-    # "landscape" and "navigate" have honest uses and you may want them gone.
+    # The built-in matches any listed word and its ordinary inflections: the
+    # stem as written plus s, es, ed, ing, ly, ment(s) and ion(s), with a final
+    # silent e dropped where English drops it, so "delve" catches "delves" and
+    # "delving", and "seamless" catches "seamlessly". Matching is
+    # case-insensitive and stops at a word boundary, so "landscape" does not
+    # catch "landscaped lawn" through some longer word. A derivation further
+    # from the stem than those suffixes, such as "intricacies", is a separate
+    # word: add it to the list if you want it.
+    #
+    # `except` lists phrases in which a listed word is doing its literal job.
+    # These are matched case-insensitively and take the word out of the count.
+    # Edit both lists freely; a word on this list is a tell in some registers
+    # and the plain choice in others.
     builtin: slop_vocab
     words:
       - delve
@@ -71,7 +121,21 @@ rules:
       - pivotal
       - seamless
       - showcase
-    message: "A word only a model reaches for. Say the plain one."
+    except:
+      - landscape architect
+      - landscape architecture
+      - landscape gardener
+      - landscape orientation
+      - landscape mode
+      - navigate to
+      - navigate by
+      - navigate the menu
+      - navigation bar
+      - navigation pane
+      - unlock the door
+      - unlock the screen
+      - unlock your phone
+    message: "A word that turns up far more often in generated text than in prose a person wrote. Try the plain one."
     seed: { transform: insert_slop_word, count: 1 }
 
   - id: banned_words
@@ -116,9 +180,9 @@ rules:
     message: "Not X, it's Y. The reframe is doing the arguing for you."
     seed:
       splice:
-        - "This is not a limit, it is a choice somebody made years ago."
-        - "The delay was never the printer. It was the paper order."
-        - "That is a ritual, not a process."
+        - "Calling Tuesday an outage would be generous. Somebody chose to turn it off."
+        - "Whatever the Friday meeting has become, a review is no longer the word for it. A rehearsal is."
+        - "Nobody has a scheduling problem here. What everyone has is a saying-no problem."
       position: any
 
   - id: tricolon
@@ -145,7 +209,7 @@ rules:
       splice:
         - "The result was quieter, lighter, and kinder."
         - "Read, mark, move on."
-        - "It was cold, it was dark, it was early."
+        - "Small budget, small room, small hopes."
       position: any
 
   - id: stacked_hedging
@@ -190,6 +254,9 @@ rules:
     criteria:
       true: "The first sentence is a question asked for rhetorical effect."
       false: "The first sentence is a statement, or the only questions come later, or the opening question is one someone actually asked."
+    # About the paragraph's opening, so it is not asked of the later pieces of a
+    # paragraph that was too long to send in one request.
+    sentence: first
     message: "Opens on a question nobody asked. Start with the answer."
     seed:
       splice:
@@ -214,6 +281,9 @@ rules:
     criteria:
       true: "The last sentence is a summary of the paragraph and adds nothing."
       false: "The last sentence advances the argument or adds information, or the paragraph is a single sentence."
+    # About the paragraph's ending, so it is not asked of the earlier pieces of
+    # a paragraph that was too long to send in one request.
+    sentence: last
     message: "The last sentence says the paragraph again. End one sentence earlier."
     seed:
       splice:
@@ -223,6 +293,9 @@ rules:
 
   - id: self_undercutting
     kind: judgment
+    tags: [marketing]
+    # A page meant to sell has to make its offer. A page meant to document
+    # has to state its limits, which is why this rule sits out by default.
     what: |
       A line that talks the reader out of the thing being offered. It says
       the thing may not work, that the writer does not claim it works, that
@@ -235,9 +308,11 @@ rules:
       A measured result with its range ("Recall was 0.85 to 0.94 across three
       runs.").
       A specific past failure that the paragraph then explains.
+      An honest statement of what a piece of work does and does not cover
+      ("We do not claim this catches every case."), which is a scope note and
+      belongs in good documentation.
       Disputing a claim someone else made.
     examples:
-      - "We do not claim this catches every case."
       - "This may not work for you, and we are not saying it will."
       - "There is no guarantee any of this helps."
     criteria:
@@ -246,13 +321,16 @@ rules:
     message: "The copy is talking the reader out of it. Name the limit and drop the shrug."
     seed:
       splice:
-        - "It might not do anything for your team, and that is fine."
-        - "Honestly, we are not sure it makes a difference."
+        - "It might do nothing at all for your team, and that is fine."
+        - "Plenty of people try this once and shrug, so keep your expectations low."
         - "Results vary and we make no promises about yours."
       position: any
 
   - id: first_x_that
     kind: judgment
+    tags: [marketing]
+    # A first claim is a marketing habit; a technical note may need the word
+    # for a sequence, which `not_for` covers.
     what: |
       A claim that the writer, or their team, product, or company, is the
       first to do something. "The first tool that", "the first team to", "we
@@ -274,12 +352,14 @@ rules:
     message: '"The first X that." Someone will check.'
     seed:
       splice:
-        - "We were the first to put a probability next to every flag."
-        - "It is the first notebook app that a crew can run without a signal."
+        - "Nobody had put a probability beside every flag until our team did."
+        - "Ours is the earliest field notebook a crew could carry down a mine with no signal."
       position: any
 
   - id: naked_cost_figure
     kind: judgment
+    tags: [marketing]
+    # This is a house rule about marketing surfaces, not about writing.
     what: |
       The paragraph states what something cost to make or run, in model
       spend, compute, hours, or "it cost us", without naming the price a
@@ -308,6 +388,9 @@ rules:
 
   - id: jobs_claim
     kind: judgment
+    tags: [marketing]
+    # A positioning rule for pages that sell. A report about employment
+    # says what it measures and is not covered by this.
     what: |
       A claim about employment. That the thing creates jobs, that it
       replaces the people who used to do the work, or that it would never
@@ -336,6 +419,8 @@ rules:
 
   - id: pullquote_fragment
     kind: judgment
+    tags: [marketing]
+    # A typographic convention of published copy, not of ordinary prose.
     what: |
       A pull quote, meaning a short line set apart in quotation marks or
       italics as a display line, whose text is a fragment with no subject and

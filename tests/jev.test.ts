@@ -8,10 +8,14 @@ import {
   JevRequestError,
   JevStateRefusedError,
   MODEL,
+  NO_JUDGMENT_HIGH,
+  NO_JUDGMENT_LOW,
   STATE_GUARD_CHARS,
   createJevClient,
   estimatedCostUsd,
+  isNoJudgment,
   questionsFromRules,
+  retryAfterMs,
 } from "../src/jev.ts";
 import { HIDDEN } from "../src/scrub.ts";
 import type { JudgmentRule } from "../src/types.ts";
@@ -175,6 +179,25 @@ describe("createJevClient response parsing", () => {
     expect(result.nouls).toEqual({ a: 0 });
   });
 
+  test("a noul outside 0 to 1 is no answer at all", async () => {
+    const stub = stubFetch([
+      () =>
+        ok({
+          model: "jev-1.13.0",
+          answers: {
+            a: { type: "noul", noul: 7 },
+            b: { type: "noul", noul: -0.2 },
+            c: { type: "noul", noul: 1 },
+          },
+          usage: { input_tokens: 10, output_tokens: 0 },
+        }),
+    ]);
+    const client = createJevClient({ apiKey: fakeKey, fetch: stub.doFetch });
+
+    const result = await client.ask({ state: "A paragraph.", questions });
+    expect(result.nouls).toEqual({ c: 1 });
+  });
+
   test("a response with no answers object is a torn response, not a silent empty result", async () => {
     const stub = stubFetch([() => ok({ model: "jev-1.13.0" })]);
     const client = createJevClient({ apiKey: fakeKey, fetch: stub.doFetch, attempts: 1 });
@@ -237,6 +260,55 @@ describe("createJevClient retries", () => {
     expect((thrown as JevHttpError).status).toBe(503);
     expect(stub.calls).toHaveLength(3);
     expect(clock.waited).toEqual([1000, 2000]);
+  });
+
+  test("a Retry-After in seconds is waited instead of the ladder's guess", async () => {
+    const stub = stubFetch([
+      () => new Response("slow down", { status: 429, headers: { "retry-after": "2" } }),
+      () => ok(answered),
+    ]);
+    const clock = recordingSleep();
+    const client = createJevClient({ apiKey: fakeKey, fetch: stub.doFetch, sleep: clock.sleep });
+
+    const result = await client.ask({ state: "A paragraph.", questions });
+
+    // Two seconds because the service said two, not one because the ladder
+    // starts there.
+    expect(clock.waited).toEqual([2000]);
+    expect(result.attempts).toBe(2);
+  });
+
+  test("a Retry-After longer than the cap is capped, and a nonsense one is ignored", async () => {
+    const hour = stubFetch([
+      () => new Response("later", { status: 503, headers: { "retry-after": "3600" } }),
+      () => ok(answered),
+    ]);
+    const capped = recordingSleep();
+    await createJevClient({ apiKey: fakeKey, fetch: hour.doFetch, sleep: capped.sleep }).ask({
+      state: "A paragraph.",
+      questions,
+    });
+    expect(capped.waited).toEqual([8000]);
+
+    const nonsense = stubFetch([
+      () => new Response("later", { status: 503, headers: { "retry-after": "whenever" } }),
+      () => ok(answered),
+    ]);
+    const ladder = recordingSleep();
+    await createJevClient({ apiKey: fakeKey, fetch: nonsense.doFetch, sleep: ladder.sleep }).ask({
+      state: "A paragraph.",
+      questions,
+    });
+    expect(ladder.waited).toEqual([1000]);
+  });
+
+  test("a Retry-After given as a date is read as the wait it describes", () => {
+    const now = Date.parse("2026-09-17T10:00:00Z");
+    expect(retryAfterMs("Thu, 17 Sep 2026 10:00:03 GMT", now)).toBe(3000);
+    // A date already past is a wait of nothing, not a negative one.
+    expect(retryAfterMs("Thu, 17 Sep 2026 09:59:00 GMT", now)).toBe(0);
+    expect(retryAfterMs(null, now)).toBeUndefined();
+    expect(retryAfterMs("   ", now)).toBeUndefined();
   });
 
   test("a network failure is retried and the last one is reported", async () => {
@@ -402,6 +474,18 @@ describe("the state guard is local and never asks the service", () => {
       questions,
     });
     expect(stub.calls).toHaveLength(1);
+  });
+});
+
+describe("the no-judgment band", () => {
+  test("the middle of the range is no judgment and the ends of it are", () => {
+    expect(isNoJudgment(0.5)).toBe(true);
+    expect(isNoJudgment(NO_JUDGMENT_LOW)).toBe(true);
+    expect(isNoJudgment(NO_JUDGMENT_HIGH)).toBe(true);
+    expect(isNoJudgment(0.39)).toBe(false);
+    expect(isNoJudgment(0.61)).toBe(false);
+    expect(isNoJudgment(0)).toBe(false);
+    expect(isNoJudgment(1)).toBe(false);
   });
 });
 

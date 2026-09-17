@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { ConfigError, PROJECT_RULES_FILE, resolveRuleset } from "../src/config.ts";
+import { ConfigError, PROJECT_RULES_FILE, resolveRuleset, selectRules } from "../src/config.ts";
 import type { BuiltinRule } from "../src/types.ts";
 
 const temporary: string[] = [];
@@ -220,5 +220,72 @@ describe("resolveRuleset failures", () => {
     const dir = sandbox();
     write(dir, "bad.yaml", "version: 1\nrules:\n\t- id: a\n");
     expect(() => resolveRuleset({ cwd: dir, rulesPath: "bad.yaml" })).toThrow(/bad\.yaml:3/);
+  });
+});
+
+describe("which rules a run uses, once tags are read", () => {
+  const tagged = parseTagged();
+
+  function parseTagged(): ReturnType<typeof resolveRuleset>["ruleset"] {
+    const dir = sandbox();
+    write(
+      dir,
+      "tagged.yaml",
+      [
+        "version: 1",
+        "off_by_default: [marketing]",
+        "rules:",
+        "  - id: dash_present",
+        "    kind: regex",
+        "    builtin: dash_present",
+        '    message: "A long dash."',
+        "  - id: first_x_that",
+        "    kind: regex",
+        "    builtin: dash_present",
+        "    tags: [marketing]",
+        '    message: "The first X that."',
+        "",
+      ].join("\n"),
+    );
+    return resolveRuleset({ cwd: dir, rulesPath: "tagged.yaml" }).ruleset;
+  }
+
+  function ids(ruleset: Parameters<typeof selectRules>[0], selection?: Parameters<typeof selectRules>[1]): string[] {
+    return selectRules(ruleset, selection).ruleset.rules.map((rule) => rule.id);
+  }
+
+  test("a tag the ruleset sits out does not run, and says which tag kept it out", () => {
+    const selected = selectRules(tagged);
+    expect(selected.ruleset.rules.map((rule) => rule.id)).toEqual(["dash_present"]);
+    expect(selected.dropped).toEqual([
+      { rule: "first_x_that", reason: 'the tag "marketing" is off by default' },
+    ]);
+  });
+
+  test("--only marketing asks for the tag by name, which is how it is switched on", () => {
+    expect(ids(tagged, { only: ["marketing"] })).toEqual(["first_x_that"]);
+  });
+
+  test("--skip takes a tag out even when nothing sits out by default", () => {
+    const everything = { ...tagged, off_by_default: [] };
+    expect(ids(everything)).toEqual(["dash_present", "first_x_that"]);
+    expect(ids(everything, { skip: ["marketing"] })).toEqual(["dash_present"]);
+  });
+
+  test("--skip wins over --only when a tag is named in both", () => {
+    expect(ids(tagged, { only: ["marketing"], skip: ["marketing"] })).toEqual([]);
+  });
+
+  test("a child ruleset writing off_by_default: [] turns the tag back on", () => {
+    const dir = sandbox();
+    write(
+      dir,
+      "base.yaml",
+      "version: 1\noff_by_default: [marketing]\nrules:\n  - id: a\n    kind: regex\n    builtin: dash_present\n    tags: [marketing]\n    message: \"m\"\n",
+    );
+    write(dir, "child.yaml", "version: 1\nextends: base.yaml\noff_by_default: []\nrules: []\n");
+
+    const child = resolveRuleset({ cwd: dir, rulesPath: "child.yaml" }).ruleset;
+    expect(selectRules(child).ruleset.rules.map((rule) => rule.id)).toEqual(["a"]);
   });
 });

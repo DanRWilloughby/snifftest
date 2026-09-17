@@ -132,7 +132,8 @@ describe("the executable, reached through the link a package manager writes", ()
     // The other half of the claim, and the reason the defect stayed invisible:
     // on clean prose a live run prints nothing and exits 0, which is exactly
     // what a dead executable does. `--format json` is the spelling that tells
-    // the two apart, because a run that happened writes an empty list.
+    // the two apart, because a run that happened writes a report object with
+    // an empty flag list and a word about what the judgment arm did.
     const { bin, dir } = await installed();
     writeFileSync(
       join(dir, "draft.md"),
@@ -143,7 +144,14 @@ describe("the executable, reached through the link a package manager writes", ()
     const result = run(bin, ["check", "--dry-run", "--format", "json", "--", "draft.md"], dir);
 
     expect(result.code).toBe(0);
-    expect(JSON.parse(result.out)).toEqual([]);
+    const report = JSON.parse(result.out) as {
+      tool: string;
+      flags: readonly unknown[];
+      judgment: { state: string };
+    };
+    expect(report.tool).toBe("snifftest check");
+    expect(report.flags).toEqual([]);
+    expect(report.judgment.state).toBe("not run");
   });
 
   test("the run happens once, not once per entry point", async () => {
