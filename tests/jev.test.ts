@@ -15,6 +15,7 @@ import {
   estimatedCostUsd,
   isNoJudgment,
   questionsFromRules,
+  retryAfterMs,
 } from "../src/jev.ts";
 import { HIDDEN } from "../src/scrub.ts";
 import type { JudgmentRule } from "../src/types.ts";
@@ -259,6 +260,55 @@ describe("createJevClient retries", () => {
     expect((thrown as JevHttpError).status).toBe(503);
     expect(stub.calls).toHaveLength(3);
     expect(clock.waited).toEqual([1000, 2000]);
+  });
+
+  test("a Retry-After in seconds is waited instead of the ladder's guess", async () => {
+    const stub = stubFetch([
+      () => new Response("slow down", { status: 429, headers: { "retry-after": "2" } }),
+      () => ok(answered),
+    ]);
+    const clock = recordingSleep();
+    const client = createJevClient({ apiKey: fakeKey, fetch: stub.doFetch, sleep: clock.sleep });
+
+    const result = await client.ask({ state: "A paragraph.", questions });
+
+    // Two seconds because the service said two, not one because the ladder
+    // starts there.
+    expect(clock.waited).toEqual([2000]);
+    expect(result.attempts).toBe(2);
+  });
+
+  test("a Retry-After longer than the cap is capped, and a nonsense one is ignored", async () => {
+    const hour = stubFetch([
+      () => new Response("later", { status: 503, headers: { "retry-after": "3600" } }),
+      () => ok(answered),
+    ]);
+    const capped = recordingSleep();
+    await createJevClient({ apiKey: fakeKey, fetch: hour.doFetch, sleep: capped.sleep }).ask({
+      state: "A paragraph.",
+      questions,
+    });
+    expect(capped.waited).toEqual([8000]);
+
+    const nonsense = stubFetch([
+      () => new Response("later", { status: 503, headers: { "retry-after": "whenever" } }),
+      () => ok(answered),
+    ]);
+    const ladder = recordingSleep();
+    await createJevClient({ apiKey: fakeKey, fetch: nonsense.doFetch, sleep: ladder.sleep }).ask({
+      state: "A paragraph.",
+      questions,
+    });
+    expect(ladder.waited).toEqual([1000]);
+  });
+
+  test("a Retry-After given as a date is read as the wait it describes", () => {
+    const now = Date.parse("2026-09-17T10:00:00Z");
+    expect(retryAfterMs("Thu, 17 Sep 2026 10:00:03 GMT", now)).toBe(3000);
+    // A date already past is a wait of nothing, not a negative one.
+    expect(retryAfterMs("Thu, 17 Sep 2026 09:59:00 GMT", now)).toBe(0);
+    expect(retryAfterMs(null, now)).toBeUndefined();
+    expect(retryAfterMs("   ", now)).toBeUndefined();
   });
 
   test("a network failure is retried and the last one is reported", async () => {

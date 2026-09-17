@@ -34,6 +34,14 @@
  * bad key retried four times is four times the wait and the same answer. The
  * ladder is carried over from the measurement harness this was spiked with,
  * which is where the numbers came from.
+ *
+ * When the service says how long to wait, its number is used instead of the
+ * doubling one, capped, because a `Retry-After` of two seconds is a fact and the
+ * ladder's four is a guess. The cap is there because the header is a number
+ * somebody else controls, and a run must not be parked for an hour by it. A
+ * header that says longer than the cap is treated as a failure worth reporting
+ * rather than a wait worth taking: the ladder tries once more at the cap and
+ * then gives the paragraph up, which is the caller's business to report.
  */
 
 import { scrubSecrets } from "./scrub.ts";
@@ -103,6 +111,12 @@ export const PRICE_BASIS = {
 const DEFAULT_TIMEOUT_MS = 10_000;
 const DEFAULT_ATTEMPTS = 4;
 const BACKOFF_BASE_MS = 1000;
+
+/**
+ * The longest wait a `Retry-After` header can buy. Past this the service is
+ * asking for more time than a check of somebody's prose is worth holding for.
+ */
+const MAX_RETRY_AFTER_MS = 8000;
 
 /** Enough of a failure body to say why, short enough to sit in a log line. */
 const MAX_BODY_CHARS = 200;
@@ -205,6 +219,8 @@ export class JevHttpError extends JevError {
   constructor(
     readonly status: number,
     message: string,
+    /** What `Retry-After` asked for, in ms, when the service sent one. */
+    readonly retryAfterMs?: number,
   ) {
     super(message);
   }
@@ -270,7 +286,7 @@ export function createJevClient(options: JevClientOptions = {}): JevClient {
         } catch (error) {
           last = error;
           if (!isRetryable(error) || attempt === attempts) break;
-          await sleep(BACKOFF_BASE_MS * 2 ** (attempt - 1));
+          await sleep(waitFor(error, attempt));
         }
       }
 
@@ -334,11 +350,13 @@ async function post(
 
     if (!response.ok) {
       const detail = await response.text().catch(() => "");
+      const asked = retryAfterMs(response.headers.get("retry-after"));
       throw new JevHttpError(
         response.status,
         `jev returned ${response.status}${
           detail.trim() === "" ? "" : `: ${detail.trim().slice(0, MAX_BODY_CHARS)}`
         }`,
+        asked,
       );
     }
 
@@ -393,18 +411,65 @@ function readAnswer(parsed: unknown): Answer {
   };
 }
 
-function isRetryable(error: unknown): boolean {
+/**
+ * How long to wait before the next attempt: what the service asked for if it
+ * asked, and the doubling ladder if it did not.
+ */
+function waitFor(error: unknown, attempt: number): number {
+  const ladder = BACKOFF_BASE_MS * 2 ** (attempt - 1);
+  if (!(error instanceof JevHttpError)) return ladder;
+  const asked = error.retryAfterMs;
+  if (asked === undefined) return ladder;
+  return Math.min(Math.max(asked, 0), MAX_RETRY_AFTER_MS);
+}
+
+/**
+ * `Retry-After`, which is either a number of seconds or an HTTP date, and is
+ * written by somebody else, so every shape that is not a time in the future
+ * comes back undefined rather than as a wait of zero or NaN.
+ */
+export function retryAfterMs(header: string | null, now: number = Date.now()): number | undefined {
+  if (header === null) return undefined;
+  const text = header.trim();
+  if (text === "") return undefined;
+
+  if (/^\d+$/.test(text)) {
+    const seconds = Number(text);
+    return Number.isFinite(seconds) ? seconds * 1000 : undefined;
+  }
+
+  const at = Date.parse(text);
+  if (Number.isNaN(at)) return undefined;
+  const wait = at - now;
+  return wait > 0 ? wait : 0;
+}
+
+/**
+ * Whether a failure is the kind that a later request might not meet.
+ *
+ * A 429 or a 5xx or a dropped socket is about this minute. A 401, a 403 or a
+ * 422 is about the request, and the next paragraph will be told the same thing
+ * in the same words. Callers running a long loop need that difference: one is
+ * worth carrying on through, the other is worth stopping on at once.
+ */
+export function isTransientFailure(error: unknown): boolean {
   if (error instanceof JevStateRefusedError || error instanceof JevMissingKeyError) return false;
   if (error instanceof JevHttpError) return RETRYABLE_STATUSES.has(error.status);
   // A torn response, a timeout, a dropped socket: all worth one more try.
   return true;
 }
 
+function isRetryable(error: unknown): boolean {
+  return isTransientFailure(error);
+}
+
 /** The last error, with any trace of the key taken out of its message. */
 function scrubbed(error: unknown, key: string): Error {
   const message = scrubSecrets(messageOf(error), [key]);
 
-  if (error instanceof JevHttpError) return new JevHttpError(error.status, message);
+  if (error instanceof JevHttpError) {
+    return new JevHttpError(error.status, message, error.retryAfterMs);
+  }
   if (error instanceof JevError) {
     const rebuilt = new JevRequestError(message);
     rebuilt.name = error.name;

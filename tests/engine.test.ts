@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { readFileSync, readdirSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { type AnswerCache, openCache } from "../src/cache.ts";
 
 import {
   chunkDocument,
@@ -11,7 +14,7 @@ import {
   runJudgmentArm,
   runRegexArm,
 } from "../src/engine.ts";
-import type { JevClient, JevRequest, JevResult } from "../src/jev.ts";
+import { JevHttpError, type JevClient, type JevRequest, type JevResult } from "../src/jev.ts";
 import { parseRuleset } from "../src/rules.ts";
 import type { Flag } from "../src/types.ts";
 
@@ -757,4 +760,236 @@ rules:
       },
     };
   }
+});
+
+describe("the judgment arm when the service falters", () => {
+  const rules = mixedRules;
+  const draft = [
+    "The first paragraph is ordinary prose and says its thing plainly.",
+    "",
+    "The second paragraph is also ordinary and also says its thing.",
+    "",
+    "The third paragraph carries on in the same voice as the others.",
+    "",
+    "The fourth paragraph says a little more and then stops there.",
+    "",
+    "The fifth paragraph closes the draft without any flourish at all.",
+    "",
+  ].join("\n");
+
+  /** A gateway that answers, or fails, according to a script of one entry per call. */
+  function scripted(script: readonly (number | Error)[]): { client: JevClient; calls: () => number } {
+    let call = 0;
+    return {
+      calls: () => call,
+      client: {
+        async ask(): Promise<JevResult> {
+          const step = script[call] ?? script[script.length - 1];
+          call += 1;
+          if (step instanceof Error) throw step;
+          return {
+            model: "jev-test",
+            nouls: { restating_closer: step ?? 0 },
+            inputTokens: 50,
+            outputTokens: 0,
+            estimatedCostUsd: 50 * 0.042e-6,
+            usageReported: true,
+            latencyMs: 7,
+            attempts: 1,
+          };
+        },
+      },
+    };
+  }
+
+  test("a 503 on one request keeps every answer received before it", async () => {
+    const chunks = chunkDocument(draft, "d.md");
+    const down = new JevHttpError(503, "jev returned 503: model_unavailable");
+    const { client, calls } = scripted([0.9, 0.2, down, 0.3, 0.25]);
+
+    const result = await runJudgmentArm(chunks, rules, client);
+
+    // The one that failed is named and counted; the two before it are still
+    // readings, and the arm carried on to the two after it.
+    expect(calls()).toBe(5);
+    expect(result.readings).toHaveLength(4);
+    expect(result.tally.answered).toBe(4);
+    expect(result.tally.unanswered).toBe(1);
+    expect(result.tally.asked).toBe(5);
+    expect(result.skipped).toHaveLength(1);
+    expect(result.skipped[0]?.reason).toContain("503");
+    expect(result.stopped).toBeUndefined();
+  });
+
+  test("three failures in a row stop the arm, and what was answered is kept", async () => {
+    const chunks = chunkDocument(draft, "d.md");
+    const down = new JevHttpError(503, "jev returned 503: model_unavailable");
+    const { client, calls } = scripted([0.9, down, down, down, 0.4]);
+
+    const result = await runJudgmentArm(chunks, rules, client);
+
+    // Four calls, not five: the fourth paragraph opened the breaker and the
+    // fifth was never sent.
+    expect(calls()).toBe(4);
+    expect(result.readings).toHaveLength(1);
+    expect(result.stopped?.after).toBe(3);
+    expect(result.stopped?.notSent).toBe(1);
+    expect(result.stopped?.reason).toContain("503");
+    expect(result.tally.asked).toBe(5);
+    expect(result.tally.answered).toBe(1);
+    expect(result.tally.unanswered).toBe(4);
+  });
+
+  test("an answer between two failures resets the count, so the arm carries on", async () => {
+    const chunks = chunkDocument(draft, "d.md");
+    const down = new JevHttpError(503, "jev returned 503: model_unavailable");
+    const { client, calls } = scripted([down, down, 0.8, down, down]);
+
+    const result = await runJudgmentArm(chunks, rules, client);
+
+    expect(calls()).toBe(5);
+    expect(result.stopped).toBeUndefined();
+    expect(result.tally.answered).toBe(1);
+  });
+
+  test("a bad key stops the arm at once, because the next paragraph gets the same answer", async () => {
+    const chunks = chunkDocument(draft, "d.md");
+    const { client, calls } = scripted([new JevHttpError(401, "jev returned 401: bad key")]);
+
+    const result = await runJudgmentArm(chunks, rules, client);
+
+    expect(calls()).toBe(1);
+    expect(result.stopped?.after).toBe(1);
+    expect(result.stopped?.notSent).toBe(4);
+    expect(result.tally.asked).toBe(5);
+    expect(result.tally.unanswered).toBe(5);
+  });
+});
+
+describe("the judgment arm with answers already paid for", () => {
+  const draft = [
+    "The first paragraph is ordinary prose and says its thing plainly.",
+    "",
+    "The second paragraph is also ordinary and also says its thing.",
+    "",
+    "The third paragraph closes the draft without any flourish at all.",
+    "",
+  ].join("\n");
+
+  function counting(nouls: Readonly<Record<string, number>>): { client: JevClient; calls: () => number } {
+    let call = 0;
+    return {
+      calls: () => call,
+      client: {
+        async ask(): Promise<JevResult> {
+          call += 1;
+          return {
+            model: "jev-test",
+            nouls,
+            inputTokens: 50,
+            outputTokens: 0,
+            estimatedCostUsd: 50 * 0.042e-6,
+            usageReported: true,
+            latencyMs: 7,
+            attempts: 1,
+          };
+        },
+      },
+    };
+  }
+
+  test("a second run over the same draft asks for nothing and reads the same", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-cache-"));
+    try {
+      const cache = openCache({ env: { SNIFFTEST_CACHE_DIR: dir } });
+      expect(cache).toBeDefined();
+      const chunks = chunkDocument(draft, "d.md");
+
+      const first = counting({ restating_closer: 0.81 });
+      const one = await runJudgmentArm(chunks, mixedRules, first.client, { cache: cache as AnswerCache });
+
+      // A gateway that must never be reached, so a hit is the only way through.
+      const second = counting({ restating_closer: 0.11 });
+      const two = await runJudgmentArm(chunks, mixedRules, second.client, { cache: cache as AnswerCache });
+
+      expect(first.calls()).toBe(3);
+      expect(second.calls()).toBe(0);
+      expect(two.readings.map((row) => row.probability)).toEqual(
+        one.readings.map((row) => row.probability),
+      );
+      expect(two.usage.requests).toBe(0);
+      expect(two.usage.cached).toBe(3);
+      expect(two.usage.estimatedCostUsd).toBe(0);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("after an outage the rerun pays only for the paragraphs that were never answered", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-cache-"));
+    try {
+      const cache = openCache({ env: { SNIFFTEST_CACHE_DIR: dir } });
+      const chunks = chunkDocument(draft, "d.md");
+      const down = new JevHttpError(503, "jev returned 503: model_unavailable");
+
+      let call = 0;
+      const flaky: JevClient = {
+        async ask(): Promise<JevResult> {
+          call += 1;
+          // The first paragraph is answered and paid for; the service falls
+          // over before the other two, which is the run from the field.
+          if (call > 1) throw down;
+          return {
+            model: "jev-test",
+            nouls: { restating_closer: 0.77 },
+            inputTokens: 50,
+            outputTokens: 0,
+            estimatedCostUsd: 50 * 0.042e-6,
+            usageReported: true,
+            latencyMs: 7,
+            attempts: 1,
+          };
+        },
+      };
+
+      const outage = await runJudgmentArm(chunks, mixedRules, flaky, { cache: cache as AnswerCache });
+      expect(outage.readings).toHaveLength(1);
+
+      const back = counting({ restating_closer: 0.12 });
+      const rerun = await runJudgmentArm(chunks, mixedRules, back.client, { cache: cache as AnswerCache });
+
+      // Two requests, not three: the paragraph answered before the outage is
+      // read off the disk.
+      expect(back.calls()).toBe(2);
+      expect(rerun.usage.cached).toBe(1);
+      expect(rerun.tally.answered).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  test("a rule reworded is a different question, so the old answer is never used", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "snifftest-cache-"));
+    try {
+      const cache = openCache({ env: { SNIFFTEST_CACHE_DIR: dir } });
+      const chunks = chunkDocument(draft, "d.md");
+
+      const first = counting({ restating_closer: 0.81 });
+      await runJudgmentArm(chunks, mixedRules, first.client, { cache: cache as AnswerCache });
+
+      const reworded = parseRuleset(
+        readFileSync(join(here, "fixtures", "rules", "mixed.yaml"), "utf8").replace(
+          "The closing sentence only restates what the paragraph already said.",
+          "The closing sentence repeats the paragraph and adds nothing to it.",
+        ),
+        "rules/mixed.yaml",
+      );
+      const second = counting({ restating_closer: 0.11 });
+      await runJudgmentArm(chunks, reworded, second.client, { cache: cache as AnswerCache });
+
+      expect(second.calls()).toBe(3);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });
