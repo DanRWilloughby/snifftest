@@ -263,7 +263,26 @@ describe("which rules a run uses, once tags are read", () => {
   });
 
   test("--only marketing asks for the tag by name, which is how it is switched on", () => {
-    expect(ids(tagged, { only: ["marketing"] })).toEqual(["first_x_that"]);
+    // The countable rules stay: they send nothing and cost nothing, so a
+    // narrowing meant to cut what a model is asked about has no reason to
+    // stop them catching an em dash.
+    expect(ids(tagged, { only: ["marketing"] })).toEqual(["dash_present", "first_x_that"]);
+  });
+
+  test("a tag no rule carries is a usage error naming the tags that exist", () => {
+    expect(() => selectRules(tagged, { only: ["marketting"] })).toThrow(/no rule carries the tag/);
+    expect(() => selectRules(tagged, { only: ["marketting"] })).toThrow(/marketing/);
+    expect(() => selectRules(tagged, { skip: ["housse"] })).toThrow(/no rule carries the tag/);
+  });
+
+  test("a countable rule still goes out under --only when --skip names its tag", () => {
+    // `first_x_that` is a countable rule carrying the tag. `--only` would keep
+    // it for being countable; `--skip` names it and takes it out anyway.
+    const everything = { ...tagged, off_by_default: [] };
+    expect(ids(everything, { only: ["marketing"] })).toContain("first_x_that");
+    expect(ids(everything, { only: ["marketing"], skip: ["marketing"] })).not.toContain(
+      "first_x_that",
+    );
   });
 
   test("--skip takes a tag out even when nothing sits out by default", () => {
@@ -273,7 +292,9 @@ describe("which rules a run uses, once tags are read", () => {
   });
 
   test("--skip wins over --only when a tag is named in both", () => {
-    expect(ids(tagged, { only: ["marketing"], skip: ["marketing"] })).toEqual([]);
+    // `dash_present` carries no tag at all, so nothing names it either way and
+    // it keeps running; the rule both flags name goes out.
+    expect(ids(tagged, { only: ["marketing"], skip: ["marketing"] })).toEqual(["dash_present"]);
   });
 
   test("a child ruleset writing off_by_default: [] turns the tag back on", () => {

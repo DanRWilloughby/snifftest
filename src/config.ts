@@ -27,7 +27,7 @@ import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { validateRuleset } from "./rules.ts";
-import type { Rule, Ruleset } from "./types.ts";
+import { type Rule, type Ruleset, isRegexRule } from "./types.ts";
 import { type YamlValue, parseYaml } from "./yaml.ts";
 
 /** The file a project keeps its own rules in. */
@@ -127,6 +127,21 @@ export interface SelectedRules {
 }
 
 /**
+ * Every tag any rule in the file carries, in the order a reader would meet them.
+ *
+ * A tag nobody carries is a typo, and a typo that silently selects nothing is
+ * the worst of the two failures: `--only marketting` would run no rules at all
+ * and exit 0, which reads exactly like a clean draft.
+ */
+export function knownTags(ruleset: Ruleset): string[] {
+  const out: string[] = [];
+  for (const rule of ruleset.rules) {
+    for (const tag of rule.tags ?? []) if (!out.includes(tag)) out.push(tag);
+  }
+  return out.sort();
+}
+
+/**
  * The rules a run actually uses, after its tags are read.
  *
  * `--only` names what a run wants and nothing else, which is also how a tag
@@ -134,10 +149,32 @@ export interface SelectedRules {
  * `--only`, everything runs except the tags the ruleset sits out and the tags
  * `--skip` names. A ruleset that wants all of its own rules back writes
  * `off_by_default: []` in a file that extends this one.
+ *
+ * Two things `--only` deliberately does not do. It does not sit the countable
+ * rules out: they are regular expressions, they cost nothing, they send
+ * nothing, and a narrowing meant to cut what a model is asked about should not
+ * quietly stop catching an em dash. `--skip` still sits them out, because that
+ * one names a thing to stop doing. And a tag no rule carries is refused rather
+ * than obeyed, because obeying it means running nothing and saying nothing.
  */
 export function selectRules(ruleset: Ruleset, selection: TagSelection = {}): SelectedRules {
   const only = selection.only ?? [];
   const skip = selection.skip ?? [];
+  const known = knownTags(ruleset);
+  for (const [name, tags] of [
+    ["--only", only],
+    ["--skip", skip],
+  ] as const) {
+    for (const tag of tags) {
+      if (known.includes(tag)) continue;
+      throw new ConfigError(
+        `no rule carries the tag "${tag}", so ${name} ${tag} would select nothing. ` +
+          (known.length === 0
+            ? "This ruleset carries no tags at all."
+            : `The tags in this ruleset are: ${known.join(", ")}.`),
+      );
+    }
+  }
   const off = only.length > 0 ? [] : (ruleset.off_by_default ?? []);
   const dropped: { rule: string; reason: string }[] = [];
 
@@ -148,7 +185,7 @@ export function selectRules(ruleset: Ruleset, selection: TagSelection = {}): Sel
       dropped.push({ rule: rule.id, reason: `--skip ${skipped}` });
       return false;
     }
-    if (only.length > 0 && !tags.some((tag) => only.includes(tag))) {
+    if (only.length > 0 && !isRegexRule(rule) && !tags.some((tag) => only.includes(tag))) {
       dropped.push({ rule: rule.id, reason: `--only ${only.join(",")}` });
       return false;
     }

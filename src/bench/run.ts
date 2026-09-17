@@ -53,8 +53,9 @@
  */
 
 import { classifyChunk, runRegexArm } from "../engine.ts";
-import type { ArmObservation, ArmScore, Cell, JudgedDocument } from "../eval/score.ts";
+import type { ArmObservation, ArmScore, Cell, JudgedDocument, ScoreFacts } from "../eval/score.ts";
 import { scoreArm, thresholdsWith } from "../eval/score.ts";
+import { factsFor } from "../eval/run.ts";
 import { type Chunk, type Ruleset, isJudgmentRule, isRegexRule } from "../types.ts";
 import type { ModelAdapter, ModelCall, ModelReply } from "./adapter.ts";
 import type { Provider, ReasoningSetting, ResolvedModel } from "./panel.ts";
@@ -103,7 +104,12 @@ export interface RequestSettings {
 /** One repeat's headline numbers, so agreement across repeats can be printed. */
 export interface BenchRepeatScore {
   readonly repeat: number;
+  /** Pooled over every rule, including the countable cells nothing was asked about. */
   readonly recall: number | null;
+  /** The judgment rules alone, which is the only part of the row a model decided. */
+  readonly judgmentRecall: number | null;
+  readonly judgmentHits: number;
+  readonly judgmentPositives: number;
   readonly fpCleanParagraphs: number;
   readonly cleanParagraphs: number;
 }
@@ -120,6 +126,10 @@ export interface BenchSpread {
   readonly meanRecall: number | null;
   readonly minRecall: number | null;
   readonly maxRecall: number | null;
+  /** The same three figures over the judgment rules alone. */
+  readonly meanJudgmentRecall: number | null;
+  readonly minJudgmentRecall: number | null;
+  readonly maxJudgmentRecall: number | null;
   readonly perRepeat: readonly BenchRepeatScore[];
 }
 
@@ -319,6 +329,7 @@ export async function runBench(options: RunBenchOptions): Promise<BenchOutcome> 
       thresholds,
       threshold: options.threshold,
       documents: options.documents.length,
+      facts: factsFor(ruleset),
     }),
   );
 
@@ -603,6 +614,15 @@ interface SummaryContext {
   /** The shipped operating point, the one the headline and the spread read. */
   readonly threshold: number;
   readonly documents: number;
+  /**
+   * Which rules a model decided and which the regular expressions decided.
+   *
+   * Without it every row in the table carries the countable cells the seeder
+   * guaranteed, and a model that answered nothing still scores whatever
+   * fraction of the corpus the patterns catch. The scorer splits the classes
+   * apart only when it is told which is which.
+   */
+  readonly facts: ScoreFacts;
 }
 
 function summarise(
@@ -639,7 +659,16 @@ function summarise(
     },
     score: null,
     scoreVerbalised: null,
-    spread: { repeats: 0, meanRecall: null, minRecall: null, maxRecall: null, perRepeat: [] },
+    spread: {
+      repeats: 0,
+      meanRecall: null,
+      minRecall: null,
+      maxRecall: null,
+      meanJudgmentRecall: null,
+      minJudgmentRecall: null,
+      maxJudgmentRecall: null,
+      perRepeat: [],
+    },
     failureDetail: [],
   };
 
@@ -661,16 +690,23 @@ function summarise(
       armOf(model, held.judged, held.flagCells),
       context.classes,
       context.thresholds,
+      context.facts,
     ).overall[at];
     perRepeat.push({
       repeat,
       recall: scored?.recall ?? null,
+      judgmentRecall: scored?.judgment?.recall ?? null,
+      judgmentHits: scored?.judgment?.hits ?? 0,
+      judgmentPositives: scored?.judgment?.positives ?? 0,
       fpCleanParagraphs: scored?.fp_clean_paragraphs ?? 0,
       cleanParagraphs: scored?.clean_paragraphs ?? 0,
     });
   }
   const recalls = perRepeat
     .map((row) => row.recall)
+    .filter((value): value is number => value !== null);
+  const judgmentRecalls = perRepeat
+    .map((row) => row.judgmentRecall)
     .filter((value): value is number => value !== null);
 
   const usdPerCall =
@@ -709,6 +745,7 @@ function summarise(
             armOf(model, firstObservation.judged, firstObservation.flagCells),
             context.classes,
             context.thresholds,
+            context.facts,
           ),
     scoreVerbalised:
       firstObservation === undefined || firstObservation.judged.length === 0
@@ -717,12 +754,19 @@ function summarise(
             armOf(model, firstObservation.judged, firstObservation.verbalisedCells),
             context.classes,
             context.thresholds,
+            context.facts,
           ),
     spread: {
       repeats: perRepeat.length,
       meanRecall: recalls.length === 0 ? null : recalls.reduce((a, b) => a + b, 0) / recalls.length,
       minRecall: recalls.length === 0 ? null : Math.min(...recalls),
       maxRecall: recalls.length === 0 ? null : Math.max(...recalls),
+      meanJudgmentRecall:
+        judgmentRecalls.length === 0
+          ? null
+          : judgmentRecalls.reduce((a, b) => a + b, 0) / judgmentRecalls.length,
+      minJudgmentRecall: judgmentRecalls.length === 0 ? null : Math.min(...judgmentRecalls),
+      maxJudgmentRecall: judgmentRecalls.length === 0 ? null : Math.max(...judgmentRecalls),
       perRepeat,
     },
     failureDetail: state.failureDetail,

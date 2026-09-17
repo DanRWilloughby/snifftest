@@ -37,7 +37,10 @@ import type { BenchModelResult, BenchOutcome, BenchSpread } from "./run.ts";
 export interface JoinedArm {
   readonly arm: string;
   readonly label: string;
+  /** Pooled over every rule, countable ones included. */
   readonly recall: number | null;
+  /** The judgment rules alone, which is the comparable half. */
+  readonly judgmentRecall?: number | null;
   readonly fpPerCleanCell: number | null;
   readonly fpCleanParagraphs?: number | null;
   readonly cleanParagraphs?: number | null;
@@ -247,14 +250,15 @@ export function renderBenchMarkdown(report: BenchReport): string {
   // The served model rides in the headline rather than only in the run table
   // below: a row of numbers read on its own has to say which model produced it.
   lines.push(
-    `| Model | Tier | Model served | Recall, own flag | Spread over repeats | Recall, p >= ${at} | ` +
-      `Median ms | $ per 100 paragraphs |`,
+    `| Model | Tier | Model served | Judgment recall, own flag | Pooled recall, own flag | ` +
+      `Spread over repeats | Judgment recall, p >= ${at} | Median ms | $ per 100 paragraphs |`,
   );
-  lines.push("|---|---|---|---|---|---|---|---|");
+  lines.push("|---|---|---|---|---|---|---|---|---|");
 
   for (const arm of report.joined) {
     lines.push(
-      `| ${arm.label} | eval arm | ${arm.servedModel ?? "-"} | - | - | ${num(arm.recall)} | ` +
+      `| ${arm.label} | eval arm | ${arm.servedModel ?? "-"} | - | - | - | ` +
+        `${num(arm.judgmentRecall ?? null)} (pooled ${num(arm.recall)}) | ` +
         `${Math.round(arm.medianMs)} (eval run) | ${money(arm.usdPer100Paragraphs)} |`,
     );
   }
@@ -262,22 +266,31 @@ export function renderBenchMarkdown(report: BenchReport): string {
   for (const model of report.models) {
     if (!model.available) {
       lines.push(
-        `| ${model.label} | ${model.tier} | ${model.note ?? "not available"} | - | - | - | - | - |`,
+        `| ${model.label} | ${model.tier} | ${model.note ?? "not available"} | - | - | - | - | - | - |`,
       );
       continue;
     }
     lines.push(
       `| ${model.label} | ${model.tier} | ${model.served_model ?? model.slug ?? "-"} | ` +
+        `${num(model.accuracy?.overall[at]?.judgment?.recall ?? null)} | ` +
         `${num(model.accuracy?.overall[at]?.recall)} | ${spreadWords(model.spread)} | ` +
-        `${num(model.accuracy_verbalised?.overall[at]?.recall)} | ` +
+        `${num(model.accuracy_verbalised?.overall[at]?.judgment?.recall ?? null)} | ` +
         `${Math.round(model.latency.median_ms)} | ${money(model.cost.usd_per_100_paragraphs)} |`,
     );
   }
   lines.push("");
 
   lines.push(
+    "The judgment columns cover the rules a model actually decided. The pooled column adds the " +
+      "countable rules, which are regular expressions every row gets right for free and which " +
+      "the seeder guaranteed, so it puts the same floor under every row and reads higher than " +
+      "anything the model did. Read the judgment column; the pooled one is there to be checked " +
+      "against, not quoted.",
+  );
+  lines.push("");
+  lines.push(
     "Each model was asked for a boolean and a probability. The first recall column is the " +
-      "boolean, which is the decision the model made. The second applies this tool's own " +
+      "boolean, which is the decision the model made. The last applies this tool's own " +
       `operating point of ${at} to the probability it wrote, which a general model was never ` +
       "asked to calibrate, so read that column as a comparison of one number against another " +
       "tool's line and no more than that.",
@@ -482,8 +495,16 @@ function num(value: number | null | undefined): string {
 /** How far a row moved between repeats, or why there is no spread to print. */
 function spreadWords(spread: BenchSpread): string {
   if (spread.repeats <= 1) return "one repeat";
-  if (spread.minRecall === null || spread.maxRecall === null) return "n/a";
-  return `${num(spread.minRecall)} to ${num(spread.maxRecall)} over ${spread.repeats}`;
+  const low = spread.minJudgmentRecall;
+  const high = spread.maxJudgmentRecall;
+  if (low === null || high === null) {
+    if (spread.minRecall === null || spread.maxRecall === null) return "n/a";
+    return `pooled ${num(spread.minRecall)} to ${num(spread.maxRecall)} over ${spread.repeats}`;
+  }
+  // The spread is the judgment half for the same reason the headline is: the
+  // countable cells do not move between repeats, so pooling them shrinks every
+  // range towards agreement the models never showed.
+  return `${num(low)} to ${num(high)} over ${spread.repeats}`;
 }
 
 /** Every false-alarm denominator the scorer computed, each with its own k of n. */

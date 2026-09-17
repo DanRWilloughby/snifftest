@@ -32,6 +32,48 @@ the reason. A line is reopened by new evidence, not by asking again.
   out. A measurement that quietly skipped half the ruleset would report a
   recall figure for a ruleset nobody runs.
 
+- **`--only` narrows what gets asked, not what gets checked.** The countable
+  rules are regular expressions: they send nothing, they cost nothing, and a
+  narrowing meant to limit what a model is asked about has no reason to stop
+  them catching an em dash. They keep running under `--only` and go out only
+  when `--skip` names their tag. A tag no rule in the file carries is a usage
+  error that lists the tags that exist, because obeying it would mean running
+  nothing and exiting 0, which reads exactly like a clean draft.
+
+- **The judgment arm is never asked about structure.** A heading, a table,
+  front matter, a link definition and an HTML comment go through the same
+  filter `check` uses and are scored by the countable rules alone. An eval that
+  asked about them would pay a paragraph's price for a question nobody asked
+  and measure a product nobody ships. The count of blocks held back is printed
+  under the headline table.
+
+- **The eval carries the same breaker `check` has.** A local refusal is that
+  paragraph's business and the run carries on. A 429, a 5xx or a dropped socket
+  is a bad minute, and three in a row with no answer between them opens the
+  breaker. A rejected key or a malformed request stops the arm on the first
+  one. A run that got no usable answer to anything exits 2 with a plain line
+  rather than printing a recall of zero, which would read as rules that never
+  fire rather than a service that never answered.
+
+- **The near misses are written out and travel to the bench.** They sit in
+  `inputs/negatives.json` beside the clean and seeded paragraphs, and
+  `bench --eval <dir>` reads them as clean documents. They are the hardest
+  clean paragraphs in the corpus, so a bench that left them out would measure
+  every row on the easy half of the false-alarm question. A bench given paths
+  rather than an eval directory seeds from the same bank for the same reason.
+
+- **The bench headline reports judgment-only recall beside the pooled
+  figure.** The pooled column adds the countable cells, which every row gets
+  right for free and which the seeder guaranteed, so it puts the same floor
+  under every row. The spread across repeats is the judgment half too, because
+  the countable cells do not move between repeats and pooling them shrinks
+  every range towards an agreement the models never showed.
+
+- **The tuning disclosure is written by the report code.** A rule reworded
+  after watching it miss faults on this seed set, and then measured again on
+  the same seeds, is named in the tables themselves rather than only in this
+  file. Adding a rule to that list is part of rewording it.
+
 - **A judgment answer inside the no-judgment band does not count as usable.**
   A run whose every answer lands between 0.4 and 0.6 has told the reader
   nothing, so it exits 2 rather than 0. A model that returns the middle of the
