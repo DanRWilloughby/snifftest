@@ -62,7 +62,7 @@ import {
   runJudgmentArm,
   runRegexArm,
 } from "./engine.ts";
-import { buildReport, writeReport } from "./eval/report.ts";
+import { type WrittenReport, buildReport, writeReport } from "./eval/report.ts";
 import { type RunEvalOptions, runEval } from "./eval/run.ts";
 import { DEFAULT_PER_RULE, DEFAULT_SEED, SeedError, type BaseDocument, seedCorpus } from "./eval/seed.ts";
 import {
@@ -403,7 +403,7 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
   if (options.format === "json") {
     deps.write(JSON.stringify(report, null, 2));
   } else {
-    for (const line of evalSummary(report, written.markdown, deps.cwd)) deps.write(line);
+    for (const line of evalSummary(report, written, deps.cwd)) deps.write(line);
   }
 
   for (const failure of outcome.failures) {
@@ -414,7 +414,7 @@ async function evaluate(deps: CliDeps, options: Options): Promise<number> {
 
 function evalSummary(
   report: ReturnType<typeof buildReport>,
-  markdownPath: string,
+  written: WrittenReport,
   cwd: string,
 ): string[] {
   const at = String(report.threshold);
@@ -435,7 +435,14 @@ function evalSummary(
   }
 
   for (const row of report.corpus.skipped) lines.push(`skipped ${row.rule}: ${row.reason}`);
-  lines.push("", `wrote ${display(markdownPath, cwd)}`);
+  // Both files are named, because one of them is the report and the other is
+  // every paragraph of the corpus in full. A user should learn where their
+  // prose was written from the run that wrote it, not from a later look around.
+  lines.push("", `wrote ${display(written.markdown, cwd)}`);
+  lines.push(
+    `wrote ${display(dirname(written.cleanInputs), cwd)}, which holds the paragraphs in full; ` +
+      "the directory carries a .gitignore so they are not committed by accident",
+  );
   return lines;
 }
 
