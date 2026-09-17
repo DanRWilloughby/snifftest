@@ -1,4 +1,5 @@
-// Builds assets/nose/{concepts/a,b,c.svg, expressions.json, frames/*.svg, favicon.svg, contact-sheet.html}.
+// Builds assets/nose/{concepts/a,b,c,e,f.svg, expressions.json, frames/*.svg, favicon.svg,
+// favicon-sketch.svg, contact-sheet.html}. Concept E is the locked mark; see E_LOCK below.
 // The drawings are hand-placed centrelines with a width profile per stroke; this script expands
 // them into tapered filled outlines with a little hand tremor. No dependencies, no raster.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -229,7 +230,7 @@ const SPEC = {
       '<path d="M59 15 37 55"/>',
     ],
     bridge: [
-      { line: "M59 15 C56.5 19 54.5 23 53.5 27 C51.5 35 46 44 39 52", w: [[0, 0.35], [0.25, 0.9], [0.55, 1.25], [0.85, 1], [1, 0.55]], seed: 101, samples: 24, opacity: 0.8 },
+      { line: "M59 15 C56.5 19 54.5 23 53.5 27 C51.5 35 46 44 39 52", w: [[0, 0.35], [0.25, 0.9], [0.55, 1.25], [0.85, 1], [1, 0.55]], seed: 101, samples: 24, opacity: 0.8, main: true },
       { line: "M55 24 C52.5 32 47 42 41 50", w: W.ghost, seed: 102, opacity: 0.3, tremor: 0.6, shift: [0.9, -0.3] },
       { line: "M59 15 C56.5 19 54.5 23 53.5 27 C51.5 35 46 44 39 52", w: W.ghost, seed: 103, opacity: 0.22, tremor: 0.7, shift: [-0.7, 0.6] },
     ],
@@ -240,13 +241,13 @@ const SPEC = {
       { line: "M44.5 42 C47 41 49.5 40 52 39", w: W.pencilThin, seed: 113, opacity: 0.8 },
     ],
     tip: [
-      { line: "M39 52 C32 57 24 63 21.5 70 C19.5 76.5 24 82 31 82.5 C37 83 43 81 48 79", w: [[0, 0.5], [0.3, 1.05], [0.55, 1.3], [0.8, 1.15], [1, 0.5]], seed: 121, samples: 26, opacity: 0.8 },
+      { line: "M39 52 C32 57 24 63 21.5 70 C19.5 76.5 24 82 31 82.5 C37 83 43 81 48 79", w: [[0, 0.5], [0.3, 1.05], [0.55, 1.3], [0.8, 1.15], [1, 0.5]], seed: 121, samples: 26, opacity: 0.8, main: true },
       { line: "M38 53.5 C31 58.5 23.5 64.5 21.5 71", w: W.ghost, seed: 122, opacity: 0.28, tremor: 0.6, shift: [-0.8, 0.2] },
       { line: "M25 80 C30 83.5 38 83 46 80.5", w: W.ghost, seed: 123, opacity: 0.3, tremor: 0.5, shift: [0.3, 1] },
     ],
     hatchTip: { pts: [[26, 82], [29, 83.8], [32, 84.5], [35, 84.4], [38, 84], [41, 83.2], [44, 82.2]], len: 4.5, angle: 62, seed: 8 },
     nostrilR: [
-      { line: "M46 60 C54 59 60.5 65 60 71.5 C59.5 75.5 55.5 79 50 79", w: [[0, 0.4], [0.4, 1.1], [0.8, 0.95], [1, 0.4]], seed: 131, samples: 20, opacity: 0.8 },
+      { line: "M46 60 C54 59 60.5 65 60 71.5 C59.5 75.5 55.5 79 50 79", w: [[0, 0.4], [0.4, 1.1], [0.8, 0.95], [1, 0.4]], seed: 131, samples: 20, opacity: 0.8, main: true },
     ],
     nostrilRShape: '<path opacity="0.42" d="M39.5 77.2c2-1.7 5.6-2 8-0.5 1.3 0.8 0.6 2.1-0.9 2.3-2.5 0.3-5.7 0-7.1-1.8z"/>',
     hatchNostril: { pts: [[41, 76.5], [43.5, 76.2], [46, 76.4]], len: 2.2, angle: 70, seed: 9, w: 0.45, o: 0.5 },
@@ -312,8 +313,29 @@ const SPEC = {
   },
 };
 
-function conceptSvg(key) {
-  const s = SPEC[key];
+// ---- the lock: E is the mark, at a heavier pencil weight ------------------------------------------
+// Ruling on round 2: "E sketch is fine maybe a bit heavier weight but not as heavy as snoot."
+// SPEC.e above stays as drawn for round 2; the lock is a weight pass over the same centrelines, so
+// the before and after on the contact sheet differ in weight and nothing else. Main contours
+// (`main: true`) take `contour` and the higher opacity; thin strokes and hatching take `fine`; the
+// ghost passes and construction marks are left alone so the line still reads as graphite, not ink.
+// Settled by eye at 64 and 400 px on white and near-black: 1.35 did not register at 64 px, 1.85 read
+// as an inked outline on the wing. At 1.5 the heaviest point of the contour is 1.95 units against
+// concept A's 9.2.
+const E_LOCK = { contour: 1.5, fine: 1.25, contourOpacity: 0.9, nostrilFill: 0.46 };
+function lockWeight(spec, { contour, fine, contourOpacity, nostrilFill }) {
+  const scale = (w, k) => w.map(([u, v]) => [u, Number((v * k).toFixed(3))]);
+  const stroke = (st) => (st.w === W.ghost ? st : st.main ? { ...st, w: scale(st.w, contour), opacity: contourOpacity } : { ...st, w: scale(st.w, fine) });
+  const out = { ...spec };
+  for (const k of ["bridge", "wrinkle", "tip", "nostrilR", "nostrilL", "lip"]) out[k] = spec[k].map(stroke);
+  for (const k of ["hatchBridge", "hatchTip", "hatchNostril"]) out[k] = { ...spec[k], w: Number(((spec[k].w ?? 0.5) * fine).toFixed(3)) };
+  out.nostrilRShape = spec.nostrilRShape.replace(/opacity="[^"]*"/, `opacity="${nostrilFill}"`);
+  return out;
+}
+const E_BEFORE = SPEC.e; // round 2 weights as shipped at dd662bc; only the contact sheet still draws it
+SPEC.e = lockWeight(E_BEFORE, E_LOCK);
+
+function conceptSvg(key, s = SPEC[key]) {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Sniff Test nose">
   <title>${s.title}</title>
   <!--
@@ -384,7 +406,8 @@ const CONCEPTS = {
   f: { name: "Sketch ¾", file: "concepts/f-sketch-3q.svg", blurb: SPEC.f.blurb, round: 2 },
 };
 for (const k of ["a", "b", "c", "e", "f"]) writeFileSync(join(ROOT, CONCEPTS[k].file), conceptSvg(k));
-const RECOMMENDED = "e"; // round 2 recommendation; A stays the round 1 recommendation until Dan picks
+const RECOMMENDED = "e";
+const LOCKED = { concept: "e", motion: "rig" }; // the pick: concept E, tweened rig (not the baked frames)
 const FRAMED = ["a", "e"]; // concepts that get a baked frame set
 
 // ---- expression manifest --------------------------------------------------------------------------
@@ -442,6 +465,7 @@ const manifest = {
   version: 1,
   viewBox: [0, 0, 100, 100],
   recommended: RECOMMENDED,
+  locked: LOCKED,
   transform: "translate(tx ty) translate(px py) rotate(r) scale(sx sy) translate(-px -py); opacity = o. Lerp every field between two states to tween.",
   parts: PARTS,
   expressions: EXPRESSIONS,
@@ -525,14 +549,14 @@ for (const rc of FRAMED) {
 `;
   writeFileSync(join(ROOT, "favicon.svg"), fav);
 }
-{
-  // Round 2: the pencil line is too thin to survive 16 px, so the favicon cut keeps only the main
-  // contours (no ghosts, hatching or lip) and puts the weight up. Still the same centrelines.
-  const s = SPEC.e;
+// The pencil line is too thin to survive 16 px, so the favicon cut keeps only the main contours (no
+// ghosts, hatching or lip) and puts the weight up. Still the same centrelines. It reads its widths
+// from the spec it is given, so the locked E carries its weight factor into the 16 px cut.
+function faviconSketchSvg(s) {
   const heavy = (list) => list.slice(0, 1).map((st) => ({ ...st, opacity: undefined, shift: undefined, tremor: 0.25, w: st.w.map(([u, w]) => [u, w * 5 + 1.8]) }));
   const fav = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100" role="img" aria-label="Sniff Test">
   <title>Sniff Test favicon, sketch cut</title>
-  <!-- Favicon cut of concept E (round 2): main contours only, weight up so the pencil line survives 16 px, filled to the box. -->
+  <!-- Favicon cut of concept E, the locked mark: main contours only, weight up so the pencil line survives 16 px, filled to the box. -->
   <g transform="translate(50 50) scale(1.22) translate(-41 -48)" fill="currentColor">
     ${strokes(heavy(s.bridge))}
     ${strokes(heavy(s.tip))}
@@ -541,8 +565,9 @@ for (const rc of FRAMED) {
   </g>
 </svg>
 `;
-  writeFileSync(join(ROOT, "favicon-sketch.svg"), fav);
+  return fav;
 }
+writeFileSync(join(ROOT, "favicon-sketch.svg"), faviconSketchSvg(SPEC.e));
 
 // ---- the contact sheet ------------------------------------------------------------------------------
 const stripXml = (s) => s.replace(/^\s*<\?xml[^>]*>\s*/, "").replace(/<!--[\s\S]*?-->\n?/g, "");
@@ -550,6 +575,10 @@ const frameSets = {};
 for (const rc of FRAMED) frameSets[rc] = EXPRESSIONS.map((e, i) => stripXml(readFileSync(join(ROOT, "frames", `${rc}-${String(i + 1).padStart(2, "0")}-${e}.svg`), "utf8")));
 const favicon = readFileSync(join(ROOT, "favicon.svg"), "utf8");
 const faviconSketch = readFileSync(join(ROOT, "favicon-sketch.svg"), "utf8");
+// The round 2 weights are drawn only here, in memory, for the before-and-after on the sheet.
+const eBefore = conceptSvg("e", E_BEFORE);
+const faviconSketchBefore = faviconSketchSvg(E_BEFORE);
+const pct = (o) => Math.round(o * 100);
 
 const html = `<!doctype html>
 <html lang="en">
@@ -557,14 +586,21 @@ const html = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sniff Test nose, contact sheet</title>
-<meta name="description" content="Two rounds of hand-drawn nose concepts, six expressions, three sizes, two grounds. Pick a letter.">
+<meta name="description" content="The locked Sniff Test nose: concept E at its final pencil weight, six expressions, three sizes, two grounds, with the concepts not chosen kept below as history.">
 <style>
-  :root { --ink:#141414; --ground:#ffffff; --ground-2:#f2f3f5; --line:#d9dbe0; --muted:#6b6f78; --nose-accent:#e4572e; --dark-ground:#141414; --dark-ink:#f2f2f2; --dark-line:#2e3036; }
+  :root { --ink:#141414; --ground:#ffffff; --ground-2:#f2f3f5; --line:#d9dbe0; --muted:#6b6f78; --nose-accent:#e4572e; --light-ground:#ffffff; --light-ink:#141414; --dark-ground:#141414; --dark-ink:#f2f2f2; --dark-line:#2e3036; }
   * { box-sizing:border-box; }
   html, body { margin:0; background:var(--ground); color:var(--ink); font:15px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
   main { max-width:1500px; margin:0 auto; padding:32px 24px 96px; }
   h1 { font-size:28px; margin:0 0 4px; letter-spacing:-0.01em; }
   h2 { font-size:18px; margin:48px 0 12px; padding-top:20px; border-top:1px solid var(--line); }
+  h3 { font-size:15px; margin:30px 0 8px; }
+  .history { margin-top:72px; padding-top:8px; border-top:3px solid var(--line); }
+  .history > h2:first-child { border-top:0; margin-top:16px; }
+  .pill { display:inline-block; font-size:11px; font-weight:700; letter-spacing:0.06em; text-transform:uppercase; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--muted); vertical-align:middle; margin-left:8px; }
+  .pill.on { background:var(--ink); color:var(--ground); border-color:var(--ink); }
+  .ceiling { display:grid; grid-template-columns:1fr 1fr; border:1px solid var(--line); border-radius:12px; overflow:hidden; }
+  .ceiling .ground { flex-direction:row; align-items:flex-end; justify-content:center; gap:26px; flex-wrap:wrap; }
   p { max-width:70ch; margin:0 0 10px; color:var(--muted); }
   p b { color:var(--ink); }
   .concepts { display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; }
@@ -577,7 +613,8 @@ const html = `<!doctype html>
   .pair { display:grid; grid-template-columns:1fr 1fr; }
   .concepts .card .pair { grid-template-columns:1fr; }
   .ground { display:flex; flex-direction:column; align-items:center; gap:8px; padding:14px 10px 16px; }
-  .ground.light { background:var(--ground); color:var(--ink); }
+  /* The review grounds are fixed, not themed: "light" stays white when the page itself is in dark mode. */
+  .ground.light { background:var(--light-ground); color:var(--light-ink); }
   .ground.dark { background:var(--dark-ground); color:var(--dark-ink); }
   .ground .row { display:flex; gap:10px; align-items:flex-end; }
   .ground .cell { display:flex; flex-direction:column; align-items:center; gap:4px; }
@@ -601,7 +638,7 @@ const html = `<!doctype html>
   .tabs.light { background:#e6e7ea; }
   .tabs.dark { background:#26272b; }
   .tab { display:flex; align-items:center; gap:8px; padding:8px 14px; border-radius:8px 8px 0 0; font-size:13px; }
-  .tabs.light .tab { background:var(--ground); color:var(--ink); }
+  .tabs.light .tab { background:var(--light-ground); color:var(--light-ink); }
   .tabs.dark .tab { background:#3a3b40; color:var(--dark-ink); }
   .tab.inactive { opacity:0.55; background:transparent !important; }
   .tab svg { width:16px; height:16px; display:block; }
@@ -609,39 +646,49 @@ const html = `<!doctype html>
   .note { font-size:12px; color:var(--muted); margin-top:6px; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --ink:#f2f2f2; --ground:#141414; --ground-2:#1c1d20; --line:#2e3036; --muted:#a2a6ae; } }
   :root[data-theme="dark"] { --ink:#f2f2f2; --ground:#141414; --ground-2:#1c1d20; --line:#2e3036; --muted:#a2a6ae; }
-  @media (max-width:760px) { .pair, .motion, .favs { grid-template-columns:1fr; } .grid { grid-template-columns:90px 1fr; } .grid .ground.dark { grid-column:2; } .grid .hdr.dark { display:none; } main { padding:20px 16px 64px; } }
+  @media (max-width:760px) { .pair, .motion, .favs, .ceiling { grid-template-columns:1fr; } .grid { grid-template-columns:90px 1fr; } .grid .ground.dark { grid-column:2; } .grid .hdr.dark { display:none; } main { padding:20px 16px 64px; } }
 </style>
 </head>
 <body>
 <main>
   <h1>Sniff Test nose, contact sheet</h1>
-  <p>Two rounds. Round 1 (A to D) is the inked cartoon. Round 2 (E, F) is the pencil sketch after the note that the edges were too bold and the shape not clearly enough a nose. Same rig, same six expressions, same transform hooks on both. <b>Pick a concept with a letter (A to F) and a motion style with a letter (R rig, F frames).</b> Ink is the current text colour; the only accent is one warm red on the scent and stink lines.</p>
+  <p><b>Locked: concept E, the pencil sketch, a little heavier, moved by the rig.</b> The note on round 2 was that E is fine, maybe a bit heavier, but not as heavy as A. Section 1 is that weight pass, before beside after. The rig, its parts, pivots and six expressions are unchanged. Ink is the current text colour; the only accent is one warm red on the scent and stink lines.</p>
 
-  <h2>1. Round 1 versus round 2</h2>
-  <p>The round 1 recommendation (A) above the two round 2 drawings (E profile, F three-quarter), in three states, light and dark, at 16, 64 and 400 px. Round 2 recommendation: <b>E, Sketch</b>. Wildcard: <b>F, Sketch three-quarter</b>.</p>
-  <div class="grid" id="compare"></div>
+  <h2>1. The lock: E before, E locked</h2>
+  <p>The same centrelines at two weights. Main contours are ${E_LOCK.contour} times as wide and go from ${pct(E_BEFORE.bridge[0].opacity)} to ${pct(E_LOCK.contourOpacity)} percent opacity; hatching and the thin strokes are ${E_LOCK.fine} times as wide; the faint searching passes and the construction marks are untouched, so the line still reads as graphite. Rest, sniff and recoil at 16, 64 and 400 px, light and dark.</p>
+  <div class="grid" id="lock"></div>
 
-  <h2>2. Concepts</h2>
-  <p>Each at rest and in recoil, light and dark, with the 16, 32 and 64 px reads underneath. Round 2 first, then round 1 as shipped.</p>
-  <div class="concepts" id="concepts"></div>
+  <h3>Against A, the weight ceiling</h3>
+  <p>At its heaviest the locked contour is ${f2(Math.max(...SPEC.e.tip[0].w.map((p) => p[1])))} units wide on the 100-unit canvas; concept A is ${f2(Math.max(...SPEC.a.tip[0].w.map((p) => p[1])))}. Heavier than round 2, nowhere near the inked outline.</p>
+  <div class="ceiling" id="ceiling"></div>
 
-  <h2>3. Expressions at 16, 64 and 400 px</h2>
-  <p>Six named states, each a set of per-part transforms in the expressions manifest: rest, sniff, approve, wrinkle, recoil, twitch. Switch the concept to see the same rig on another drawing.</p>
+  <h3>In a browser tab</h3>
+  <p>A pencil line does not survive 16 px, so the tab icon is its own cut: E's main contours only, weight up, filled to the box. It reads its widths from the locked drawing, so it took the same factor. The earlier cut and the rig itself at 16 px sit beside it as inactive tabs.</p>
+  <div class="favs" id="favs"></div>
+
+  <h2>2. The six expressions</h2>
+  <p>Six named states, each a set of per-part transforms in the expressions manifest: rest, sniff, approve, wrinkle, recoil, twitch. Shown on the locked mark; the switch puts the same rig on a drawing that was not chosen.</p>
   <div class="toolbar" id="conceptSwitch"></div>
   <div class="grid" id="grid"></div>
 
-  <h2>4. Motion: rig versus frames</h2>
-  <p><b>R</b> tweens the one rigged SVG between states (what the serve page and the reel would do). <b>F</b> jump-cuts through six baked frames whose lines were redrawn with a little boil, the way a hand-drawn cycle looks. Same beat schedule on both. Frames are baked for A and E.</p>
+  <h2>3. Motion: the rig</h2>
+  <p><b>R, the rig, is the pick.</b> One SVG tweened between states field by field, which is what a web page and a video template need; baked frames cannot interpolate. <b>F</b>, the six baked frames jump-cut with a little line boil, stays here for comparison, on the same beat schedule.</p>
   <div class="motion">
-    <div class="card"><header><span class="letter">R</span><span class="name">Rig, tweened</span><span class="tag" id="rigCap"></span></header>
+    <div class="card"><header><span class="letter">R</span><span class="name">Rig, tweened<span class="pill on">locked</span></span><span class="tag" id="rigCap"></span></header>
       <div class="pair"><div class="ground light"><div class="stage" id="rigLight"></div><div class="cap" data-cap></div></div><div class="ground dark"><div class="stage" id="rigDark"></div><div class="cap" data-cap></div></div></div></div>
-    <div class="card"><header><span class="letter">F</span><span class="name">Frames, jump-cut with boil</span><span class="tag" id="frCap"></span></header>
+    <div class="card"><header><span class="letter">F</span><span class="name">Frames, jump-cut with boil<span class="pill">not chosen</span></span><span class="tag" id="frCap"></span></header>
       <div class="pair"><div class="ground light"><div class="stage" id="frLight"></div><div class="cap" data-cap></div></div><div class="ground dark"><div class="stage" id="frDark"></div><div class="cap" data-cap></div></div></div></div>
   </div>
 
-  <h2>5. In a browser tab</h2>
-  <p>The round 2 rig itself at 16 px beside its favicon cut (main contours only, weight up, filled to the box) and the round 1 cut for comparison. A pencil line does not survive 16 px on its own, so the favicon is allowed to be heavier than the 400 px art.</p>
-  <div class="favs" id="favs"></div>
+  <div class="history">
+  <h2>4. History: round 1 and F<span class="pill">not chosen</span></h2>
+  <p>Kept for the record. A was the round 1 pick, an inked cartoon; the note was that its edges were too bold and the shape not clearly enough a nose. F was the round 2 wildcard, the pencil in three-quarter view. Same rig and states on all of them.</p>
+  <div class="grid" id="compare"></div>
+
+  <h3>The concepts not chosen</h3>
+  <p>Each at rest and in recoil, light and dark, with the 16, 32 and 64 px reads underneath.</p>
+  <div class="concepts" id="concepts"></div>
+  </div>
   <div class="note">Self-contained file: every SVG is inline, nothing loads from the network.</div>
 </main>
 <script>
@@ -651,8 +698,12 @@ const BLURB = ${JSON.stringify(Object.fromEntries(Object.entries(CONCEPTS).map((
 const FRAMES = ${JSON.stringify(frameSets)};
 const FAVICON = ${JSON.stringify(stripXml(favicon))};
 const FAVICON_SKETCH = ${JSON.stringify(stripXml(faviconSketch))};
-const COMPARE = ["a", "e", "f"];
-const ORDER = ["e", "f", "a", "b", "c", "d"];
+const E_BEFORE = ${JSON.stringify(stripXml(eBefore))};
+const FAVICON_SKETCH_BEFORE = ${JSON.stringify(stripXml(faviconSketchBefore))};
+const LOCKED = MANIFEST.locked.concept;
+const COMPARE = ["a", "f"];
+const ORDER = [LOCKED, "f", "a", "b", "c", "d"];
+const HISTORY = ORDER.filter((k) => k !== LOCKED);
 const EXPR = MANIFEST.expressions;
 const PARTS = MANIFEST.parts;
 let uid = 0;
@@ -681,8 +732,8 @@ function apply(svg, concept, state) {
     el.setAttribute("opacity", state[p].o);
   }
 }
-function posed(concept, expr, size) {
-  const svg = instance(SRC[concept], size);
+function posed(concept, expr, size, svgText = SRC[concept]) {
+  const svg = instance(svgText, size);
   apply(svg, concept, MANIFEST.concepts[concept].expressions[expr]);
   return svg;
 }
@@ -693,7 +744,34 @@ function cell(svg, label) {
   return c;
 }
 
-// 1. round 1 versus round 2
+// 1. the lock: E at the round 2 weights beside E locked
+const threeSizes = (gr, k, e, text) => { for (const n of [16, 64, 400]) gr.appendChild(cell(posed(k, e, n, text), String(n))); };
+{
+  const grid = document.getElementById("lock");
+  grid.innerHTML = '<div class="hdr">state, weight</div><div class="hdr">light, 16 / 64 / 400</div><div class="hdr dark">dark, 16 / 64 / 400</div>';
+  for (const e of ["rest", "sniff", "recoil"]) {
+    for (const [name, text] of [["before, round 2", E_BEFORE], ["locked", SRC[LOCKED]]]) {
+      const lbl = document.createElement("div"); lbl.className = "lbl";
+      lbl.innerHTML = e + '<small>E ' + name + '</small>';
+      grid.appendChild(lbl);
+      for (const g of ["light", "dark"]) {
+        const gr = document.createElement("div"); gr.className = "ground " + g;
+        threeSizes(gr, LOCKED, e, text);
+        grid.appendChild(gr);
+      }
+    }
+  }
+  const ceiling = document.getElementById("ceiling");
+  for (const g of ["light", "dark"]) {
+    const gr = document.createElement("div"); gr.className = "ground " + g;
+    gr.appendChild(cell(posed(LOCKED, "rest", 200, E_BEFORE), "E before"));
+    gr.appendChild(cell(posed(LOCKED, "rest", 200), "E locked"));
+    gr.appendChild(cell(posed("a", "rest", 200), "A, not chosen"));
+    ceiling.appendChild(gr);
+  }
+}
+
+// 4. history: round 1 pick and the round 2 wildcard
 {
   const grid = document.getElementById("compare");
   grid.innerHTML = '<div class="hdr">state, concept</div><div class="hdr">light, 16 / 64 / 400</div><div class="hdr dark">dark, 16 / 64 / 400</div>';
@@ -701,25 +779,23 @@ function cell(svg, label) {
     for (const k of COMPARE) {
       const c = MANIFEST.concepts[k];
       const lbl = document.createElement("div"); lbl.className = "lbl";
-      lbl.innerHTML = e + '<small>' + k.toUpperCase() + ' ' + c.name + ', round ' + c.round + '</small>';
+      lbl.innerHTML = e + '<small>' + k.toUpperCase() + ' ' + c.name + ', round ' + c.round + ', not chosen</small>';
       grid.appendChild(lbl);
       for (const g of ["light", "dark"]) {
         const gr = document.createElement("div"); gr.className = "ground " + g;
-        gr.appendChild(cell(posed(k, e, 16), "16"));
-        gr.appendChild(cell(posed(k, e, 64), "64"));
-        gr.appendChild(cell(posed(k, e, 400), "400"));
+        threeSizes(gr, k, e);
         grid.appendChild(gr);
       }
     }
   }
 }
 
-// 2. concepts
+// 4. the concepts not chosen
 {
   const host = document.getElementById("concepts");
-  for (const k of ORDER) {
+  for (const k of HISTORY) {
     const c = MANIFEST.concepts[k];
-    const tag = "round " + c.round + (k === MANIFEST.recommended ? ", recommended" : (k === "a" ? ", round 1 pick" : ""));
+    const tag = "round " + c.round + (k === "a" ? " pick" : (k === "f" ? " wildcard" : "")) + ", not chosen";
     const card = document.createElement("div"); card.className = "card";
     card.innerHTML = '<header><span class="letter">' + k.toUpperCase() + '</span><span class="name">' + c.name + '</span><span class="tag">' + tag + '</span></header><p>' + BLURB[k] + '</p>';
     const pair = document.createElement("div"); pair.className = "pair";
@@ -742,8 +818,8 @@ function cell(svg, label) {
   }
 }
 
-// 3. expression grid, switchable concept
-let current = MANIFEST.recommended;
+// 2. expression grid, switchable concept
+let current = LOCKED;
 function renderGrid() {
   const grid = document.getElementById("grid");
   grid.innerHTML = '<div class="hdr">state</div><div class="hdr">light, 16 / 64 / 400</div><div class="hdr dark">dark, 16 / 64 / 400</div>';
@@ -766,7 +842,7 @@ function renderGrid() {
   const bar = document.getElementById("conceptSwitch");
   for (const k of ORDER) {
     const b = document.createElement("button");
-    b.textContent = k.toUpperCase() + " " + MANIFEST.concepts[k].name;
+    b.textContent = k.toUpperCase() + " " + MANIFEST.concepts[k].name + (k === LOCKED ? ", locked" : "");
     b.setAttribute("aria-pressed", String(k === current));
     b.onclick = () => { current = k; for (const x of bar.children) x.setAttribute("aria-pressed", String(x === b)); renderGrid(); resetMotion(); };
     bar.appendChild(b);
@@ -814,25 +890,26 @@ function tick(now) {
 }
 requestAnimationFrame(tick);
 
-// 5. favicon strips
+// 1, continued. favicon strips
 {
   const host = document.getElementById("favs");
   for (const g of ["light", "dark"]) {
     const card = document.createElement("div"); card.className = "card";
     const tabs = document.createElement("div"); tabs.className = "tabs " + g;
     const mk = (svg, text, inactive) => { const t = document.createElement("div"); t.className = "tab" + (inactive ? " inactive" : ""); t.appendChild(svg); const s = document.createElement("span"); s.textContent = text; t.appendChild(s); return t; };
-    tabs.appendChild(mk(instance(FAVICON_SKETCH, 16), "Sniff Test, round 2 cut"));
-    tabs.appendChild(mk(posed(MANIFEST.recommended, "rest", 16), "rig E at 16", true));
-    tabs.appendChild(mk(instance(FAVICON, 16), "round 1 cut", true));
+    tabs.appendChild(mk(instance(FAVICON_SKETCH, 16), "Sniff Test"));
+    tabs.appendChild(mk(instance(FAVICON_SKETCH_BEFORE, 16), "cut before", true));
+    tabs.appendChild(mk(posed(LOCKED, "rest", 16), "rig at 16", true));
     card.appendChild(tabs);
     const gr = document.createElement("div"); gr.className = "ground " + g;
     const row = document.createElement("div"); row.className = "row";
-    row.appendChild(cell(posed(MANIFEST.recommended, "rest", 32), "rig E 32"));
-    row.appendChild(cell(instance(FAVICON_SKETCH, 32), "round 2 cut 32"));
-    row.appendChild(cell(instance(FAVICON_SKETCH, 64), "round 2 cut 64"));
-    row.appendChild(cell(instance(FAVICON_SKETCH, 128), "round 2 cut 128"));
-    row.appendChild(cell(instance(FAVICON, 32), "round 1 cut 32"));
-    row.appendChild(cell(instance(FAVICON, 64), "round 1 cut 64"));
+    row.appendChild(cell(instance(FAVICON_SKETCH, 16), "locked 16"));
+    row.appendChild(cell(instance(FAVICON_SKETCH, 32), "32"));
+    row.appendChild(cell(instance(FAVICON_SKETCH, 64), "64"));
+    row.appendChild(cell(instance(FAVICON_SKETCH, 128), "128"));
+    row.appendChild(cell(instance(FAVICON_SKETCH_BEFORE, 32), "before 32"));
+    row.appendChild(cell(instance(FAVICON_SKETCH_BEFORE, 64), "before 64"));
+    row.appendChild(cell(instance(FAVICON, 64), "round 1 cut, not chosen"));
     gr.appendChild(row);
     card.appendChild(gr);
     host.appendChild(card);
@@ -843,4 +920,4 @@ requestAnimationFrame(tick);
 </html>
 `;
 writeFileSync(join(ROOT, "contact-sheet.html"), html);
-console.log("wrote concepts a/b/c/e/f, expressions.json, frames/ (a, e), favicon.svg, favicon-sketch.svg, contact-sheet.html");
+console.log("wrote concepts a/b/c/e/f (E locked), expressions.json, frames/ (a, e), favicon.svg, favicon-sketch.svg, contact-sheet.html");
