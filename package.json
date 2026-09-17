@@ -21,10 +21,14 @@
   "files": [
     "dist",
     "rules",
-    "examples",
     "bench/panel.yaml",
     "bench/prices",
+    "examples/CORPUS.md",
+    "examples/corpus",
+    "examples/seeds",
+    "examples/replays",
     "README.md",
+    "SECURITY.md",
     "LICENSE"
   ],
   "scripts": {

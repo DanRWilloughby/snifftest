@@ -95,7 +95,13 @@ guard=$(git rev-parse --show-toplevel 2>/dev/null) || guard=''
 [ -z "$guard" ] || guard=$(cd "$guard" && pwd -P)
 
 scratch="$tmp/fetch"
-mkdir -p "$scratch"
+# An empty node_modules of its own, because npm resolves a local install by
+# walking *up* from the working directory rather than by looking in it. Without
+# this, a node_modules/snifftest at the matching version anywhere above the
+# scratch directory is what runs, and on Linux `mktemp -d` sits under a
+# world-writable /tmp where any local user can plant one. The empty directory
+# ends the walk somewhere this script owns.
+mkdir -p "$scratch/node_modules"
 
 inside_guard() {
   [ -n "$guard" ] || return 1
@@ -123,7 +129,9 @@ run_snifftest() {
   elif command -v bunx >/dev/null 2>&1; then
     (cd "$scratch" && bunx "snifftest@$SNIFFTEST_VERSION" "$@")
   elif command -v npx >/dev/null 2>&1; then
-    (cd "$scratch" && npx --yes "snifftest@$SNIFFTEST_VERSION" "$@")
+    # --ignore-scripts: a fetched package's lifecycle scripts have no business
+    # running on somebody's machine because they wrote a draft.
+    (cd "$scratch" && npx --yes --ignore-scripts "snifftest@$SNIFFTEST_VERSION" "$@")
   else
     return 127
   fi

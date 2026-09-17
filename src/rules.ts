@@ -273,6 +273,7 @@ function validateRegexRule(
       throw new RulesetError(`${where}: pattern is not a valid regular expression (${reason(error)})`);
     }
     refuseNestedQuantifiers(pattern, where);
+    probePattern(pattern, typeof flags === "string" ? flags : "", where);
     return {
       ...common,
       kind: "regex",
@@ -384,21 +385,39 @@ function validateSeed(value: YamlValue | undefined, where: string): Seed | undef
  * signal lands, the process is simply gone. A worker would only move the hang
  * somewhere it can be killed, at the cost of a thread per rule.
  *
- * So the check happens before anything runs, and it is deliberately blunt: a
- * quantifier that can match more than one length, applied to a group that
- * already contains one. That is the shape of every exponential blowup anyone
- * writes by accident. `{4}` matches exactly one length, so `(\d{4})?` and
- * `(\d{4})+` are ordinary patterns and pass.
+ * So the check happens before anything runs, and it is deliberately blunt. Two
+ * shapes are refused.
  *
- * What it does not catch is ambiguity through alternation, `(a|a)+`, which
- * needs a real analyser to see. The cap below is the second layer under that,
- * and it is a bound on the cost rather than a proof there is none.
+ * A quantifier that can match more than one length, applied to a group that
+ * already contains one: `(a+)+`. That is the shape of every exponential blowup
+ * anyone writes by accident. `{4}` matches exactly one length, so `(\d{4})?`
+ * and `(\d{4})+` are ordinary patterns and pass.
+ *
+ * And a quantified group whose alternatives can match the same text: `(a|a)+`,
+ * `(a|ab)+`, `(x|xx)*`. Two branches that can both start on the same character,
+ * or where one is a prefix of the other, give the engine the same two ways
+ * through the subject that nesting does, and they cost the same. `(cat|dog)+`
+ * is left alone, because its branches cannot both start on one character. A
+ * branch whose first character cannot be worked out, `(\s|\s)*` or
+ * `(.|x)+`, is treated as able to start on anything, so it is refused; that is
+ * a false positive on a shape a prose ruleset does not write.
+ *
+ * Under both of those sits a measured probe: the pattern is run against short
+ * strings of growing length before the ruleset is accepted, and a pattern whose
+ * cost climbs out of a few milliseconds over twenty-four characters is refused
+ * with what it measured. The probe is a measurement on a short string and not a
+ * proof of anything about a long one, and it is written that way on purpose:
+ * the two shape rules above are what carry the weight.
  */
 function refuseNestedQuantifiers(pattern: string, where: string): void {
   interface Frame {
     ambiguous: boolean;
+    /** Where this group's contents begin, so its branches can be read back. */
+    readonly opened: number;
+    /** Where each top-level alternative of this group begins. */
+    readonly branches: number[];
   }
-  const frames: Frame[] = [{ ambiguous: false }];
+  const frames: Frame[] = [{ ambiguous: false, opened: 0, branches: [0] }];
   const top = (): Frame | undefined => frames[frames.length - 1];
 
   let i = 0;
@@ -406,7 +425,15 @@ function refuseNestedQuantifiers(pattern: string, where: string): void {
     const ch = pattern[i];
 
     if (ch === "(") {
-      frames.push({ ambiguous: false });
+      // A group's contents start after its prefix: `(?:`, `(?<name>`, `(?=`.
+      const opens = groupBodyStart(pattern, i);
+      frames.push({ ambiguous: false, opened: opens, branches: [opens] });
+      i = opens;
+      continue;
+    }
+
+    if (ch === "|") {
+      top()?.branches.push(i + 1);
       i++;
       continue;
     }
@@ -424,10 +451,25 @@ function refuseNestedQuantifiers(pattern: string, where: string): void {
             "two parts separately.",
         );
       }
+      const branches = frame.branches.map((start, at) =>
+        pattern.slice(start, at + 1 < frame.branches.length ? (frame.branches[at + 1] as number) - 1 : i),
+      );
+      const overlapping = branches.length > 1 && branchesOverlap(branches);
+      if (quantifier !== null && quantifier.ambiguous && overlapping) {
+        throw new RulesetError(
+          `${where}: pattern repeats a group whose alternatives can match the same text. Two ways ` +
+            "through the same characters, repeated, backtracks exponentially, and nothing can " +
+            "interrupt it once it starts. Give the alternatives different first characters, or " +
+            "match them separately.",
+        );
+      }
       const parent = top();
       if (parent !== undefined) {
         parent.ambiguous =
-          parent.ambiguous || frame.ambiguous || (quantifier !== null && quantifier.ambiguous);
+          parent.ambiguous ||
+          frame.ambiguous ||
+          overlapping ||
+          (quantifier !== null && quantifier.ambiguous);
       }
       i = quantifier === null ? i + 1 : quantifier.end;
       continue;
@@ -446,6 +488,119 @@ function refuseNestedQuantifiers(pattern: string, where: string): void {
     }
     i = end;
   }
+}
+
+/** Where a group's contents start, past `?:`, `?<name>`, `?=`, `?!` and friends. */
+function groupBodyStart(pattern: string, open: number): number {
+  if (pattern[open + 1] !== "?") return open + 1;
+  const rest = pattern.slice(open + 2);
+  const named = /^<[^>]*>/.exec(rest);
+  if (named !== null) return open + 2 + named[0].length;
+  const look = /^(<=|<!|:|=|!)/.exec(rest);
+  if (look !== null) return open + 2 + look[0].length;
+  return open + 2;
+}
+
+/**
+ * Whether two alternatives of one group can match the same text.
+ *
+ * Two tests, both conservative. One branch being a prefix of another means the
+ * shorter one always matches where the longer one might, which is `(a|ab)` and
+ * `(x|xx)`. Branches that can begin on the same character give the engine two
+ * ways into the same position, which is `(a|a)` and `(ab|ac)`. Anything whose
+ * first character cannot be read off the pattern counts as able to begin on
+ * anything.
+ */
+function branchesOverlap(branches: readonly string[]): boolean {
+  const firsts = branches.map(firstCharacters);
+  for (let a = 0; a < branches.length; a++) {
+    for (let b = a + 1; b < branches.length; b++) {
+      const one = branches[a] as string;
+      const other = branches[b] as string;
+      if (one.startsWith(other) || other.startsWith(one)) return true;
+      if (rangesMeet(firsts[a] as Ranges, firsts[b] as Ranges)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * The characters a branch can begin on, or `null` for "anything".
+ *
+ * Only the shapes that can be read without an engine: a literal, an escaped
+ * literal, and a simple character class. A class escape, a dot, a nested group
+ * or an optional first atom all give `null`, which is read as "could be
+ * anything" and therefore as overlapping.
+ */
+type Ranges = readonly (readonly [number, number])[] | null;
+
+function firstCharacters(branch: string): Ranges {
+  if (branch === "") return null;
+  const ch = branch[0] as string;
+  let end = 1;
+  let ranges: Ranges;
+
+  if (ch === "\\") {
+    const next = branch[1];
+    if (next === undefined) return null;
+    // A class escape, a boundary or a back reference: not one known character.
+    if (/[dDwWsSbBpPuxck0-9]/.test(next)) return null;
+    ranges = [[next.codePointAt(0) as number, next.codePointAt(0) as number]];
+    end = 2;
+  } else if (ch === "[") {
+    end = classEnd(branch, 0);
+    ranges = classRanges(branch.slice(0, end));
+  } else if (ch === "(" || ch === "." || ch === "^" || ch === "$") {
+    return null;
+  } else {
+    ranges = [[ch.codePointAt(0) as number, ch.codePointAt(0) as number]];
+  }
+
+  // An optional or repeatable first atom means the branch can also begin on
+  // whatever follows it, which is more than this reads.
+  const quantifier = quantifierAt(branch, end);
+  if (quantifier !== null && quantifier.ambiguous) return null;
+  return ranges;
+}
+
+/** A simple character class as ranges, or `null` when it is not simple. */
+function classRanges(source: string): Ranges {
+  const body = source.slice(1, -1);
+  if (body.startsWith("^")) return null;
+  const ranges: [number, number][] = [];
+  let i = 0;
+  while (i < body.length) {
+    let ch = body[i] as string;
+    if (ch === "\\") {
+      const next = body[i + 1];
+      if (next === undefined || /[dDwWsSbBpPuxck0-9]/.test(next)) return null;
+      ch = next;
+      i += 2;
+    } else {
+      i += 1;
+    }
+    if (body[i] === "-" && i + 1 < body.length && body[i + 1] !== "]") {
+      let upper = body[i + 1] as string;
+      if (upper === "\\") {
+        const next = body[i + 2];
+        if (next === undefined || /[dDwWsSbBpPuxck0-9]/.test(next)) return null;
+        upper = next;
+        i += 3;
+      } else {
+        i += 2;
+      }
+      ranges.push([ch.codePointAt(0) as number, upper.codePointAt(0) as number]);
+    } else {
+      ranges.push([ch.codePointAt(0) as number, ch.codePointAt(0) as number]);
+    }
+  }
+  return ranges.length === 0 ? null : ranges;
+}
+
+/** Whether two sets of first characters share one. A null side shares with all. */
+function rangesMeet(one: Ranges, other: Ranges): boolean {
+  if (one === null || other === null) return true;
+  return one.some(([lo, hi]) => other.some(([lo2, hi2]) => lo <= hi2 && lo2 <= hi));
 }
 
 /** Where a character class ends, so its contents are read as literals. */
@@ -479,15 +634,93 @@ function quantifierAt(pattern: string, start: number): { end: number; ambiguous:
   return { end, ambiguous };
 }
 
+/**
+ * What a pattern costs on a short string, measured before it is accepted.
+ *
+ * The shape rules above refuse the families anyone writes by accident. This is
+ * underneath them, for a shape nobody named: the pattern is run against strings
+ * of four to twenty-four characters with a tail it cannot match, so the engine
+ * has to backtrack through everything it tried, and the time is taken. A
+ * linear pattern does that in microseconds. A pattern that backtracks
+ * exponentially crosses a few milliseconds somewhere in that range and is
+ * refused with the length and the time it took.
+ *
+ * The lengths climb rather than jumping to the longest, because measuring the
+ * cost of a pattern is the one thing that can itself hang: each step is only
+ * taken when the one before it was cheap, so the worst case is one step past
+ * the budget rather than a process nobody can interrupt.
+ *
+ * This measures a short string. It is not a proof about a long one, and it
+ * cannot be: no bound on a backtracking engine is available from outside it.
+ * It catches what it catches, and `PATTERN_TEXT_CAP` limits what any pattern
+ * is ever run against.
+ */
+const PROBE_LENGTHS = [4, 8, 12, 16, 20, 24];
+
+/** Milliseconds one probe may take before the pattern is refused. */
+const PROBE_BUDGET_MS = 25;
+
+/** Characters worth repeating: the pattern's own literals, and three staples. */
+function probeAlphabet(pattern: string): string[] {
+  const seen = new Set<string>();
+  for (let i = 0; i < pattern.length && seen.size < 4; i++) {
+    const ch = pattern[i] as string;
+    if (ch === "\\") {
+      i++;
+      continue;
+    }
+    if (/[A-Za-z0-9 ]/.test(ch)) seen.add(ch);
+  }
+  for (const ch of ["a", " ", "0"]) if (seen.size < 6) seen.add(ch);
+  return [...seen];
+}
+
+function probePattern(pattern: string, flags: string, where: string): void {
+  let regex: RegExp;
+  try {
+    // Without `g` or `y`, so `lastIndex` cannot carry between probes.
+    regex = new RegExp(pattern, flags.replace(/[gy]/g, ""));
+  } catch {
+    return;
+  }
+
+  for (const ch of probeAlphabet(pattern)) {
+    for (const length of PROBE_LENGTHS) {
+      // A tail the pattern cannot match, so a run that started has to try
+      // every way through the repeat before it gives up.
+      const subject = `${ch.repeat(length)}\u0000!`;
+      const started = performance.now();
+      try {
+        regex.test(subject);
+      } catch {
+        return;
+      }
+      const elapsed = performance.now() - started;
+      if (elapsed > PROBE_BUDGET_MS) {
+        throw new RulesetError(
+          `${where}: pattern took ${elapsed.toFixed(0)} ms on ${String(length)} characters, which is ` +
+            "the shape of a regular expression that backtracks exponentially. Nothing can interrupt " +
+            "one once it starts, so it is refused here rather than run on somebody's draft. Give any " +
+            "repeated group one way through the same characters.",
+        );
+      }
+    }
+  }
+}
+
 // --- running the countable checks ----------------------------------------
 
 /**
  * How much of one paragraph a ruleset's own pattern is run against.
  *
- * The second layer under the refusal above, for the shapes it cannot name. A
- * paragraph longer than this is checked up to here by a pattern rule, and the
- * run says so rather than quietly finding nothing; the built-in rules read the
- * whole paragraph, because this tool wrote them.
+ * The last layer, under the two shape refusals and the probe. A paragraph
+ * longer than this is checked up to here by a pattern rule, and the run says so
+ * rather than quietly finding nothing; the built-in rules read the whole
+ * paragraph, because this tool wrote them.
+ *
+ * On a pattern that backtracks exponentially a cap on the length is not a cap
+ * on the cost, which is why it is written down here as the last layer and not
+ * as the answer. The refusals above are the answer.
  */
 export const PATTERN_TEXT_CAP = 8_000;
 

@@ -97,26 +97,15 @@ jobs:
           rm -rf "$smoke" "$tarball" packed.txt
 
       - name: The package carries only what the allowlist names
+        # The allowlist and its reasons live in one file, shared with the
+        # release workflow, because the last time `files` was widened this gate
+        # was left red instead of answered.
         run: |
           set -euo pipefail
-          npm pack --dry-run --json > pack.json
-          node --input-type=module -e '
-            import { readFileSync } from "node:fs";
-            const [report] = JSON.parse(readFileSync("pack.json", "utf8"));
-            const files = report.files.map((f) => f.path).sort();
-            console.log(files.join("\n"));
-            const strays = files.filter((p) =>
-              p.startsWith("bench/") ||
-              p.startsWith("examples/") ||
-              p.startsWith("tests/") ||
-              p.startsWith("src/") ||
-              p.startsWith(".github/")
-            );
-            if (strays.length > 0) {
-              console.error("These have no business in the tarball: " + strays.join(", "));
-              process.exit(1);
-            }
-          '
+          # --ignore-scripts: the bin is built by the step above, and a
+          # lifecycle script's own output on stdout would not be JSON.
+          npm pack --dry-run --ignore-scripts --json > pack.json
+          node .github/scripts/tarball-allowlist.mjs pack.json
           rm -f pack.json
 
       - name: No tracked file is larger than the cap
