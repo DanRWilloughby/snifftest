@@ -12,8 +12,17 @@
 # of those models directly, which is what makes that hop measurable rather than
 # an asterisk.
 #
-# Jev is not in this file. Arm C is run by `snifftest eval`, over the same
-# seeded corpus, and joined into the headline table with `--eval`.
+# Jev is in the rotation, as the last row. Its accuracy still comes from
+# `snifftest eval`, where arm C is scored against arms A and B over the same
+# seeded corpus and joined into the headline table with `--eval`; what the row
+# below adds is a latency measured in the same interleaved rotation, with the
+# same repeats, as every other row. Two latency numbers in one column measured
+# two different ways is not a comparison.
+#
+# A row may also name `alternates`. A preferred slug the provider has stopped
+# listing then falls to a substitute the panel file named, and the tables print
+# which one was taken; a row with no alternates says "not available" instead of
+# quietly measuring a neighbour.
 #
 # A row may also declare `max_tokens` and `reasoning`. Those two settings are
 # the only way the rows differ, they are there because a reasoning model spends
@@ -25,6 +34,10 @@ version: 1
 prices:
   # OpenRouter publishes a price per model, so only the direct row needs a file.
   anthropic: prices/anthropic-2026-09-17.yaml
+  # No dated published price has been recorded for the judgment service, so no
+  # file is named here and its row prints its cost as unknown. A constant in
+  # this repo's source is not a source. When a dated one exists it goes in
+  # `prices/` beside the Anthropic file and this line points at it.
 
 models:
   - id: haiku
@@ -106,3 +119,18 @@ models:
     note: >
       The overhead control. Same model as the sonnet row, called without the
       OpenRouter hop, so the pair measures the hop.
+
+  - id: jev
+    label: Jev, the judgment arm
+    tier: judgment
+    provider: jev
+    match: "^jev-"
+    prefer:
+      - jev-latest
+    note: >
+      Asked its own way, one request per paragraph carrying every rule as a
+      separate question, which is the shape the service documents and the shape
+      arm C uses. The request count matches the other rows; the request shape
+      does not. It returns a probability and no boolean, so its flag column is
+      that probability against the shipped threshold rather than a decision the
+      service made.

@@ -50,10 +50,11 @@ import {
 } from "./bench/panel.ts";
 import { PriceError, type PriceTable, parsePriceTable, priceCitation, priceFor } from "./bench/prices.ts";
 import { readAnthropicCatalog } from "./bench/anthropic.ts";
+import { createJevAdapter, jevCatalog } from "./bench/jev-adapter.ts";
 import { type BenchDocument, runBench } from "./bench/run.ts";
 import { type JoinedArm, buildBenchReport, writeBenchReport } from "./bench/tables.ts";
 import { ConfigError, type ResolvedRuleset, resolveRuleset, selectRules } from "./config.ts";
-import { type Destination, type Env, requestConsent } from "./consent.ts";
+import { type Destination, type Env, TYPESAFE_DESTINATION, requestConsent } from "./consent.ts";
 import {
   type JudgmentArmResult,
   type JudgmentReading,
@@ -705,6 +706,9 @@ const DESTINATIONS: Readonly<Record<Provider, Destination>> = {
     endpoint: ANTHROPIC_MESSAGES_ENDPOINT,
     keyEnv: ANTHROPIC_KEY_ENV,
   },
+  // The judgment arm's own service, in the panel rotation rather than joined in
+  // from another run, so that one latency column is one measurement.
+  jev: TYPESAFE_DESTINATION,
 };
 
 /**
@@ -742,6 +746,7 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
   const keys: Record<Provider, string> = {
     openrouter: (deps.env[OPENROUTER_KEY_ENV] ?? "").trim(),
     anthropic: (deps.env[ANTHROPIC_KEY_ENV] ?? "").trim(),
+    jev: (deps.env[KEY_ENV] ?? "").trim(),
   };
   const secrets = [keys.openrouter, keys.anthropic, (deps.env[KEY_ENV] ?? "").trim()].filter(
     (key) => key !== "",
@@ -759,7 +764,16 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
     adapters[provider] =
       provider === "openrouter"
         ? createOpenRouterAdapter(adapterOptions)
-        : createAnthropicAdapter(adapterOptions);
+        : provider === "anthropic"
+          ? createAnthropicAdapter(adapterOptions)
+          : createJevAdapter({
+              client: (deps.createClient ?? createJevClient)({
+                apiKey: keys.jev,
+                ...(deps.fetchLike === undefined ? {} : { fetch: deps.fetchLike }),
+              }),
+              rules: ruleset.rules.filter(isJudgmentRule),
+              threshold,
+            });
   }
 
   // The catalogues. A recorded payload means a dry run touches no network at
@@ -776,6 +790,10 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
     if (payload["anthropic"] !== undefined) {
       catalogs.anthropic = readAnthropicCatalog(payload["anthropic"]);
     }
+    // The judgment service publishes no model list, so there is nothing to
+    // record and nothing to read: its one model is a constant, and no network
+    // call is made to learn it.
+    if (adapters.jev !== undefined) catalogs.jev = jevCatalog();
     catalogNotes.push(`model lists read from ${display(file, deps.cwd)}, not from the providers`);
   } else {
     for (const provider of wanted) {
@@ -878,7 +896,7 @@ async function bench(deps: CliDeps, options: Options): Promise<number> {
             ? `${(model.served_model ?? model.slug ?? "").padEnd(34)} ` +
               `recall ${fixed(model.accuracy?.overall[String(threshold)]?.recall)}  ` +
               `median ${Math.round(model.latency.median_ms)} ms  ` +
-              `${model.cost.usd_per_100_documents === null ? "cost unknown" : `$${model.cost.usd_per_100_documents.toFixed(4)} per 100 documents`}`
+              `${model.cost.usd_per_100_paragraphs === null ? "cost unknown" : `$${model.cost.usd_per_100_paragraphs.toFixed(4)} per 100 paragraphs`}`
             : (model.note ?? "not available")
         }`,
       );
@@ -1018,8 +1036,14 @@ function joinedArms(scores: Record<string, unknown>): JoinedArm[] {
       label: typeof arm["label"] === "string" ? arm["label"] : id,
       recall: ratioOf(overall?.["recall"]),
       fpPerCleanCell: ratioOf(overall?.["fp_rate_per_clean_cell"]),
+      fpCleanParagraphs: ratioOf(overall?.["fp_clean_paragraphs"]),
+      cleanParagraphs: ratioOf(overall?.["clean_paragraphs"]),
       medianMs: numberOf(summary?.["median_latency_ms"]),
-      usdPer100Documents: ratioOf(summary?.["usd_per_100_documents"]),
+      // The eval used to write this per 100 documents, which was always per 100
+      // paragraphs. An older results directory is still read under its old key.
+      usdPer100Paragraphs: ratioOf(
+        summary?.["usd_per_100_paragraphs"] ?? summary?.["usd_per_100_documents"],
+      ),
       servedModel: arm["network"] === true ? served : null,
     });
   }
