@@ -1,0 +1,360 @@
+# Sniff Test, the default ruleset.
+#
+# Fifteen rules that apply to most prose. Five are countable and run as
+# regular expressions on your machine, with nothing sent anywhere. Ten are
+# judgment calls and are answered by the judgment model, one probability
+# per rule per paragraph. A flag names its rule and its probability.
+#
+# A `.snifftest.yaml` in your project extends or replaces this file. Copy a
+# rule, change its words, keep its id unique. The `seed` on each rule is how
+# `snifftest eval` manufactures one defect of that kind inside your own clean
+# text, so that recall and false alarms can be measured on your prose rather
+# than ours. A transform seed is mechanical; a splice seed inserts one of the
+# listed sentences, at the start, at the end, or anywhere, per `position`.
+#
+# Each judgment rule carries four parts. `what` describes the defect.
+# `not_for` lists the near misses that must not be flagged. `examples` are
+# sentences that do trip the rule. `criteria` are the two statements the
+# model decides between. The contrast is what makes the judgment reliable;
+# a rule with a `what` and no `not_for` will flag things you did not mean.
+
+version: 1
+threshold: 0.7
+
+rules:
+  # --- countable rules: regular expressions, no network -------------------
+
+  - id: dash_present
+    kind: regex
+    # The built-in matches the pattern [–—], that is an en dash – or
+    # an em dash —. A plain hyphen in a compound word does not count.
+    builtin: dash_present
+    message: "A long dash. Give the sentence a full stop instead."
+    seed: { transform: insert_em_dash, count: 1 }
+
+  - id: colon_heavy
+    kind: regex
+    # The built-in counts the colon character (U+003A) in the paragraph and
+    # trips at `min` or more. A semicolon is not a colon.
+    builtin: colon_count
+    min: 3
+    message: "Three colons in one paragraph. Pick one."
+    seed: { transform: add_colons, count: 3 }
+
+  - id: sentence_rhythm
+    kind: regex
+    # The built-in splits on (?<=[.!?])\s+, counts words per sentence, and
+    # trips when the coefficient of variation (standard deviation over mean)
+    # is below `floor`. Paragraphs shorter than `min_sentences` are skipped.
+    builtin: sentence_rhythm
+    floor: 0.25
+    min_sentences: 4
+    message: "Every sentence runs to the same length. The reader nods off by the third."
+    seed: { transform: equalize_sentences }
+
+  - id: slop_vocab
+    kind: regex
+    # The built-in matches any listed word at a word boundary, case-insensitive,
+    # in any inflection that shares the stem as written. Edit the list freely;
+    # "landscape" and "navigate" have honest uses and you may want them gone.
+    builtin: slop_vocab
+    words:
+      - delve
+      - tapestry
+      - landscape
+      - unlock
+      - testament
+      - navigate
+      - realm
+      - myriad
+      - intricate
+      - pivotal
+      - seamless
+      - showcase
+    message: "A word only a model reaches for. Say the plain one."
+    seed: { transform: insert_slop_word, count: 1 }
+
+  - id: banned_words
+    kind: regex
+    # Same matcher as slop_vocab, over your own list. Empty by default, so it
+    # flags nothing until you add a word. Put the words your house never uses.
+    builtin: banned_words
+    words: []
+    message: "A word from your own banned list."
+    seed: { transform: insert_banned_word, count: 1 }
+
+  # --- judgment rules: answered by the model, one probability each ---------
+
+  - id: not_x_but_y
+    kind: judgment
+    what: |
+      A sentence, or a pair of sentences, whose whole job is to swap one
+      label for another. The writer denies one description of a thing and
+      puts a replacement in its place, and the swap is the point. The shape
+      is "it is not X, it is Y", or "this was never X. It was Y.", or "not a
+      X but a Y", or the same swap in reverse, "it is Y, not X". Both halves
+      describe the same subject, and the sentence carries nothing else.
+    not_for: |
+      A plain negation with no replacement offered ("This is not a
+      guarantee.").
+      A denial followed by a separate fact rather than a relabelling ("It is
+      not finished, and two tests still fail.").
+      A comparison with "rather than" or "instead of" inside a sentence that
+      carries other information ("We ship on Tuesdays rather than Fridays so
+      the weekend stays quiet.").
+      A factual correction of a claim someone else made, with the evidence
+      for it.
+      Two sentences that each carry their own information, where the second
+      does not exist only to replace the first.
+    examples:
+      - "It is not a shortcut, it is the whole method."
+      - "The problem was never the tooling. It was the calendar."
+      - "That is a habit, not a strategy."
+    criteria:
+      true: "At least one sentence, or sentence pair, denies one description of a thing and substitutes another for effect, in either order, with the swap as its point."
+      false: "Every negation either stands alone, is followed by new information rather than a relabelling, or corrects a claim with evidence."
+    message: "Not X, it's Y. The reframe is doing the arguing for you."
+    seed:
+      splice:
+        - "It is not a shortcut, it is the whole method."
+        - "The problem was never the tooling. It was the calendar."
+        - "That is a habit, not a strategy."
+      position: any
+
+  - id: tricolon
+    kind: judgment
+    what: |
+      A decorative rule of three. Three short parallel words or phrases in a
+      row whose job is the beat rather than the information, such as three
+      adjectives, three verbs, or a three-word fragment used as a flourish.
+    not_for: |
+      A list of three distinct things the reader needs, such as three named
+      steps, three options, or three findings, each adding something the
+      others do not.
+      A list of two, or of four or more.
+      Three items quoted from somewhere else and discussed.
+    examples:
+      - "The fix is cleaner, faster, and truer."
+      - "Plan, build, repeat."
+      - "It was slow, it was loud, it was late."
+    criteria:
+      true: "At least one three-item run appears whose purpose is rhythm rather than information."
+      false: "Any three-item runs present are informative lists, or there are none."
+    message: "Three items for the cadence. Keep the one that carries the weight."
+    seed:
+      splice:
+        - "The fix is cleaner, faster, and truer."
+        - "Plan, build, repeat."
+        - "It was slow, it was loud, it was late."
+      position: any
+
+  - id: stacked_hedging
+    kind: judgment
+    what: |
+      One claim carrying two or more softeners at once, so that the sentence
+      never commits. "Might perhaps", "arguably, in some sense, probably",
+      "it seems to me that it could possibly".
+    not_for: |
+      A single hedge used once and on purpose, such as one "I think" or one
+      "roughly".
+      Honest uncertainty stated plainly ("The cause is unknown.").
+      A precise qualifier on a number ("about 40 percent", "at least three").
+      A passage that quotes or discusses hedging as its subject.
+    examples:
+      - "It might perhaps, in some sense, arguably be the main reason."
+      - "It seems to me that this could possibly tend to help a little."
+    criteria:
+      true: "At least one claim carries two or more piled-up softeners in the same sentence."
+      false: "Hedges are absent, or each claim carries at most one, used deliberately."
+    message: "Three hedges on one claim. Either say it or leave it out."
+    seed:
+      splice:
+        - "It might perhaps, in some sense, arguably be the main reason."
+        - "It seems to me that this could possibly tend to help a little."
+      position: any
+
+  - id: rhetorical_opener
+    kind: judgment
+    what: |
+      The paragraph's first sentence is a question asked for effect, to set
+      up what the writer is about to say, rather than to get an answer from
+      anyone.
+    not_for: |
+      A question that appears later in the paragraph.
+      A first sentence that is a statement, even a curious-sounding one.
+      An opening question addressed to a named person, or one the paragraph
+      reports someone else asking.
+    examples:
+      - "What if the checker itself is the thing that is wrong?"
+      - "But what happens when nobody reads the draft twice?"
+    criteria:
+      true: "The first sentence is a question asked for rhetorical effect."
+      false: "The first sentence is a statement, or the only questions come later, or the opening question is one someone actually asked."
+    message: "Opens on a question nobody asked. Start with the answer."
+    seed:
+      splice:
+        - "What if the checker itself is the thing that is wrong?"
+        - "But what happens when nobody reads the draft twice?"
+      position: start
+
+  - id: restating_closer
+    kind: judgment
+    what: |
+      The paragraph's final sentence only says again what the paragraph has
+      already said. It often opens with "in short", "in other words", "to sum
+      up", or "put simply", or refers back to "everything above".
+    not_for: |
+      A closing sentence that lands something new: a consequence, a named
+      mechanism, a number, a source, a condition, or a turn the paragraph had
+      not yet made, even when it is short or emphatic.
+      A paragraph of a single sentence.
+    examples:
+      - "In short, everything above is what we said."
+      - "To sum up, that is how the process works, as this paragraph has described."
+    criteria:
+      true: "The last sentence is a summary of the paragraph and adds nothing."
+      false: "The last sentence advances the argument or adds information, or the paragraph is a single sentence."
+    message: "The last sentence says the paragraph again. End one sentence earlier."
+    seed:
+      splice:
+        - "In short, everything above is what we said."
+        - "To sum up, that is how the process works, as this paragraph has described."
+      position: end
+
+  - id: self_undercutting
+    kind: judgment
+    what: |
+      A line that talks the reader out of the thing being offered. It says
+      the thing may not work, that the writer does not claim it works, that
+      there is no guarantee, or that it may not be for them. On a page meant
+      to sell, describe, or recommend, this weakens the offer and tells the
+      reader nothing they can use.
+    not_for: |
+      A precise statement of scope or a known limit ("It checks Markdown and
+      plain text, not PDFs.").
+      A measured result with its range ("Recall was 0.85 to 0.94 across three
+      runs.").
+      A specific past failure that the paragraph then explains.
+      Disputing a claim someone else made.
+    examples:
+      - "We do not claim this catches every case."
+      - "This may not work for you, and we are not saying it will."
+      - "There is no guarantee any of this helps."
+    criteria:
+      true: "The paragraph contains a line telling the reader not to count on the thing working, with no specific limit named."
+      false: "Limits are named precisely, or no self-undercutting line appears."
+    message: "The copy is talking the reader out of it. Name the limit and drop the shrug."
+    seed:
+      splice:
+        - "We do not claim this catches every case."
+        - "This may not work for you, and we are not saying it will."
+        - "There is no guarantee any of this helps."
+      position: any
+
+  - id: first_x_that
+    kind: judgment
+    what: |
+      A claim that the writer, or their team, product, or company, is the
+      first to do something. "The first tool that", "the first team to", "we
+      were the first to".
+    not_for: |
+      A first-ever claim about someone else, with a source.
+      "First" as a position in a sequence, such as the first step, the first
+      draft, or the first of two things.
+      A claim of being different, deeper, or better that does not use
+      "first".
+      A dated historical fact with a source ("The first edition appeared in
+      1918.").
+    examples:
+      - "This is the first tool that reads a draft the way an editor does."
+      - "We are the first team to run this check on every save."
+    criteria:
+      true: "The paragraph claims the writer, or their product, team, or company, was first to do something."
+      false: "No first claim is made about the writer or their own work."
+    message: '"The first X that." Someone will check.'
+    seed:
+      splice:
+        - "This is the first tool that reads a draft the way an editor does."
+        - "We are the first team to run this check on every save."
+      position: any
+
+  - id: naked_cost_figure
+    kind: judgment
+    what: |
+      The paragraph states what something cost to make or run, in model
+      spend, compute, hours, or "it cost us", without naming the price a
+      customer pays and the alternative beside it.
+    not_for: |
+      A cost quoted together with the customer price and a comparison ("It
+      costs us about a dollar to run, you pay $49, and an agency charges
+      $2,000.").
+      A cost in a technical appendix or a bench table that names what it
+      measures.
+      A customer price quoted as a price.
+      A revenue figure, a valuation, or a figure about someone else's
+      business.
+    examples:
+      - "This report cost us $1.30 in API calls."
+      - "Each run costs us about nine cents in model spend."
+    criteria:
+      true: "A production or running cost appears with no customer price and no alternative next to it."
+      false: "Every cost figure is accompanied by the price and an alternative, or no cost figure appears."
+    message: "A cost with no price next to it. Sniffs like a discount nobody asked for."
+    seed:
+      splice:
+        - "It cost us about four dollars of compute to make this."
+        - "Each run costs us about nine cents in model spend."
+      position: any
+
+  - id: jobs_claim
+    kind: judgment
+    what: |
+      A claim about employment. That the thing creates jobs, that it
+      replaces the people who used to do the work, or that it would never
+      replace a person.
+    not_for: |
+      Describing what the tool does and what a person still decides, with no
+      claim about employment.
+      Naming who reviews or signs off.
+      Replacing a thing rather than a person ("It replaces the spreadsheet.").
+      A sourced statistic about employment, in a report whose subject is
+      employment.
+    examples:
+      - "We would never replace a person."
+      - "This replaces the people who used to do the checking by hand."
+      - "Four seats means we create jobs rather than removing them."
+    criteria:
+      true: "The paragraph makes an employment claim of one of those kinds."
+      false: "It describes the division of work without any employment claim."
+    message: "A claim about jobs. Say what the tool does and what people keep, then stop."
+    seed:
+      splice:
+        - "We would never replace a person."
+        - "This replaces the people who used to do the checking by hand."
+        - "Four seats means we create jobs rather than removing them."
+      position: any
+
+  - id: pullquote_fragment
+    kind: judgment
+    what: |
+      A pull quote, meaning a short line set apart in quotation marks or
+      italics as a display line, whose text is a fragment with no subject and
+      verb of its own.
+    not_for: |
+      A quotation from a named source running inline as part of a sentence,
+      however short.
+      A complete sentence used as a pull quote.
+      A heading or a title.
+      A paragraph with no pull quote at all.
+    examples:
+      - "*\"Built to be argued with.\"*"
+      - "*\"The part nobody reads twice.\"*"
+    criteria:
+      true: "A display pull quote appears and it is a fragment rather than a complete sentence."
+      false: "There is no pull quote, or the pull quote is a complete sentence."
+    message: "A pull quote with no verb. Quote a whole sentence."
+    seed:
+      splice:
+        - "*\"Built to be argued with.\"*"
+        - "*\"The part nobody reads twice.\"*"
+      position: any
