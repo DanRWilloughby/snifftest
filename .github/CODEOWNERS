@@ -1,0 +1,12 @@
+# Every file has one owner until there is a second maintainer.
+*                       @DanRWilloughby
+
+# The paths where a mistake is expensive: what leaves the machine, what the
+# release publishes, and what the shipped ruleset says about anyone's prose.
+/.github/workflows/     @DanRWilloughby
+/action.yml             @DanRWilloughby
+/.pre-commit-hooks.yaml @DanRWilloughby
+/hooks/                 @DanRWilloughby
+/rules/                 @DanRWilloughby
+/SECURITY.md            @DanRWilloughby
+/package.json           @DanRWilloughby
