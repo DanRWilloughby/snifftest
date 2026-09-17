@@ -46,6 +46,15 @@ export interface EvalReport {
   readonly threshold: number;
   readonly seed: number;
   readonly per_rule: number;
+  /** 1 is the ruleset's own splice lists; 2 is the seed bank. */
+  readonly seed_version: number;
+  /** Near misses planted in clean paragraphs, and whether any arm flagged them. */
+  readonly hard_negatives: readonly {
+    readonly id: string;
+    readonly rule: string;
+    readonly why: string;
+    readonly flagged_by: readonly string[];
+  }[];
   readonly thresholds: readonly number[];
   readonly ruleset_sources: readonly string[];
   readonly corpus_paths: readonly string[];
@@ -84,6 +93,17 @@ export function buildReport(outcome: EvalOutcome, options: ReportOptions): EvalR
     threshold: options.threshold,
     seed: seeding.seedValue,
     per_rule: seeding.perRule,
+    seed_version: seeding.seedVersion,
+    hard_negatives: seeding.negatives.map((row) => ({
+      id: row.id,
+      rule: row.rule,
+      why: row.why,
+      flagged_by: Object.values(outcome.scores)
+        .filter((arm) =>
+          arm.false_positives_at_0_7.some((flag) => flag.doc === row.id && flag.rule === row.rule),
+        )
+        .map((arm) => arm.label),
+    })),
     thresholds: outcome.thresholds,
     ruleset_sources: options.rulesetSources ?? [],
     corpus_paths: options.corpusPaths ?? [],
@@ -118,8 +138,9 @@ export function renderMarkdown(report: EvalReport): string {
   lines.push(`# snifftest eval, ${report.run_date}`);
   lines.push("");
   lines.push(
-    `${report.corpus.seeded} seeded paragraphs and ${report.corpus.clean} clean ones, ` +
-      `${report.per_rule} seeds per rule, seed value ${report.seed}. ` +
+    `${report.corpus.seeded} seeded paragraphs, ${report.corpus.clean} clean ones and ` +
+      `${report.hard_negatives.length} near misses, which are counted as clean. ` +
+      `${report.per_rule} seeds per rule, seed value ${report.seed}, seed version ${report.seed_version}. ` +
       `Served by ${report.served_model ?? "no model, since no arm made a call"}. ` +
       `Flags count at ${at}.`,
   );
@@ -305,6 +326,25 @@ export function renderMarkdown(report: EvalReport): string {
     lines.push("");
     for (const row of report.corpus.dropped_detail) {
       lines.push(`- \`${row.id}\` ${row.file}: ${row.reason}`);
+    }
+    lines.push("");
+  }
+
+  if (report.hard_negatives.length > 0) {
+    lines.push("## Hard negatives");
+    lines.push("");
+    lines.push(
+      "Each of these is a clean paragraph with a sentence planted in it that sits close to one " +
+        "rule and is not a defect. A flag on one is a false positive, and it is the false " +
+        "positive worth knowing about, because it is the one a careful writer would meet.",
+    );
+    lines.push("");
+    lines.push("| Paragraph | Near | Why it is not a defect | Flagged by |");
+    lines.push("|---|---|---|---|");
+    for (const row of report.hard_negatives) {
+      lines.push(
+        `| ${row.id} | ${row.rule} | ${row.why} | ${row.flagged_by.length === 0 ? "nobody" : row.flagged_by.join(", ")} |`,
+      );
     }
     lines.push("");
   }

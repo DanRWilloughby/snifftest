@@ -482,13 +482,25 @@ function wordList(text: string, words: readonly string[], except: readonly strin
   return found.filter((match) => !spared.some(([from, to]) => match.index >= from && match.index < to));
 }
 
-/** Where in the text a listed literal sense sits, so a match inside one is spared. */
+/**
+ * Where in the text a listed literal sense sits, so a match inside one is spared.
+ *
+ * Each word of the phrase is matched in its own ordinary inflections, so
+ * "unlock the door" spares "unlocks the door" and "unlocking the door". The
+ * words still have to be adjacent: "unlocks the back door" is not spared,
+ * because a phrase that tolerated anything in the middle would spare half the
+ * sentences it appeared in. That limit is in `docs/eval-notes.md`.
+ */
 function exceptionSpans(text: string, except: readonly string[]): [number, number][] {
   const spans: [number, number][] = [];
   for (const phrase of except) {
     const needle = phrase.trim();
     if (needle === "") continue;
-    const scanner = new RegExp(escapeRegExp(needle).replace(/\\?\s+/g, "\\s+"), "gi");
+    const source = needle
+      .split(/\s+/)
+      .map((word) => (/^[a-z]+$/i.test(word) ? `(?:${inflections(word.toLowerCase())})` : escapeRegExp(word)))
+      .join("\\s+");
+    const scanner = new RegExp(source, "gi");
     for (;;) {
       const hit = scanner.exec(text);
       if (hit === null) break;

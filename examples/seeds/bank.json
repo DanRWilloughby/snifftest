@@ -1,0 +1,196 @@
+{
+  "version": 2,
+  "note": "Faults written for the eval, one bank per judgment rule. Eight or more per rule so that no sentence has to be used twice at the default of three per rule, and so that a recall figure is not a figure about one sentence. Each fault carries the words a host paragraph would have to be about for the splice to sit in it; a fault whose hosts list is empty fits anywhere. Every sentence here was written for this repository and is released under its licence. None of them is taken from a rule's examples or from the wording of a rule's instruction, and a test enforces that.",
+  "rules": {
+    "not_x_but_y": {
+      "faults": [
+        { "text": "Whatever the Friday meeting has become, a review is no longer the word for it. A rehearsal is.", "hosts": ["meeting", "team", "week"] },
+        { "text": "Nobody has a scheduling problem here. What everyone has is a saying-no problem.", "hosts": ["work", "team", "time"] },
+        { "text": "Calling Tuesday an outage would be generous. Somebody chose to turn it off.", "hosts": ["release", "software", "tool", "run"] },
+        { "text": "What sits in that column is a list of apologies, whatever the header says.", "hosts": ["list", "column", "report"] },
+        { "text": "The shop never lost its customers. It stopped answering the door.", "hosts": ["shop", "customer", "letter"] },
+        { "text": "You did not forget the step. You decided it did not apply to you.", "hosts": ["step", "checklist", "process"] },
+        { "text": "What we called a draft was closer to a promise we had already made.", "hosts": ["draft", "writing", "sentence", "book"] },
+        { "text": "The route was fine. The walking was the part nobody costed.", "hosts": ["route", "walk", "station", "map"] },
+        { "text": "Whether this counts as an argument is doubtful. It reads more like a mood.", "hosts": [] },
+        { "text": "Everyone described the delay as bad luck. The calendar had said so in June.", "hosts": [] }
+      ],
+      "hard_negatives": [
+        { "text": "This is not a guarantee, and the page says so twice.", "why": "a plain negation with nothing put in its place" },
+        { "text": "It is not finished, and two of the checks still fail on the second run.", "why": "a denial followed by a separate fact rather than a relabelling" },
+        { "text": "We publish on Tuesdays rather than Fridays so that the weekend stays quiet.", "why": "a comparison inside a sentence that carries its own information" }
+      ]
+    },
+    "tricolon": {
+      "faults": [
+        { "text": "Small budget, small room, small hopes.", "hosts": [] },
+        { "text": "It arrived late, arrived wet, and arrived anyway.", "hosts": ["post", "letter", "delivery", "shop"] },
+        { "text": "Write it, leave it, read it again.", "hosts": ["writing", "draft", "sentence", "book"] },
+        { "text": "The room was warm, the light was low, the afternoon was gone.", "hosts": [] },
+        { "text": "Faster, quieter, better behaved.", "hosts": ["tool", "software", "release", "run"] },
+        { "text": "Count them, name them, forget them.", "hosts": ["list", "checklist", "step"] },
+        { "text": "One walk, one page, one clean copy.", "hosts": ["walk", "route", "page"] },
+        { "text": "Honest work, honest hours, honest pay.", "hosts": ["work", "team", "money", "price"] },
+        { "text": "Look up, look down, look at the door.", "hosts": [] },
+        { "text": "Hot, loud, and entirely beside the point.", "hosts": [] }
+      ],
+      "hard_negatives": [
+        { "text": "The three steps are to print it, mark it, and file the marked copy where the next person will find it.", "why": "three named steps, each carrying its own instruction" },
+        { "text": "Two of the entries were wrong and the third had been copied from a form that no longer exists.", "why": "a list of three that carries distinct facts" },
+        { "text": "He listed the faults as damp, subsidence, and a roof that had been patched four times.", "why": "three findings quoted and discussed, not a flourish" }
+      ]
+    },
+    "stacked_hedging": {
+      "faults": [
+        { "text": "It may well be, more or less, that the second run was probably the faster one.", "hosts": ["run", "measure", "test"] },
+        { "text": "I suspect it might, in a manner of speaking, sort of explain the gap.", "hosts": [] },
+        { "text": "Possibly, and I could be wrong, this is roughly the sort of thing that tends to happen.", "hosts": [] },
+        { "text": "One could perhaps argue, tentatively, that the wording may be a little strong.", "hosts": ["writing", "draft", "sentence", "word"] },
+        { "text": "It seems, on balance, and allowing for the usual caveats, fairly likely to hold.", "hosts": [] },
+        { "text": "Arguably it may possibly be somewhat cheaper, depending.", "hosts": ["price", "money", "cost", "shop"] },
+        { "text": "There is maybe a chance, in some sense, that the roof is more or less sound.", "hosts": [] },
+        { "text": "I would say, though I would not insist, that it seems broadly to work most of the time.", "hosts": ["tool", "software", "process"] },
+        { "text": "Perhaps, conceivably, in certain cases, the shorter route is a little quicker.", "hosts": ["route", "walk", "station", "map"] },
+        { "text": "It could be said, loosely, that the meeting may have had a purpose of some kind.", "hosts": ["meeting", "team"] }
+      ],
+      "hard_negatives": [
+        { "text": "I think the second draft is the better one, and I would keep it.", "why": "one hedge, used once and on purpose" },
+        { "text": "The cause is unknown and nobody has been able to reproduce it since March.", "why": "uncertainty stated plainly" },
+        { "text": "About forty percent of the entries were affected, and at least three were duplicates.", "why": "precise qualifiers on numbers" }
+      ]
+    },
+    "rhetorical_opener": {
+      "faults": [
+        { "text": "So what does a reader actually do with a page like this?", "hosts": ["page", "reader", "writing", "draft"] },
+        { "text": "Why does the same mistake survive four rounds of review?", "hosts": ["review", "team", "process", "checklist"] },
+        { "text": "What would it take to make the second run cheaper than the first?", "hosts": ["run", "price", "cost", "measure"] },
+        { "text": "How many of these did anybody read past the title?", "hosts": ["title", "report", "letter", "post"] },
+        { "text": "And who exactly decided that the door should be locked at five?", "hosts": ["shop", "door", "hours"] },
+        { "text": "But what happens to the route when the bridge is out?", "hosts": ["route", "walk", "station", "map", "bridge"] },
+        { "text": "Is there any version of this that does not end in a spreadsheet?", "hosts": ["work", "team", "report"] },
+        { "text": "What is a rule worth on the day everybody is tired?", "hosts": ["rule", "process", "checklist"] },
+        { "text": "Where does the time actually go on a morning like that?", "hosts": ["time", "morning", "hours"] },
+        { "text": "Could the whole thing have been a single sentence?", "hosts": ["sentence", "writing", "draft"] }
+      ],
+      "hard_negatives": [
+        { "text": "The question the team kept asking in March was whether the roof could wait another winter.", "why": "a question reported rather than asked, and not the opening sentence" },
+        { "text": "Nobody knew what the second column was counting, which is where the afternoon went.", "why": "a curious-sounding statement that is not a question" },
+        { "text": "She asked me on the Tuesday whether the draft had been read by anyone else.", "why": "a question somebody actually asked, addressed to a person" }
+      ]
+    },
+    "restating_closer": {
+      "faults": [
+        { "text": "In short, that is what this paragraph has been saying all along.", "hosts": [] },
+        { "text": "To put it another way, everything above amounts to the same point.", "hosts": [] },
+        { "text": "So that, in the end, is the shape of what was just described.", "hosts": [] },
+        { "text": "Summing up, the paragraph you have just read makes exactly that case.", "hosts": [] },
+        { "text": "Which is, when you take it all together, the whole of the argument above.", "hosts": [] },
+        { "text": "All of which is to say what has already been said here.", "hosts": [] },
+        { "text": "Taken as a whole, then, the above is the point being made.", "hosts": [] },
+        { "text": "That, restated once more, is the substance of the preceding lines.", "hosts": [] },
+        { "text": "Briefly, the foregoing says what it says and nothing further.", "hosts": [] },
+        { "text": "In essence, everything written above adds up to precisely this.", "hosts": [] }
+      ],
+      "hard_negatives": [
+        { "text": "The upshot is that the second run costs four pounds more, which is why nobody does it twice.", "why": "a closing sentence carrying a number the paragraph had not given" },
+        { "text": "The mechanism is the damp, which reaches the plaster before it reaches anything anyone can see.", "why": "a closer naming a mechanism rather than repeating" },
+        { "text": "None of that holds if the file was written on a Friday.", "why": "a closing condition the paragraph had not yet made" }
+      ]
+    },
+    "self_undercutting": {
+      "faults": [
+        { "text": "Plenty of people try this once and shrug, so keep your expectations low.", "hosts": [] },
+        { "text": "It might do nothing at all for your team, and that is fine.", "hosts": ["team", "work", "process"] },
+        { "text": "We cannot promise any of this will hold up where you are.", "hosts": [] },
+        { "text": "Honestly, whether it helps is anybody's guess.", "hosts": [] },
+        { "text": "If it turns out to be useless for you, we would not be surprised.", "hosts": [] },
+        { "text": "Some readers get something out of this and some do not, and we have stopped predicting which.", "hosts": ["reader", "page", "post"] },
+        { "text": "Take the whole thing with a pinch of salt, because we do.", "hosts": [] },
+        { "text": "There is every chance the effect wears off after a week.", "hosts": ["week", "habit", "process"] },
+        { "text": "Nothing here is worth much if your week looks nothing like ours.", "hosts": ["week", "team", "work"] },
+        { "text": "Your mileage will vary and we have no idea by how much.", "hosts": [] }
+      ],
+      "hard_negatives": [
+        { "text": "It reads Markdown and plain text, and it does not read PDFs.", "why": "a precise statement of scope" },
+        { "text": "Recall was between 0.85 and 0.94 across the three runs we recorded.", "why": "a measured result with its range" },
+        { "text": "The March version dropped every file after the first symlink, which is the bug this release fixes.", "why": "a specific past failure the paragraph then explains" }
+      ]
+    },
+    "first_x_that": {
+      "faults": [
+        { "text": "Nobody had put a probability beside every flag until our team did.", "hosts": ["tool", "software", "flag"] },
+        { "text": "Ours is the earliest field notebook a crew could carry down a mine with no signal.", "hosts": ["notebook", "field", "tool"] },
+        { "text": "No shop on this street had tried opening on a Sunday before we did.", "hosts": ["shop", "street", "hours"] },
+        { "text": "We got there before anybody else: nobody had timed the walk at all.", "hosts": ["walk", "route", "station", "time"] },
+        { "text": "Until this release nobody had shipped a checker that explains itself.", "hosts": ["release", "software", "tool"] },
+        { "text": "We are the earliest team to have run the whole thing on a Monday morning.", "hosts": ["team", "work", "week"] },
+        { "text": "Nobody else had thought to print the price next to the cost.", "hosts": ["price", "money", "cost"] },
+        { "text": "This is the earliest page anywhere to say the quiet part in a table.", "hosts": ["page", "table", "report"] },
+        { "text": "Before us, no one had written any of this down in one place.", "hosts": [] },
+        { "text": "We beat everybody to it, which is a sentence we have earned.", "hosts": [] }
+      ],
+      "hard_negatives": [
+        { "text": "The first edition appeared in 1918 and the second is the one everybody quotes.", "why": "a dated historical fact about somebody else, with a source" },
+        { "text": "The first step is to print the page, and the second is to read it aloud.", "why": "first as a position in a sequence" },
+        { "text": "It goes deeper than the other tools do, which is a different claim and an easier one to check.", "why": "a claim of being different rather than first" }
+      ]
+    },
+    "naked_cost_figure": {
+      "faults": [
+        { "text": "The whole afternoon of compute came to eleven pounds.", "hosts": ["run", "measure", "software"] },
+        { "text": "Each page works out at about three pence of model spend.", "hosts": ["page", "post", "report"] },
+        { "text": "Two hours of somebody's time went into this, which is what it cost us.", "hosts": ["work", "team", "time"] },
+        { "text": "Running the check across the whole tree costs us around forty cents.", "hosts": ["tool", "software", "run"] },
+        { "text": "We spend roughly a pound a day keeping this thing warm.", "hosts": [] },
+        { "text": "The postage alone came to nine pounds fifty.", "hosts": ["letter", "post", "shop"] },
+        { "text": "It cost us less than a sandwich to produce.", "hosts": [] },
+        { "text": "A full rerun burns about six cents of tokens.", "hosts": ["run", "measure", "test"] },
+        { "text": "The paper for the whole print run came in under thirty pounds.", "hosts": ["print", "paper", "book"] },
+        { "text": "Our side of it works out at a fraction of a penny a paragraph.", "hosts": ["paragraph", "page", "writing"] }
+      ],
+      "hard_negatives": [
+        { "text": "It costs us about a pound to run, you pay forty-nine, and the agency quote was two thousand.", "why": "a cost quoted with the customer price and the alternative" },
+        { "text": "The appendix table reports tokens per request and what the provider charged for them.", "why": "a cost in a technical appendix that names what it measures" },
+        { "text": "The subscription is nine pounds a month and there is no annual option.", "why": "a customer price quoted as a price" }
+      ]
+    },
+    "jobs_claim": {
+      "faults": [
+        { "text": "Nobody loses a job over this, and if anything it makes a few.", "hosts": ["work", "team"] },
+        { "text": "The tool now does what three people used to do by hand.", "hosts": ["tool", "software", "process"] },
+        { "text": "We have told the team that no role here will ever be automated away.", "hosts": ["team", "work"] },
+        { "text": "It takes over the checking so the checkers can be let go.", "hosts": ["check", "review", "process"] },
+        { "text": "Two more seats means two more hires, which is the honest measure of progress.", "hosts": ["team", "work", "money"] },
+        { "text": "A person will always be needed here, whatever anybody says.", "hosts": [] },
+        { "text": "The shop floor ran on four people and now it runs on one.", "hosts": ["shop", "floor", "work"] },
+        { "text": "Every hour it saves is an hour somebody no longer gets paid for.", "hosts": ["time", "work", "money"] },
+        { "text": "Jobs are created by this sort of thing, not lost to it.", "hosts": [] },
+        { "text": "The typing pool went the same way and nobody missed it.", "hosts": ["work", "office"] }
+      ],
+      "hard_negatives": [
+        { "text": "The tool sorts the entries and a person decides which of them to act on.", "why": "the division of work described with no employment claim" },
+        { "text": "Every release is signed off by whoever ran the checks that morning.", "why": "naming who reviews, with no claim about employment" },
+        { "text": "It replaces the spreadsheet that four teams were each keeping their own copy of.", "why": "replacing a thing rather than a person" }
+      ]
+    },
+    "pullquote_fragment": {
+      "faults": [
+        { "text": "*\"Twelve minutes, every morning.\"*", "hosts": ["morning", "time", "hours"] },
+        { "text": "*\"Quieter than the alternative.\"*", "hosts": [] },
+        { "text": "*\"A drawer full of Tuesdays.\"*", "hosts": [] },
+        { "text": "*\"Everything except the bill.\"*", "hosts": ["price", "money", "cost"] },
+        { "text": "*\"Four miles, no shortcuts.\"*", "hosts": ["walk", "route", "station"] },
+        { "text": "*\"The room where the paper piles up.\"*", "hosts": ["office", "paper", "work"] },
+        { "text": "*\"Read aloud, or not at all.\"*", "hosts": ["writing", "draft", "read"] },
+        { "text": "*\"Cheap, in the oldest sense.\"*", "hosts": [] },
+        { "text": "*\"One page, twice as slow.\"*", "hosts": ["page", "print", "book"] },
+        { "text": "*\"Whatever the checklist forgot.\"*", "hosts": ["checklist", "process", "step"] }
+      ],
+      "hard_negatives": [
+        { "text": "*\"The ear catches what the eye forgives.\"*", "why": "a pull quote that is a complete sentence" },
+        { "text": "She called it \"a drawer full of Tuesdays\" and went back to her desk.", "why": "a short quotation running inline inside a sentence" },
+        { "text": "The heading on that page reads Reading a draft aloud.", "why": "a heading, which is not a pull quote" }
+      ]
+    }
+  }
+}
