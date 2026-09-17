@@ -32,6 +32,13 @@ bun src/cli.ts check --dry-run README.md
 which sends the text of those files to TypeSafe and needs `TYPESAFE_API_KEY` in
 your environment. The first time that would happen the CLI asks.
 
+One thing to know before you install this from a git URL rather than from npm.
+`dist/` is not in git, so a checkout has no executable until something builds
+one, and `"prepare": "bun run build"` in `package.json` is what builds it. That
+means `npm install github:DanRWilloughby/snifftest` needs Bun on the machine.
+Installing the published package does not, because the tarball already carries
+a built `dist/`.
+
 ## Tests
 
 Write the test first. `bun test` runs everything; `bun test tests/rules.test.ts`
@@ -70,6 +77,12 @@ house style belong in that house's own `.snifftest.yaml`, not here.
   request.
 - If you change behaviour a user would notice, add a line to `CHANGELOG.md`
   under **Unreleased**.
+
+## Releasing
+
+`docs/releasing.md` is the checklist. The short version: bump `package.json`
+first, bring every other pin to the same number, write the changelog section,
+then tag. A test holds the pins together so a bump cannot quietly miss one.
 
 ## Reporting a security problem
 

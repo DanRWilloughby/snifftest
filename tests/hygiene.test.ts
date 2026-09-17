@@ -112,6 +112,91 @@ describe("what the published tarball may contain", () => {
   });
 });
 
+describe("the version is pinned in one place at a time", () => {
+  /**
+   * Every file that names the version a stranger would fetch.
+   *
+   * `package.json` is deliberately not here. It is `0.0.0` until the release
+   * commit bumps it, and the release workflow is what checks it against the
+   * tag. These are the pins that tell somebody else which version to install,
+   * and a bump that misses one of them ships a plugin pointing at a version of
+   * the tool it was never tested against. The checklist is `docs/releasing.md`.
+   */
+  const pinned: { file: string; pattern: RegExp; expected: number }[] = [
+    { file: ".claude-plugin/plugin.json", pattern: /"version":\s*"([^"]+)"/g, expected: 1 },
+    { file: ".claude-plugin/marketplace.json", pattern: /"version":\s*"([^"]+)"/g, expected: 2 },
+    { file: ".pre-commit-hooks.yaml", pattern: /snifftest@([0-9][^"\]]*)/g, expected: 2 },
+    { file: "action.yml", pattern: /default:\s*"([0-9]+\.[0-9]+\.[0-9]+)"/g, expected: 1 },
+    { file: "hooks/pre-commit", pattern: /SNIFFTEST_VERSION:-([0-9][^}]*)/g, expected: 1 },
+    { file: "skills/snifftest/scripts/run.sh", pattern: /SNIFFTEST_VERSION:-([0-9][^}]*)/g, expected: 1 },
+  ];
+
+  /** Every version string the files above carry, with where it came from. */
+  const found: { where: string; version: string }[] = [];
+  for (const { file, pattern, expected } of pinned) {
+    const versions = [...read(file).matchAll(pattern)].map((match) => match[1] ?? "");
+    test(`${file} carries ${expected} pin${expected === 1 ? "" : "s"}`, () => {
+      // A pin that moved out of reach of the pattern is a pin this suite would
+      // otherwise stop watching without saying so.
+      expect(versions).toHaveLength(expected);
+    });
+    for (const version of versions) found.push({ where: file, version });
+  }
+
+  test("they all agree with one another", () => {
+    const disagreeing = found.filter((pin) => pin.version !== found[0]?.version);
+    expect(disagreeing).toEqual([]);
+  });
+
+  test("the changelog has a section and a link for that same version", () => {
+    const version = found[0]?.version ?? "";
+    const changelog = read("CHANGELOG.md");
+    // The release workflow cuts its notes from this heading and fails without
+    // it, which is a slow way to find out.
+    expect(changelog).toContain(`## [${version}]`);
+    expect(changelog).toContain(`[${version}]: https://github.com/DanRWilloughby/snifftest/releases/tag/v${version}`);
+  });
+
+  test("the install docs quote the same version", () => {
+    const version = found[0]?.version ?? "";
+    for (const file of ["docs/claude-code.md", "docs/husky.md"]) {
+      const quoted = read(file)
+        .split("\n")
+        // A third-party action is pinned to its own commit with its own version
+        // in the comment beside it. That number has nothing to do with this one.
+        .filter((line) => !/uses:\s+actions\//.test(line))
+        .flatMap((line) => [...line.matchAll(/v?([0-9]+\.[0-9]+\.[0-9]+)/g)].map((m) => m[1]));
+      expect([file, [...new Set(quoted)]]).toEqual([file, [version]]);
+    }
+  });
+
+  test("there is a checklist saying which files these are", () => {
+    const releasing = read("docs/releasing.md");
+    for (const { file } of pinned) expect(releasing).toContain(file);
+    expect(releasing).toContain("CHANGELOG.md");
+    // Installing from a git URL needs Bun, because `prepare` is what builds
+    // `dist/`. A reader who hits that deserves to have been told.
+    expect(releasing).toContain("prepare");
+    expect(read("CONTRIBUTING.md")).toContain("prepare");
+  });
+});
+
+describe("the package says where it lives", () => {
+  const pkg = JSON.parse(read("package.json")) as {
+    homepage?: string;
+    repository?: { type?: string; url?: string };
+    bugs?: { url?: string };
+  };
+
+  test("npm can show the repository, the homepage and where to file a bug", () => {
+    // Without these the npm page has no link back, and provenance has nothing
+    // human-readable beside it.
+    expect(pkg.repository?.url).toBe("git+https://github.com/DanRWilloughby/snifftest.git");
+    expect(pkg.homepage).toContain("github.com/DanRWilloughby/snifftest");
+    expect(pkg.bugs?.url).toBe("https://github.com/DanRWilloughby/snifftest/issues");
+  });
+});
+
 describe("every action is pinned to a commit", () => {
   /** Every `uses:` line under .github, with the file and line it came from. */
   const usesLines: { file: string; line: number; text: string }[] = [];
