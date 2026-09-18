@@ -131,11 +131,15 @@ jobs:
         #
         # Every tracked Markdown file, so a rule that misfires on a table or on
         # front matter is caught here rather than by a stranger. The corpus and
-        # the fixtures are left out: both hold defects on purpose.
+        # the fixtures are left out: both hold defects on purpose. Recorded bench
+        # runs are left out too: their tables are rendered by a script, and a
+        # column of same-shaped cells trips sentence_rhythm without anybody
+        # having written a sentence.
         run: |
           git ls-files '*.md' \
             | grep -v '^examples/' \
             | grep -v '^tests/fixtures/' \
+            | grep -v '^bench/results/' \
             | xargs bun src/bin.ts check --dry-run
 
   secret-scan:

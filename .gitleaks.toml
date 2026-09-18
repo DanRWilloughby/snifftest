@@ -1,0 +1,19 @@
+# gitleaks configuration. CI runs `gitleaks git .` over the whole history and
+# `gitleaks dir .` over the working tree with --exit-code 1, so anything the
+# default rules match fails the build unless it is named here with a reason.
+
+title = "Sniff Test"
+
+[extend]
+useDefault = true
+
+# The tests hand a stub provider a short made-up key so that "a key was given"
+# can be told apart from "no key at all". Those values are eight characters,
+# never real, and the generic rule reads any quoted high-entropy word after the
+# word "key" as a secret. Only that one rule is relaxed, and only on test files:
+# every provider-specific pattern (Anthropic, OpenAI, GitHub, AWS and the rest)
+# still applies to them, and the repository's own leakage test checks every
+# tracked file against a private denylist of real values.
+[[allowlists]]
+targetRules = ["generic-api-key"]
+paths = ['''^tests/.*\.test\.ts$''']
