@@ -30,6 +30,12 @@ prices:
   # this repo's source is not a source.
 
 models:
+  # The three Claude rows share one completion budget, larger than the default.
+  # On the first direct run, at the default 900 tokens, Sonnet 5 ran out of room
+  # on 20 of its 152 replies and Opus 5 on 2: the JSON was cut mid-object and
+  # the paragraph counted as unanswered. A cut reply is a budget failure, not a
+  # model verdict, so every Claude row is given room to finish, and the same
+  # room, so their cost columns stay a fair comparison.
   - id: haiku
     label: Claude Haiku 4.5
     tier: fast
@@ -37,6 +43,7 @@ models:
     match: "^claude-haiku-4-5"
     prefer:
       - claude-haiku-4-5-20251001
+    max_tokens: 2000
 
   - id: sonnet
     label: Claude Sonnet 5
@@ -45,6 +52,7 @@ models:
     match: "^claude-sonnet-5"
     prefer:
       - claude-sonnet-5
+    max_tokens: 2000
 
   - id: opus
     label: Claude Opus 5
@@ -53,6 +61,7 @@ models:
     match: "^claude-opus-5"
     prefer:
       - claude-opus-5
+    max_tokens: 2000
 
   - id: sol
     label: gpt-5.6-sol
