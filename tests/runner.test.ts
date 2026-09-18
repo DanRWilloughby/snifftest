@@ -341,9 +341,13 @@ exit 0
     expect(hijacked(hostile)).toBe(false);
     expect(result.stdout).not.toContain("HIJACKED");
     expect(recorded(hostile)).toContain("reached=registry");
-    // The walk ended where the fetch was made, not at the plant above it.
+    // The walk ended where the fetch was made, not at the plant above it. On
+    // Linux `mktemp -d` honours TMPDIR, so the scratch really does sit under
+    // the plant and the empty node_modules is what stops the walk; on macOS
+    // `mktemp -d` ignores TMPDIR and the plant is never above the scratch at
+    // all, so only the Linux run exercises this.
     expect(stoppedAt(hostile)).toEqual(fetchDirectories(hostile));
-    for (const at of stoppedAt(hostile)) expect(at.startsWith(home)).toBe(false);
+    expect(stoppedAt(hostile)).not.toContain(home);
   });
 
   test("the pre-commit hook stops the walk inside its own scratch directory", () => {
@@ -371,7 +375,7 @@ exit 0
     expect(commit.stdout).not.toContain("HIJACKED");
     expect(recorded(hostile)).toContain("reached=registry");
     expect(stoppedAt(hostile)).toEqual(fetchDirectories(hostile));
-    for (const at of stoppedAt(hostile)) expect(at.startsWith(home)).toBe(false);
+    expect(stoppedAt(hostile)).not.toContain(home);
   });
 
   test("nothing a fetched package declares is allowed to run", () => {
