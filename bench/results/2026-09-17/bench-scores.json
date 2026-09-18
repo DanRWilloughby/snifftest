@@ -5699,7 +5699,7 @@
     {
      "doc": "N21",
      "repeat": 1,
-     "reason": "the reply is not JSON: {\"not_x_but_y\": false, \"p\": 0.15} Wait — I must output all rules. {\"not_x_but_y\": false, \"tricolon\": false, \"stacked_... (JSON Parse error: Unable to parse JSON string)"
+     "reason": "the reply is not JSON: {\"not_x_but_y\": false, \"p\": 0.15} Wait \\u2014 I must output all rules. {\"not_x_but_y\": false, \"tricolon\": false, \"stacked_... (JSON Parse error: Unable to parse JSON string)"
     },
     {
      "doc": "N30",

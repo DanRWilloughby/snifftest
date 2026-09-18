@@ -216,7 +216,7 @@ Failures, in full:
 - `opus` C18 repeat 1: answered nothing usable for not_x_but_y, tricolon, stacked_hedging, rhetorical_opener, restating_closer, self_undercutting, first_x_that, naked_cost_figure, jobs_claim, pullquote_fragment
 - `opus` N02 repeat 1: answered nothing usable for not_x_but_y, tricolon, stacked_hedging, rhetorical_opener, restating_closer, self_undercutting, first_x_that, naked_cost_figure, jobs_claim, pullquote_fragment
 - `opus` N08 repeat 1: answered nothing usable for not_x_but_y, tricolon, stacked_hedging, rhetorical_opener, restating_closer, self_undercutting, first_x_that, naked_cost_figure, jobs_claim, pullquote_fragment
-- `opus` N21 repeat 1: the reply is not JSON: {"not_x_but_y": false, "p": 0.15} Wait — I must output all rules. {"not_x_but_y": false, "tricolon": false, "stacked_... (JSON Parse error: Unable to parse JSON string)
+- `opus` N21 repeat 1: the reply is not JSON: {"not_x_but_y": false, "p": 0.15} Wait \u2014 I must output all rules. {"not_x_but_y": false, "tricolon": false, "stacked_... (JSON Parse error: Unable to parse JSON string)
 - `opus` N30 repeat 1: the reply is not JSON: {"not_x_but_y": false, "p": 0.05, "tricolon": false, "p_tricolon": 0.03, "stacked_hedging": false, "restating_closer"... (JSON Parse error: Unable to parse JSON string)
 - `jev` C03 repeat 1: answered nothing usable for naked_cost_figure
 - `jev` C09 repeat 1: answered nothing usable for self_undercutting

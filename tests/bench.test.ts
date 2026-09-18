@@ -392,6 +392,21 @@ describe("the prompt and the reply contract", () => {
     expect(() => parseReply("[1, 2, 3]", JUDGMENT_IDS)).toThrow(ReplyError);
   });
 
+  test("a failure message quotes a long dash as its codepoint, so the tables keep the rule the tool enforces", () => {
+    // Opus 5 once wrote `{"a": false} Wait \u2014 I must output all rules.` and the
+    // excerpt of it went into the scores file and the tables, which are
+    // documents. The raw record keeps the character; the quote spells it.
+    const body = '{"restating_closer": false, "p": 0.15} Wait \u2014 I must output all rules \u2013 every one.';
+    let message = "";
+    try {
+      parseReply(body, JUDGMENT_IDS);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toContain("Wait \\u2014 I must output all rules \\u2013 every one");
+    expect(message).not.toMatch(/[\u2013\u2014]/);
+  });
+
   test("a rule answered out of contract is unanswered, not defaulted", () => {
     const out = parseReply(
       JSON.stringify({

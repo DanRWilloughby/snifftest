@@ -134,8 +134,19 @@ function readOne(value: unknown): Reading | undefined {
   return { flag, p };
 }
 
+/**
+ * The first 120 characters of a reply, on one line, for a failure message.
+ *
+ * A long dash in the reply prints as its escaped codepoint. The excerpt lands
+ * in the scores file and the tables, which are documents this repository holds
+ * to the rule the tool enforces; the raw record beside them keeps the reply as
+ * it came. A reader still sees exactly which character the model wrote.
+ */
 function excerpt(body: string): string {
-  const flat = body.replace(/\s+/g, " ").trim();
+  const flat = body
+    .replace(/\s+/g, " ")
+    .replace(/[\u2013\u2014]/g, (dash) => `\\u${dash.codePointAt(0)!.toString(16)}`)
+    .trim();
   return flat.length <= 120 ? flat : `${flat.slice(0, 117)}...`;
 }
 
