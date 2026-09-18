@@ -115,7 +115,27 @@ jobs:
 
           rm -rf "$smoke" "$tarball" packed.txt
 
+      - name: Is this version already on npm?
+        # 0.1.0 was published by hand before the repo went public, and a tag
+        # re-pushed after a partial run must never publish twice. The registry
+        # is the source of truth: a version that is already there skips the
+        # publish and still cuts the release, instead of failing the run.
+        id: registry
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          version="${TAG#v}"
+          found="$(npm view "snifftest@${version}" version 2>/dev/null || true)"
+          if [ -n "$found" ]; then
+            echo "published=true" >> "$GITHUB_OUTPUT"
+            echo "snifftest@${version} is already on npm; the publish step is skipped."
+          else
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Publish to npm with provenance
+        if: steps.registry.outputs.published != 'true'
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: npm publish --provenance --access public
