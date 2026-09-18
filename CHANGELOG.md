@@ -9,7 +9,7 @@ Release notes are cut from this file: the release workflow publishes the section
 whose heading matches the tag, so a tag with no section here fails the release
 rather than shipping an empty one.
 
-## [0.1.0] - Unreleased
+## [0.1.0] - 2026-09-18
 
 ### Added
 

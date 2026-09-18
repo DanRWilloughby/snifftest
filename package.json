@@ -1,6 +1,6 @@
 {
   "name": "snifftest",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Does the draft pass the sniff test? A prose linter for your house rules.",
   "license": "MIT",
   "homepage": "https://github.com/DanRWilloughby/snifftest#readme",
