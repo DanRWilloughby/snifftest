@@ -66,7 +66,10 @@ rather than shipping an empty one.
 - A Claude Code plugin and skill, `/snifftest`, that runs the free pass by
   default and never answers the sending question on the user's behalf.
 - An example corpus of ten documents, a structure set, three adversarial twins
-  and a committed eval run under `bench/results/2026-09-17/`.
+  and a committed eval run under `bench/results/2026-09-17/`, with the direct
+  panel's bench run beside it: Claude Haiku 4.5, Sonnet 5 and Opus 5 and
+  gpt-5.6-sol on their own APIs, cost and latency measured, one paragraph per
+  request. The README's numbers table reads from that run.
 - The nose: one hand-drawn SVG with six expressions, and a favicon cut.
 
 [0.1.0]: https://github.com/DanRWilloughby/snifftest/releases/tag/v0.1.0

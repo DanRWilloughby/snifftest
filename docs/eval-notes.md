@@ -258,3 +258,46 @@ hand-written file again.
 
 No test makes a live call. The writer takes a client, and the tests hand it one
 that answers from a table.
+
+## The direct panel, measured
+
+`bench/results/2026-09-17/bench-tables.md` is `snifftest bench` with
+`bench/panel-direct.yaml` over the committed corpus: four general models, each
+called on its own provider's API with that provider's key, one paragraph per
+request, one repeat, cache off, Jev in the same rotation. Cost is the returned
+token usage at the list prices under `bench/prices/`; latency is the wall clock
+at this end. The README's numbers table reads from it.
+
+| Row | Judgment faults, own flag, of 80 | Clean paragraphs flagged, of 54 | Median ms | $ per 100 paragraphs |
+|---|---|---|---|---|
+| Claude Haiku 4.5 | 66 | 37 | 1,971 | $0.43 |
+| Claude Sonnet 5 | 72 | 2 | 6,083 | $1.34 |
+| Claude Opus 5 | 77 | 0 | 6,532 | $3.08 |
+| gpt-5.6-sol | 73 | 0 | 4,428 | $1.64 |
+| Jev, in the bench rotation | 59 | 2 | 198 | unknown, no dated price |
+
+Two things the run taught, both kept in the tables rather than smoothed over.
+
+- **The completion budget was a request fault, not a model verdict.** On the
+  first pass at the default 900 tokens, Sonnet 5 stopped mid-object on 20 of
+  its 166 replies and Opus 5 on 2. A cut reply counts as unanswered, and that
+  pass read Sonnet at 64 of 80. The three Claude rows were re-run at 2,000
+  tokens, the same for all three so their cost columns stay comparable, and
+  Sonnet read 72 with nothing cut. The pass at 900 is not committed; the panel
+  file says why the budget is what it is, and the tables print the budget each
+  row was sent. Opus 5 still left five paragraphs unanswered at 2,000: three
+  replies were usable for none of the ten rules and two were not JSON (one
+  carried a "Wait" mid-object), which is the model and is listed in full.
+- **The bench's Jev row read lower than the eval's arm C, and the gap is two
+  things.** Arm C's 63 of 80 is the eval's own run; the bench row is a
+  separate run of the same model, and across the three runs of this seed on
+  2026-09-17 (the eval, the bench pass at 900 tokens, the bench pass at
+  2,000) the judgment model read 63, 64 and 59 of 80, which is the swing to
+  read every row against. The bench row also came back with one rule
+  missing from the reply on 13 paragraphs (`unanswered` in the raw record),
+  which the eval path never did; the missing rule is counted as unanswered,
+  never as a pass. Why the bench adapter's reply drops a rule the eval
+  adapter's does not is open and noted here rather than patched around.
+
+The Haiku row is the one to read twice: it catches about as many faults as
+the judgment model and flags 37 of the 54 clean paragraphs while doing it.

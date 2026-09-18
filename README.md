@@ -286,37 +286,42 @@ consent per destination, and a yes given for TypeSafe is never a yes for anyone
 else.
 
 The run committed under `bench/results/2026-09-17/` is the eval over the
-packaged corpus with eight seeds per rule. The panel rows below come from a
-blind read of the same 166 paragraphs by four general models.
+packaged corpus with eight seeds per rule, and beside it the bench over the
+same 166 paragraphs with `bench/panel-direct.yaml`: four general models, each
+on its own provider's API, on the same day.
 
 <!-- numbers:start -->
 | Arm | Judgment faults caught, of 80 | Clean paragraphs flagged, of 54 | Cost per 100 paragraphs | Median per paragraph |
 | --- | --- | --- | --- | --- |
 | Sniff Test, judgment model (Jev, measured) | 63 | 1 | $0.0129 | 182 ms |
-| Claude Haiku 4.5 (estimate) | 61 | 11 | about $0.36 | not measured |
-| Claude Sonnet 5 (estimate) | 63 | 2 | about $0.94 | not measured |
-| Claude Opus 5 (estimate) | 72 | 0 | about $2.36 | not measured |
-| OpenAI gpt-5.6-sol (estimate) | 75 | 3 | about $1.45 | not measured |
+| Claude Haiku 4.5 (measured) | 66 | 37 | $0.43 | 1,971 ms |
+| Claude Sonnet 5 (measured) | 72 | 2 | $1.34 | 6,083 ms |
+| Claude Opus 5 (measured) | 77 | 0 | $3.08 | 6,532 ms |
+| OpenAI gpt-5.6-sol (measured) | 73 | 0 | $1.64 | 4,428 ms |
 <!-- numbers:end -->
 
-Flags count at 0.7. The panel models judged about fourteen paragraphs per
-context inside agent sessions, and Jev judged one paragraph per request. The
-Jev cost and latency are measured from provider-reported usage. The model costs
-are estimates: one request is the rules prompt plus a paragraph, about 11,500
-characters, taken as 2,900 tokens in and 150 out at four characters a token,
-times 1.3 for Claude Sonnet 5 and Opus 5, whose tokenizer produces about 30
-percent more tokens, at the list prices published on 2026-09-17 (Haiku 4.5
-$1 in and $5 out per million, Sonnet 5 $2 and $10, Opus 5 $5 and $25,
-gpt-5.6-sol $4 and $20), with no prompt caching. Model latency was not measured. The Jev row is
-the run committed under `bench/results/2026-09-17/`. The model rows were judged
-on the earlier run of the same corpus (commit e2ff9ee), before three judgment
-rules were reworded and two near misses in the seed bank were replaced; they
-are re-measured on the current corpus when `snifftest bench` runs.
+Every row is one paragraph per request. The Sniff Test row is the eval's arm
+C, flags counted at 0.7, cost and latency from provider-reported usage. The
+model rows are `snifftest bench` on 2026-09-17, one repeat, cache off, and
+they count each model's own yes, which is the decision the model made; their
+cost is the returned token usage at the list prices recorded under
+`bench/prices/` with no prompt caching, and their latency is the wall clock at
+this end. Haiku, Sonnet and Opus were given 2,000 completion tokens, because
+at the default 900 Sonnet 5 ran out of room on 20 of its 166 replies on an
+earlier pass of the same run and a cut reply counts as unanswered; gpt-5.6-sol
+was given 4,000 at low reasoning effort. `bench-tables.md` in the results
+folder carries p95, the per-rule detail, every failure and the budget each row
+was sent. Jev ran in the same rotation as the models, where it read 59 of 80,
+2 of 54 and 198 ms, with one rule missing from its reply on 13 paragraphs;
+across the runs of this corpus on 2026-09-17 the judgment model read between
+59 and 64 of 80, and that swing is the size to read every row against.
 
-What that supports. On this corpus the judgment model's accuracy sits in the
-range of the mid-tier general models, with far fewer false alarms than the
-cheapest one, at a small fraction of the cost, and with no general model in
-the loop. The top models catch more.
+What that supports. On this corpus the judgment model catches about as many
+faults as the cheapest general model and fewer than the mid and top tiers,
+raises far fewer false alarms than the cheapest one, and does it at about a
+thirtieth of that model's cost and a tenth of its latency, with no general
+model in the loop. The top models catch more, at twenty to thirty-five times
+the latency and a hundred to two hundred and forty times the cost.
 
 Three things to read beside the table. Eight seeds per rule is a small sample,
 so the per-rule figures are direction rather than measurement. The eval
