@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/nose/concepts/e-sketch.svg" alt="A pencil sketch of a nose in profile" width="160">
+  <img src="assets/nose/nose.gif" alt="A pencil sketch of a nose in profile, sniffing twice and then approving" width="200">
 </p>
 
 # Sniff Test

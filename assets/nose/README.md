@@ -26,6 +26,8 @@ The tab icon is `favicon-sketch.svg`. Everything else in this directory is histo
 | `expressions.json` | The rig manifest: `locked`, parts, pivots, six expressions per concept, beat timing, `round` and `frames` per concept. |
 | `frames/e-01-rest.svg` … `e-06-twitch.svg`, `frames/a-*.svg` | E and A baked one state per file with a little line boil. The alternative to tweening, not chosen. |
 | `favicon-sketch.svg` | **The tab icon.** E's main contours only, weight up so the pencil line survives 16 px. |
+| `nose.gif` | **The README image.** The rig tweened through rest, sniff, sniff, approve on a white card with the ink fixed dark, because a GitHub README does not pass its text colour into an `<img>` and the bare SVG vanished on the dark theme. The one raster in this directory, and it is generated. |
+| `gif.mjs` | Writes the frames for `nose.gif` from `expressions.json` and the locked SVG: `node gif.mjs assets/nose <out>`, then `rsvg-convert` each frame at 480 px on white and `ffmpeg` with a 64-colour palette at 24 fps. |
 | `favicon.svg` | Round 1 favicon, not chosen: A's strokes, heavier, filled to the box. |
 | `contact-sheet.html` | Self-contained review page: E before and E locked at 16, 64 and 400 px on light and dark, the tab mock, the six expressions, the rig in motion, then round 1 and F as history. Open it in a browser. |
 | `build.mjs` | Regenerates A, B, C, E, F, the manifest, frames, favicons and the contact sheet. `bun assets/nose/build.mjs assets/nose`. D is hand-authored and only read. |
