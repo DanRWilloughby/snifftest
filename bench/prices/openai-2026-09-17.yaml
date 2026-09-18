@@ -1,0 +1,27 @@
+# Published list prices for the OpenAI direct rows, in US dollars per million
+# tokens.
+#
+# This file exists because the models endpoint returns ids and nothing else: no
+# prices, and no list of the parameters each model takes. A price written into
+# source code is a number with no provenance and no expiry, so it lives here
+# instead, and every table that uses these numbers cites this file, its source
+# and the date below.
+#
+# `match` is a substring of the served model id, so a dated id lands on its
+# family. A served model that matches no row here has no cost at all in the
+# report. It is never a zero, which would read as "this call was free".
+#
+# Re-verify on the run date and write a new dated file rather than editing this
+# one; the run that used the old numbers should keep pointing at them.
+
+version: 1
+source: >-
+  OpenAI published list prices (developers.openai.com/api/docs/pricing),
+  transcribed on 2026-09-17
+verified_on: 2026-09-17
+currency: usd_per_million_tokens
+
+models:
+  - match: gpt-5.6-sol
+    input: 4
+    output: 20

@@ -31,10 +31,22 @@ characters is split before it is sent.
 
 There is no telemetry and no analytics.
 
-`bench` is different. It sends the same paragraphs to general models through
-OpenRouter and directly to Anthropic, with `OPENROUTER_API_KEY` and
-`ANTHROPIC_API_KEY`. It asks for consent naming each destination, and a yes
-given for TypeSafe never covers either of them.
+`bench` is different. It sends the same paragraphs to general models at other
+companies. Each destination is its own key and its own endpoint, and a row runs
+only when its key is set:
+
+- OpenRouter, which routes most of the panel: the paragraphs and the rule
+  wording go to `https://openrouter.ai/api/v1/chat/completions` with
+  `OPENROUTER_API_KEY`.
+- Anthropic, called directly: the same text to
+  `https://api.anthropic.com/v1/messages` with `ANTHROPIC_API_KEY`.
+- OpenAI, called directly: the same text to
+  `https://api.openai.com/v1/chat/completions` with `OPENAI_API_KEY`.
+
+It asks for consent naming each destination, and a yes given for TypeSafe never
+covers any of them. Before the first model call each provider's model list is
+read, which is an authenticated request with that key, so it sits behind the
+same question.
 
 ## Consent
 

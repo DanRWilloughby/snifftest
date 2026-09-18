@@ -32,6 +32,7 @@ import {
   priceOf,
   requestJson,
 } from "./adapter.ts";
+import { billedOutput, chatText, firstChoice } from "./chat-completions.ts";
 import type { CatalogEntry, ReasoningSetting } from "./panel.ts";
 
 export const OPENROUTER_CHAT_ENDPOINT = "https://openrouter.ai/api/v1/chat/completions";
@@ -114,7 +115,7 @@ export function createOpenRouterAdapter(options: AdapterOptions): ModelAdapter {
 
       return {
         servedModel: typeof served === "string" ? served : request.slug,
-        text: textOf(root),
+        text: chatText(root),
         inputTokens: countOf(usage?.["prompt_tokens"]),
         outputTokens: billedOutput(usage, details),
         reasoningTokens: countOf(details?.["reasoning_tokens"]),
@@ -139,43 +140,3 @@ function reasoningField(setting: ReasoningSetting | undefined): Record<string, u
   };
 }
 
-/**
- * What the call is billed for, which is not always what it wrote.
- *
- * OpenRouter documents `completion_tokens` as covering the reasoning tokens as
- * well as the visible answer, so the usual case is that number on its own. A
- * provider that reported the reasoning alongside rather than inside would
- * otherwise have a deep call priced as if it had only written its answer, so
- * reasoning that plainly is not inside the total is added to it. Undercounting
- * here would make the cheapest-looking row the one that thought the hardest.
- */
-function billedOutput(
-  usage: Record<string, unknown> | null,
-  details: Record<string, unknown> | null,
-): number {
-  const completion = countOf(usage?.["completion_tokens"]);
-  const reasoning = countOf(details?.["reasoning_tokens"]);
-  return reasoning > completion ? completion + reasoning : completion;
-}
-
-function firstChoice(root: Record<string, unknown> | null): Record<string, unknown> | null {
-  const choices = root?.["choices"];
-  return Array.isArray(choices) ? asRecord(choices[0]) : null;
-}
-
-function textOf(root: Record<string, unknown> | null): string {
-  const message = asRecord(firstChoice(root)?.["message"]);
-  const content = message?.["content"];
-  if (typeof content === "string") return content;
-
-  // Some routed models answer with the parts array the Chat Completions spec allows.
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        const text = asRecord(part)?.["text"];
-        return typeof text === "string" ? text : "";
-      })
-      .join("");
-  }
-  return "";
-}

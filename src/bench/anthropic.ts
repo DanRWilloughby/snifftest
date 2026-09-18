@@ -69,10 +69,13 @@ export function createAnthropicAdapter(options: AdapterOptions): ModelAdapter {
     },
 
     async call(request: ModelCall): Promise<ModelReply> {
+      // No temperature. The Claude 5 models refuse the field outright (a 400
+      // that reads "`temperature` is deprecated for this model"), so a row on
+      // this provider is asked at the provider's default, and every row on it
+      // is asked the same way. The tables say so in the request footnote.
       const body = JSON.stringify({
         model: request.slug,
         max_tokens: request.maxTokens,
-        temperature: 0,
         system: request.system,
         messages: [{ role: "user", content: request.user }],
       });

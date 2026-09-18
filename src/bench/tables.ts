@@ -233,9 +233,11 @@ export function renderBenchMarkdown(report: BenchReport): string {
   lines.push(
     `${report.corpus.seeded} seeded paragraphs and ${report.corpus.clean} clean ones, seed ` +
       `${report.corpus.seed}, ${report.corpus.per_rule} per rule. Every model was sent the same ` +
-      `rule wording and the same paragraph, one call per paragraph, temperature 0. The rows ` +
-      `differ in one respect, the completion budget and reasoning each was given, and that is ` +
-      `printed in full under "The run". ` +
+      `rule wording and the same paragraph, one call per paragraph. Rows routed through ` +
+      `OpenRouter are asked at temperature 0; rows called on their provider's own API are asked ` +
+      `at the provider's default, because the Claude 5 and gpt-5 models refuse the field. Beyond ` +
+      `that the rows differ in one respect, the completion budget and reasoning each was given, ` +
+      `and that is printed in full under "The run". ` +
       `A paragraph is one corpus entry of roughly 150 to 400 words, and one call: every ` +
       `per-paragraph figure below is per call, never per file. ` +
       `The detailed tables are from the first repeat; every repeat is scored and the spread ` +

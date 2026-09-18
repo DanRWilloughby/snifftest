@@ -47,6 +47,11 @@ rather than shipping an empty one.
 - `snifftest bench` asks a panel of general models the same questions over the
   same corpus and puts cost, speed and accuracy side by side, with consent
   asked per destination.
+- A bench row can be called on OpenAI's own API with `OPENAI_API_KEY`, so an
+  OpenAI model can be measured without an OpenRouter account and its latency is
+  the provider's rather than a proxy's. `bench/panel-direct.yaml` is a panel of
+  nothing but direct rows, and `SNIFFTEST_SEND=openai` answers the send question
+  for that destination and no other.
 - `snifftest serve` opens a local page where you type and the nose reacts,
   live or from a recorded replay that needs no key. `serve --record` writes
   that replay from a live run, with the measured time and cost of each answer.
@@ -61,7 +66,10 @@ rather than shipping an empty one.
 - A Claude Code plugin and skill, `/snifftest`, that runs the free pass by
   default and never answers the sending question on the user's behalf.
 - An example corpus of ten documents, a structure set, three adversarial twins
-  and a committed eval run under `bench/results/2026-09-17/`.
+  and a committed eval run under `bench/results/2026-09-17/`, with the direct
+  panel's bench run beside it: Claude Haiku 4.5, Sonnet 5 and Opus 5 and
+  gpt-5.6-sol on their own APIs, cost and latency measured, one paragraph per
+  request. The README's numbers table reads from that run.
 - The nose: one hand-drawn SVG with six expressions, and a favicon cut.
 
 [0.1.0]: https://github.com/DanRWilloughby/snifftest/releases/tag/v0.1.0

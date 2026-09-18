@@ -103,6 +103,7 @@ describe("what the published tarball may contain", () => {
       "dist",
       "rules",
       "bench/panel.yaml",
+      "bench/panel-direct.yaml",
       "bench/prices",
       "examples/CORPUS.md",
       "examples/corpus",

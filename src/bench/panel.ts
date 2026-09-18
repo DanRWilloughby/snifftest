@@ -37,7 +37,7 @@
 import { type YamlValue, parseYaml } from "../yaml.ts";
 
 /** The providers this bench has an adapter for. Anything else is refused. */
-export const PROVIDERS = ["openrouter", "anthropic", "jev"] as const;
+export const PROVIDERS = ["openrouter", "anthropic", "openai", "jev"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 
 /** The one place a string becomes a `Provider`, so nothing else has to assert it. */
@@ -235,9 +235,15 @@ function slugList(value: YamlValue | undefined, where: string): readonly string[
 /**
  * A row's reasoning setting, refused rather than half honoured.
  *
- * The Anthropic direct adapter has no extended thinking wired into it, so a row
- * that asks for reasoning on that provider is an error here rather than a
- * setting the footnote prints and the request never carries.
+ * Two adapters send a reasoning request and they do not take the same one.
+ * OpenRouter takes an object with an effort, a token budget or an exclude flag;
+ * the OpenAI request carries a single `reasoning_effort` string and has no
+ * field for the other two. The Anthropic direct adapter has no extended
+ * thinking wired into it at all.
+ *
+ * So a setting the row's own provider could not carry is an error here, at the
+ * moment the file is read, rather than a footnote printed under a table about a
+ * request that never went down the wire.
  */
 function readReasoning(
   value: YamlValue | undefined,
@@ -246,9 +252,9 @@ function readReasoning(
 ): ReasoningSetting | undefined {
   if (value === undefined || value === null) return undefined;
   if (!isMapping(value)) throw new PanelError(`${where} is a mapping of the provider's own fields.`);
-  if (provider !== "openrouter") {
+  if (provider !== "openrouter" && provider !== "openai") {
     throw new PanelError(
-      `${where} is set, and only the openrouter adapter sends a reasoning request; the ${provider} adapter has no extended thinking wired into it.`,
+      `${where} is set, and the openrouter and openai adapters are the only ones that send a reasoning request; the ${provider} adapter has no extended thinking wired into it.`,
     );
   }
 
@@ -267,6 +273,17 @@ function readReasoning(
   const exclude = value["exclude"];
   if (exclude !== undefined && exclude !== null && typeof exclude !== "boolean") {
     throw new PanelError(`${where}.exclude is true or false.`);
+  }
+
+  if (provider === "openai" && budget !== undefined) {
+    throw new PanelError(
+      `${where}.max_tokens is set, and the OpenAI request has no such field; that adapter sends an effort and nothing else, so name ${where}.effort instead.`,
+    );
+  }
+  if (provider === "openai" && exclude !== undefined && exclude !== null) {
+    throw new PanelError(
+      `${where}.exclude is set, and the OpenAI request has no such field; that adapter sends an effort and nothing else.`,
+    );
   }
 
   const setting: ReasoningSetting = {
