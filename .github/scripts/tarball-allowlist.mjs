@@ -72,7 +72,16 @@ if (packPath === undefined) {
   process.exit(2);
 }
 
-const [report] = JSON.parse(readFileSync(packPath, "utf8"));
+// The runner's npm runs `prepare` even under --ignore-scripts, and the build's
+// own stdout lands ahead of the JSON. The report is the array that begins at
+// the first `[`; whatever precedes it is a lifecycle script talking.
+const raw = readFileSync(packPath, "utf8");
+const start = raw.indexOf("[");
+if (start < 0) {
+  console.error(`${packPath} holds no JSON array from npm pack --json.`);
+  process.exit(2);
+}
+const [report] = JSON.parse(raw.slice(start));
 const files = report.files.map((file) => file.path).sort();
 console.log(files.join("\n"));
 
