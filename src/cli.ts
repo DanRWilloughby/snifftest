@@ -92,6 +92,7 @@ import {
   type JevClient,
   type JevClientOptions,
   KEY_ENV,
+  PRICE_BASIS,
   STATE_GUARD_CHARS,
   createJevClient,
 } from "./jev.ts";
@@ -173,6 +174,7 @@ interface Options {
   readonly threshold?: number;
   readonly format: "text" | "json";
   readonly dryRun: boolean;
+  readonly quiet: boolean;
   readonly assumeYes: boolean;
   /** `eval` only: the seed value, the seeds per rule, and where results land. */
   readonly seed?: number;
@@ -367,7 +369,7 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
   report(deps, options, threshold, flags, verdict, summary);
   deps.writeError(verdict);
   for (const line of degradationLines(judged)) deps.writeError(line);
-  deps.writeError(usageLine(judged.usage));
+  if (!options.quiet) deps.writeError(usageLine(judged.usage));
 
   // Asked, and heard nothing usable. Exit 0 is this tool's word for "nothing
   // tripped a rule", and a run that got no judgment at all has not earned it.
@@ -525,7 +527,8 @@ function usageLine(usage: JudgmentUsage): string {
     usage.cached === 0
       ? ""
       : `, ${usage.cached} ${usage.cached === 1 ? "paragraph" : "paragraphs"} answered from the cache and not paid for again`;
-  return `${requests}, ${usage.inputTokens} input tokens, $${usage.estimatedCostUsd.toFixed(6)}, ${usage.latencyMs} ms${retries}${cached}.`;
+  const basis = `$${(PRICE_BASIS.usd_per_input_token * 1e6).toFixed(3)} per million input tokens (${PRICE_BASIS.source ?? "unsourced price"})`;
+  return `jev: ${requests}, ${usage.inputTokens} input tokens, about $${usage.estimatedCostUsd.toFixed(6)} at ${basis}, ${usage.latencyMs} ms${retries}${cached}.`;
 }
 
 // --- eval -----------------------------------------------------------------
@@ -1393,6 +1396,7 @@ function parseArgs(argv: readonly string[]): Options {
   let threshold: number | undefined;
   let format: "text" | "json" = "text";
   let dryRun = false;
+  let quiet = false;
   let assumeYes = false;
   let endOfOptions = false;
   let seed: number | undefined;
@@ -1424,6 +1428,9 @@ function parseArgs(argv: readonly string[]): Options {
         break;
       case "--dry-run":
         dryRun = true;
+        break;
+      case "--quiet":
+        quiet = true;
         break;
       case "--no-cache":
         noCache = true;
@@ -1504,6 +1511,7 @@ function parseArgs(argv: readonly string[]): Options {
     ...(threshold === undefined ? {} : { threshold }),
     format,
     dryRun,
+    quiet,
     assumeYes,
     ...(seed === undefined ? {} : { seed }),
     ...(perRule === undefined ? {} : { perRule }),
@@ -1775,6 +1783,7 @@ function helpLines(): string[] {
     "                      for check that means the countable rules and nothing else",
     "  --no-cache          ask about every paragraph again, instead of reusing an answer",
     "                      already paid for in the last fortnight",
+    "  --quiet             hide check's usage line, keeping flags and diagnostics",
     "  --yes, -y           answer the send question for this run and remember the answer",
     "  --help, --version",
     "",

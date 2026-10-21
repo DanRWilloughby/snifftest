@@ -56,6 +56,11 @@ reported as no judgment and never becomes a flag or a pass. That band exists
 because the judgment model answers about 0.5 on text it cannot read, and a
 flat middle number is the one failure that looks like a clean draft.
 
+After a judgment run, `check` prints a usage line on stderr with the request
+count, input tokens and estimated cost at the disclosed rate. The price has
+no recorded published source, and the line says so. `--quiet` hides that line
+without hiding flags or diagnostics. A dry run prints no usage line.
+
 `--format json` prints the same flags for a machine, with every reading
 including the ones under the threshold. `snifftest rules` prints the ruleset in
 force and which file each rule came from, which is the quickest answer to "why
@@ -346,6 +351,7 @@ the corpus and where every paragraph came from.
 | `--skip <tags>` | Never run a rule carrying one of these tags. |
 | `--dry-run` | Make no network request of any kind. For `check`, the countable rules and nothing else. |
 | `--no-cache` | Ask about every paragraph again instead of reusing an answer from the last fortnight. |
+| `--quiet` | Hide the `check` usage line, keeping flags and diagnostics. |
 | `--yes`, `-y` | Answer the send question for this run and remember the answer. |
 
 | Variable | What it does |
