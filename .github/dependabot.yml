@@ -3,7 +3,7 @@ version: 2
 updates:
   # The two dev dependencies. There are no runtime dependencies to update, and
   # that is the point of the package, so this list should stay short.
-  - package-ecosystem: npm
+  - package-ecosystem: bun
     directory: "/"
     schedule:
       interval: weekly
