@@ -9,6 +9,14 @@ Release notes are cut from this file: the release workflow publishes the section
 whose heading matches the tag, so a tag with no section here fails the release
 rather than shipping an empty one.
 
+## [Unreleased]
+
+### Changed
+
+- The `check` usage line identifies Jev and carries the input-token rate beside
+  the estimated cost, marked as an unsourced price. `--quiet` hides that line
+  without hiding flags or diagnostics.
+
 ## [0.1.0] - 2026-09-18
 
 ### Added
