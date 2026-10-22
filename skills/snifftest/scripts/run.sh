@@ -32,7 +32,7 @@ set -u
 
 # Pinned. A floating version would change what runs under someone else's draft
 # without them asking for it.
-SNIFFTEST_VERSION="${SNIFFTEST_VERSION:-0.1.0}"
+SNIFFTEST_VERSION="${SNIFFTEST_VERSION:-0.2.0}"
 
 judge=0
 for argument in "$@"; do

@@ -240,7 +240,7 @@ draft whose faults you know before you let its flags block a commit.
 One command, from the root of your repository:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.1.0/hooks/pre-commit \
+curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.2.0/hooks/pre-commit \
   -o .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
@@ -270,7 +270,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
-      - uses: DanRWilloughby/snifftest@v0.1.0
+      - uses: DanRWilloughby/snifftest@v0.2.0
         with:
           paths: docs
 ```

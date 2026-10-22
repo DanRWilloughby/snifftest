@@ -11,6 +11,8 @@ rather than shipping an empty one.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-22
+
 ### Added
 
 - `check --judge-url <url> --judge-model <name>` (or `SNIFFTEST_JUDGE_URL` and
@@ -90,4 +92,5 @@ rather than shipping an empty one.
   request. The README's numbers table reads from that run.
 - The nose: one hand-drawn SVG with six expressions, and a favicon cut.
 
+[0.2.0]: https://github.com/DanRWilloughby/snifftest/releases/tag/v0.2.0
 [0.1.0]: https://github.com/DanRWilloughby/snifftest/releases/tag/v0.1.0

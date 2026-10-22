@@ -17,7 +17,7 @@
   description: Check staged prose against your house rules. Countable rules only; nothing leaves your machine.
   entry: snifftest check --dry-run --
   language: node
-  additional_dependencies: ["snifftest@0.1.0"]
+  additional_dependencies: ["snifftest@0.2.0"]
   types_or: [markdown, plain-text]
 
 - id: snifftest-send
@@ -28,6 +28,6 @@
     under the manual stage so it never runs on a commit you did not ask it to.
   entry: snifftest check --
   language: node
-  additional_dependencies: ["snifftest@0.1.0"]
+  additional_dependencies: ["snifftest@0.2.0"]
   types_or: [markdown, plain-text]
   stages: [manual]
