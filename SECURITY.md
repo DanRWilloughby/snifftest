@@ -17,8 +17,29 @@ The judgment rules send text. For each paragraph, one request goes to
 `https://api.typesafe.ai/v1/systemone` over HTTPS with your `TYPESAFE_API_KEY`
 as a bearer token. The request carries that one paragraph and the wording of
 every judgment rule in the ruleset in force. The reply is one probability per
-rule. That endpoint is the only place `check` sends anything, and the address
-cannot be changed by a ruleset, a flag or an environment variable.
+rule. By default that endpoint is the only place `check` sends anything. A
+ruleset cannot change the address. The person running the tool can, with
+`--judge-url` or `SNIFFTEST_JUDGE_URL`, as the next section says.
+
+### A model server of your own
+
+`--judge-url <url> --judge-model <name>` (or `SNIFFTEST_JUDGE_URL` and
+`SNIFFTEST_JUDGE_MODEL`) sends the judgment rules to a server that speaks
+OpenAI's Chat Completions API instead of to TypeSafe. The request carries the
+same paragraph and rule wording, goes to `<url>/chat/completions`, and carries
+no key: `TYPESAFE_API_KEY` is never sent there, and is not needed.
+
+- When the URL's host is `localhost`, `127.x.x.x` or `[::1]`, nothing leaves
+  the machine, and no send question is asked.
+- Any other host, including one on your own network, is a destination. It is
+  named in the send question as `model server at <host:port>`, a yes given for
+  TypeSafe or for another host does not cover it, and `SNIFFTEST_SEND=1` does
+  not answer for it.
+- A URL without a model, or a model without a URL, is an error rather than a
+  quiet fall back to TypeSafe.
+- Plain `http` is accepted, because that is what local servers speak. To a
+  host that is not this machine, that means the paragraph crosses the network
+  unencrypted; use `https` there.
 
 What is never sent: file names, file paths, and anything outside the text you
 pointed the tool at. Fenced code is dropped before either kind of rule reads
@@ -64,8 +85,8 @@ Nothing is sent before the answer to the send question is yes.
 - `--yes` answers without the prompt and stores the answer.
 - `SNIFFTEST_SEND` answers for one run and stores nothing. Its value names the
   destinations it answers for, comma separated. `1` is shorthand for TypeSafe,
-  the only place `check` sends, so a CI job that sets it for `check` has not
-  answered for `bench`.
+  where `check` sends by default, so a CI job that sets it for `check` has not
+  answered for `bench` or for a model server of its own.
 - With no terminal to ask in and no answer in the environment, the run exits 3
   and sends nothing. Exit 3 is the question, not an error to work around.
 - `--dry-run` makes no network request of any kind, on every command.

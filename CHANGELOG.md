@@ -11,6 +11,16 @@ rather than shipping an empty one.
 
 ## [Unreleased]
 
+### Added
+
+- `check --judge-url <url> --judge-model <name>` (or `SNIFFTEST_JUDGE_URL` and
+  `SNIFFTEST_JUDGE_MODEL`) answers the judgment rules with a model you run
+  yourself, through any Chat Completions server such as Ollama or LM Studio.
+  On `localhost` nothing leaves the machine, no key is needed and no send
+  question is asked; any other host is a named destination with its own
+  consent. Jev stays the default. Its answers are cached under the local
+  model's name, never Jev's. (#6)
+
 ### Changed
 
 - The `check` usage line identifies Jev and carries the input-token rate beside
