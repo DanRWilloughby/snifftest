@@ -43,11 +43,14 @@ or reserve the name with a placeholder release, before making it public.
    `tsc --noEmit` then the whole test suite.
 5. **Commit, then tag.** `git tag v0.2.0 && git push origin main --tags`. Only a
    tag matching `v[0-9]+.[0-9]+.[0-9]+` triggers the release workflow.
-6. **Approve the `release` environment.** The npm token lives on that protected
-   environment rather than on the repository, so no other workflow can reach it
-   and a tag on its own never publishes unattended. A reviewer has to say yes.
+6. **Approve the `release` environment.** npm's trusted publisher names that
+   protected environment, so no other workflow or job can publish, and it has a
+   required reviewer, so a tag on its own never publishes unattended. A
+   reviewer has to say yes in the Actions tab.
 7. **Check the provenance.** The workflow runs
-   `npm publish --provenance --access public` with an OIDC token, so the
+   `npm publish --provenance --access public` with an OIDC token and no
+   stored npm token (trusted publishing, configured on the package's npm
+   settings page for `release.yml` and the `release` environment), so the
    published tarball carries an attestation that anyone can check: it says this
    tarball was built by this workflow from this commit, rather than uploaded by
    whoever happened to hold a token. The npm page shows it once the publish
