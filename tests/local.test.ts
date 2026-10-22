@@ -118,6 +118,19 @@ describe("the local client", () => {
     expect(String(failure)).toContain("tiny did not answer in the shape asked for");
   });
 
+  test("a reply under names of the model's own says so, instead of a silent unanswered", async () => {
+    // What qwen3:1.7b sent back from a live Ollama, 2026-10-22.
+    const reply = '{"rule_1": {"flag": false, "p": 0}, "rule_2": {"flag": false, "p": 0}}';
+    const client = createLocalClient({ url: LOCAL, model: "qwen3:1.7b", fetch: server(reply, []) });
+
+    const failure = await ask(client).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(JevRequestError);
+    expect(String(failure)).toContain(
+      "qwen3:1.7b answered none of the rules it was asked about, and used names it was not given (rule_1, rule_2)",
+    );
+  });
+
   test("a model the server does not have stops the arm at once, with the server's reason", async () => {
     const client = createLocalClient({ url: LOCAL, model: "missing", fetch: server("", [], 404) });
 

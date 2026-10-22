@@ -144,13 +144,22 @@ export function createLocalClient(options: LocalClientOptions): JevClient {
       const root = asRecord(await post(doFetch, endpoint, body, timeoutMs));
       const text = chatText(root).replace(THINKING, "");
 
-      let readings;
+      let parsed;
       try {
-        readings = parseReply(text, Object.keys(request.questions)).readings;
+        parsed = parseReply(text, Object.keys(request.questions));
       } catch (error) {
         throw new JevRequestError(
           `${options.model} did not answer in the shape asked for: ${error instanceof Error ? error.message : String(error)}`,
         );
+      }
+      // Small models answer under names of their own ("rule_1") as often as
+      // under the ids they were given. Counted silently that is a column of
+      // "unanswered" with no reason beside it, so a reply that answered none of
+      // the rules it was asked about is a failed paragraph that says why.
+      const readings = parsed.readings;
+      if (Object.keys(readings).length === 0) {
+        const named = parsed.extra.length === 0 ? "" : `, and used names it was not given (${parsed.extra.slice(0, 3).join(", ")})`;
+        throw new JevRequestError(`${options.model} answered none of the rules it was asked about${named}`);
       }
 
       const nouls: Record<string, number> = {};
