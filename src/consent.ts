@@ -51,7 +51,8 @@ export interface ConsentOutcome {
 export interface Destination {
   readonly name: string;
   readonly endpoint: string;
-  readonly keyEnv: string;
+  /** Absent for a server of your own that takes no key. */
+  readonly keyEnv?: string;
 }
 
 /** The judgment rules' own destination, and the only one `check` ever uses. */
@@ -107,7 +108,10 @@ export function disclosure(facts: DisclosureFacts): string[] {
     `  What leaves this machine: one paragraph of your text at a time, from ${drafts},`,
     `    together with the wording of these rules: ${rules}.`,
     ...destinationsOf(facts).map(
-      (where) => `  Where it goes: ${where.endpoint} (${where.name}), over HTTPS, with your ${where.keyEnv}.`,
+      (where) =>
+        where.keyEnv === undefined
+          ? `  Where it goes: ${where.endpoint} (${where.name}).`
+          : `  Where it goes: ${where.endpoint} (${where.name}), over HTTPS, with your ${where.keyEnv}.`,
     ),
     "  What comes back: one probability per rule per paragraph.",
     "  What is never sent: file names, file paths, anything outside the text you pointed at.",

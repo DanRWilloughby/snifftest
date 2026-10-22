@@ -96,6 +96,15 @@ import {
   STATE_GUARD_CHARS,
   createJevClient,
 } from "./jev.ts";
+import {
+  JUDGE_MODEL_ENV,
+  JUDGE_URL_ENV,
+  LOCAL_PER_PARAGRAPH_BUDGET_MS,
+  type LocalJudge,
+  chatEndpoint,
+  createLocalClient,
+  isLoopback,
+} from "./local.ts";
 import { RulesetError } from "./rules.ts";
 import { serve } from "./serve/command.ts";
 import { type Flag, type Ruleset, asRecord, isJudgmentRule } from "./types.ts";
@@ -200,6 +209,9 @@ interface Options {
   readonly skip?: readonly string[];
   /** The tree this run is about, when the process is not standing in it. */
   readonly root?: string;
+  /** `check` only: a model server of your own, asked instead of Jev. */
+  readonly judgeUrl?: string;
+  readonly judgeModel?: string;
 }
 
 // --- the entry point ------------------------------------------------------
@@ -319,8 +331,9 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
     return exitFor(countable);
   }
 
+  const judge = localJudge(deps, options);
   const key = deps.env[KEY_ENV];
-  if (key === undefined || key.trim() === "") {
+  if (judge === undefined && (key === undefined || key.trim() === "")) {
     const verdict =
       `The countable rules ran and the judgment rules did not, so this is not a full verdict.`;
     report(deps, options, threshold, countable, verdict, notRun(`${KEY_ENV} is not set`));
@@ -330,31 +343,50 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
     return EXIT.failure;
   }
 
-  const consent = await requestConsent({
-    env: deps.env,
-    homedir: deps.homedir,
-    assumeYes: options.assumeYes,
-    isTty: deps.isTty,
-    ruleIds: judgmentRules.map((rule) => rule.id),
-    fileCount: files.length,
-    say: deps.writeError,
-    ...(deps.prompt === undefined ? {} : { prompt: deps.prompt }),
-  });
+  // A server on this machine is not a destination: nothing leaves, so there is
+  // nothing to ask about. Anywhere else, including a box on the same network,
+  // is asked about by name, and a yes to TypeSafe does not cover it.
+  if (judge === undefined || !isLoopback(judge.url)) {
+    const consent = await requestConsent({
+      env: deps.env,
+      homedir: deps.homedir,
+      assumeYes: options.assumeYes,
+      isTty: deps.isTty,
+      ruleIds: judgmentRules.map((rule) => rule.id),
+      fileCount: files.length,
+      say: deps.writeError,
+      ...(judge === undefined ? {} : { destinations: [judgeDestination(judge)] }),
+      ...(deps.prompt === undefined ? {} : { prompt: deps.prompt }),
+    });
 
-  if (!consent.granted) {
-    const verdict = "The countable rules ran; the judgment rules were not sent anything.";
-    report(deps, options, threshold, countable, verdict, notRun("consent was not given"));
-    return EXIT.consent;
+    if (!consent.granted) {
+      const verdict = "The countable rules ran; the judgment rules were not sent anything.";
+      report(deps, options, threshold, countable, verdict, notRun("consent was not given"));
+      return EXIT.consent;
+    }
   }
 
-  const client = (deps.createClient ?? createJevClient)({ apiKey: key });
+  if (judge !== undefined && !options.quiet) {
+    deps.writeError(
+      `the judgment rules are answered by ${judge.model} at ${judge.url}. Its accuracy is its own: ` +
+        "models under about 27B missed or over-flagged about half of the faults when this was measured.",
+    );
+  }
+
+  const client =
+    judge === undefined
+      ? (deps.createClient ?? createJevClient)({ apiKey: key ?? "" })
+      : createLocalClient({ ...judge, ...(deps.fetchLike === undefined ? {} : { fetch: deps.fetchLike }) });
   const cache =
     options.noCache === true
       ? undefined
       : openCache({ env: deps.env, ...(deps.homedir === undefined ? {} : { homedir: deps.homedir }) });
   let judged: JudgmentArmResult;
   try {
-    judged = await runJudgmentArm(chunks, ruleset, client, ...(cache === undefined ? [] : [{ cache }]));
+    judged = await runJudgmentArm(chunks, ruleset, client, {
+      ...(cache === undefined ? {} : { cache }),
+      ...(judge === undefined ? {} : { perParagraphBudgetMs: LOCAL_PER_PARAGRAPH_BUDGET_MS }),
+    });
   } catch (error) {
     const verdict = "The countable rules ran and the judgment arm failed, so this is not a full verdict.";
     report(deps, options, threshold, countable, verdict, notRun(messageOf(error)));
@@ -369,7 +401,7 @@ async function check(deps: CliDeps, options: Options): Promise<number> {
   report(deps, options, threshold, flags, verdict, summary);
   deps.writeError(verdict);
   for (const line of degradationLines(judged)) deps.writeError(line);
-  if (!options.quiet) deps.writeError(usageLine(judged.usage));
+  if (!options.quiet) deps.writeError(usageLine(judged.usage, judge));
 
   // Asked, and heard nothing usable. Exit 0 is this tool's word for "nothing
   // tripped a rule", and a run that got no judgment at all has not earned it.
@@ -518,7 +550,7 @@ function report(
   }
 }
 
-function usageLine(usage: JudgmentUsage): string {
+function usageLine(usage: JudgmentUsage, judge?: LocalJudge): string {
   const requests = usage.requests === 1 ? "1 request" : `${usage.requests} requests`;
   const retries = usage.retries === 0 ? "" : `, ${usage.retries} retried`;
   // Said in the same line as the bill, because the difference between sixty
@@ -527,8 +559,49 @@ function usageLine(usage: JudgmentUsage): string {
     usage.cached === 0
       ? ""
       : `, ${usage.cached} ${usage.cached === 1 ? "paragraph" : "paragraphs"} answered from the cache and not paid for again`;
+  if (judge !== undefined) {
+    const answered = cached.replace(" and not paid for again", "");
+    return `${judge.model}: ${requests}, ${usage.inputTokens} input tokens, nothing billed, ${usage.latencyMs} ms${answered}.`;
+  }
   const basis = `$${(PRICE_BASIS.usd_per_input_token * 1e6).toFixed(3)} per million input tokens (${PRICE_BASIS.source ?? "unsourced price"})`;
   return `jev: ${requests}, ${usage.inputTokens} input tokens, about $${usage.estimatedCostUsd.toFixed(6)} at ${basis}, ${usage.latencyMs} ms${retries}${cached}.`;
+}
+
+/**
+ * The model server `check` should ask instead of Jev, if any.
+ *
+ * The flags win over the environment, so a hook that sets the environment can
+ * still be pointed somewhere else for one run. Half a setting is an error
+ * rather than a quiet fall back to Jev: someone who named a server meant for
+ * nothing to go to TypeSafe.
+ */
+function localJudge(deps: CliDeps, options: Options): LocalJudge | undefined {
+  const url = (options.judgeUrl ?? deps.env[JUDGE_URL_ENV] ?? "").trim();
+  const model = (options.judgeModel ?? deps.env[JUDGE_MODEL_ENV] ?? "").trim();
+  if (url === "" && model === "") return undefined;
+  if (url === "") {
+    throw new UsageError(`a judge model was named without a server. Add --judge-url or ${JUDGE_URL_ENV}.`);
+  }
+  if (model === "") {
+    throw new UsageError(
+      `a judge server was named without a model. Add --judge-model or ${JUDGE_MODEL_ENV}, as the server names it.`,
+    );
+  }
+  let protocol: string;
+  try {
+    protocol = new URL(url).protocol;
+  } catch {
+    throw new UsageError(`--judge-url takes a URL like http://localhost:11434/v1, not "${url}".`);
+  }
+  if (protocol !== "http:" && protocol !== "https:") {
+    throw new UsageError(`--judge-url takes an http or https URL, not "${url}".`);
+  }
+  return { url, model };
+}
+
+/** A server of your own, named by its host so a yes to one is not a yes to another. */
+function judgeDestination(judge: LocalJudge): Destination {
+  return { name: `model server at ${new URL(judge.url).host}`, endpoint: chatEndpoint(judge.url) };
 }
 
 // --- eval -----------------------------------------------------------------
@@ -1413,6 +1486,8 @@ function parseArgs(argv: readonly string[]): Options {
   let only: string[] | undefined;
   let skip: string[] | undefined;
   let root: string | undefined;
+  let judgeUrl: string | undefined;
+  let judgeModel: string | undefined;
 
   for (let i = 1; i < argv.length; i++) {
     const argument = argv[i] ?? "";
@@ -1492,6 +1567,12 @@ function parseArgs(argv: readonly string[]): Options {
       case "--root":
         root = valueFor(argv, ++i, "--root");
         break;
+      case "--judge-url":
+        judgeUrl = valueFor(argv, ++i, "--judge-url");
+        break;
+      case "--judge-model":
+        judgeModel = valueFor(argv, ++i, "--judge-model");
+        break;
       default:
         throw new UsageError(`unknown option "${argument}". Try snifftest --help.`);
     }
@@ -1527,6 +1608,8 @@ function parseArgs(argv: readonly string[]): Options {
     ...(only === undefined ? {} : { only }),
     ...(skip === undefined ? {} : { skip }),
     ...(root === undefined ? {} : { root }),
+    ...(judgeUrl === undefined ? {} : { judgeUrl }),
+    ...(judgeModel === undefined ? {} : { judgeModel }),
   };
 }
 
@@ -1785,6 +1868,11 @@ function helpLines(): string[] {
     "                      already paid for in the last fortnight",
     "  --quiet             hide check's usage line, keeping flags and diagnostics",
     "  --yes, -y           answer the send question for this run and remember the answer",
+  "  --judge-url <url>   check only: ask a model server of your own (anything speaking",
+  "                      OpenAI's Chat Completions, e.g. http://localhost:11434/v1 for",
+  `                      Ollama) instead of Jev; also ${JUDGE_URL_ENV}. On this machine,`,
+  "                      nothing leaves it and no send question is asked",
+  `  --judge-model <name> the model that server should use; also ${JUDGE_MODEL_ENV}`,
     "  --help, --version",
     "",
     "Options for eval",
