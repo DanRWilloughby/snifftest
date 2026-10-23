@@ -427,7 +427,7 @@ describe("dependabot watches the two things there are to watch", () => {
 
   test("the dev dependencies and the pinned actions", () => {
     const ecosystems = dependabot.updates.map((u: { "package-ecosystem": string }) => u["package-ecosystem"]);
-    expect(ecosystems.sort()).toEqual(["github-actions", "npm"]);
+    expect(ecosystems.sort()).toEqual(["bun", "github-actions"]);
   });
 });
 
