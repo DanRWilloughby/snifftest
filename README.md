@@ -56,6 +56,11 @@ reported as no judgment and never becomes a flag or a pass. That band exists
 because the judgment model answers about 0.5 on text it cannot read, and a
 flat middle number is the one failure that looks like a clean draft.
 
+After a judgment run, `check` prints a usage line on stderr with the request
+count, input tokens and estimated cost at the disclosed rate. The price has
+no recorded published source, and the line says so. `--quiet` hides that line
+without hiding flags or diagnostics. A dry run prints no usage line.
+
 `--format json` prints the same flags for a machine, with every reading
 including the ones under the threshold. `snifftest rules` prints the ruleset in
 force and which file each rule came from, which is the quickest answer to "why
@@ -187,7 +192,8 @@ sends nothing.
 Each request carries one paragraph and every judgment rule's wording. It goes
 over HTTPS with your key as a bearer token, and the reply is a probability per
 rule. The wire format and the guards around it are in `src/jev.ts`, which is
-the only file in the tool that opens a network connection for `check`.
+the only file that opens a network connection for `check` unless you point the
+judgment rules at a model of your own (below).
 
 Answers are cached on disk so that a run interrupted by an outage does not pay
 for every paragraph again. The cache lives under `~/.cache/snifftest`, or
@@ -200,12 +206,41 @@ for a run, and `SNIFFTEST_CACHE_DIR=off` turns it off for good.
 
 `SECURITY.md` has the full account, including the limits.
 
+### Offline, with a model you run yourself
+
+The judgment rules can be answered by a model on your own machine instead of
+Jev. Anything that speaks OpenAI's Chat Completions API works: Ollama, LM
+Studio, llama.cpp's server, vLLM.
+
+```sh
+ollama pull qwen3.8:27b
+snifftest check --judge-url http://localhost:11434/v1 --judge-model qwen3.8:27b draft.md
+```
+
+`SNIFFTEST_JUDGE_URL` and `SNIFFTEST_JUDGE_MODEL` do the same from the
+environment, so the commit hook and CI can use it too. On `localhost` nothing
+leaves the machine, no key is needed, and no send question is asked. A server
+on any other host is asked about by name, like any other destination.
+
+Size matters more than anything else. On the 166 paragraphs of the 2026-09-17
+benchmark, models of 8 to 20B either missed about half the faults or flagged
+about half the clean paragraphs. Qwen3.8 27B caught 69 of 80 faults and flagged
+2 of 54 clean paragraphs (Jev: 63 and 1), at about 60 times Jev's time per
+paragraph. Plan on a 27B model or larger, and roughly 16 to 20 GB of memory to
+run one. A thinking model is slower again; turn thinking off in your server if
+it lets you.
+
+The no-judgment band (0.4 to 0.6, see "Reading a flag") was measured on Jev. A
+local model is held to it too, but where a given model hedges has not been
+measured, and `eval` and `bench` do not run a local model yet. Try yours on a
+draft whose faults you know before you let its flags block a commit.
+
 ## Before a commit
 
 One command, from the root of your repository:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.1.0/hooks/pre-commit \
+curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.2.0/hooks/pre-commit \
   -o .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
@@ -235,7 +270,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
-      - uses: DanRWilloughby/snifftest@v0.1.0
+      - uses: DanRWilloughby/snifftest@v0.2.0
         with:
           paths: docs
 ```
@@ -346,13 +381,17 @@ the corpus and where every paragraph came from.
 | `--skip <tags>` | Never run a rule carrying one of these tags. |
 | `--dry-run` | Make no network request of any kind. For `check`, the countable rules and nothing else. |
 | `--no-cache` | Ask about every paragraph again instead of reusing an answer from the last fortnight. |
+| `--quiet` | Hide the `check` usage line, keeping flags and diagnostics. |
 | `--yes`, `-y` | Answer the send question for this run and remember the answer. |
+| `--judge-url <url>` | `check` only. Ask a Chat Completions server of your own instead of Jev, e.g. `http://localhost:11434/v1`. |
+| `--judge-model <name>` | The model that server should use, as the server names it. |
 
 | Variable | What it does |
 | --- | --- |
 | `TYPESAFE_API_KEY` | The key the judgment rules are sent with. Read from the environment and nowhere else. |
-| `SNIFFTEST_SEND` | Answer the send question in CI without remembering it. `1` means TypeSafe, which is where `check` sends and nowhere else. |
+| `SNIFFTEST_SEND` | Answer the send question in CI without remembering it. `1` means TypeSafe, where `check` sends unless you named a model server of your own. |
 | `SNIFFTEST_CACHE_DIR` | Where cached answers live. `off` for none. |
+| `SNIFFTEST_JUDGE_URL`, `SNIFFTEST_JUDGE_MODEL` | The same as `--judge-url` and `--judge-model`. The flags win. |
 | `OPENROUTER_API_KEY`, `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` | Used by `bench` only. Each one is the key its own rows are called with, and a panel row whose key is missing says so rather than running. |
 
 `snifftest --help` lists the options for `eval` and `bench` as well.

@@ -382,6 +382,106 @@ describe("the judgment arm", () => {
   });
 });
 
+describe("check usage", () => {
+  for (const format of ["text", "json"]) {
+    test(`${format}: one usage line on stderr carries the disclosed rate and its limits`, async () => {
+      const seen: JevRequest[] = [];
+      const result = await run({
+        argv: ["check", "--format", format, "--rules", MIXED, `${TEXTS}/clean.md`],
+        client: stubClient(always({ restating_closer: 0.1 }), seen),
+        env: { SNIFFTEST_SEND: "1", SNIFFTEST_CACHE_DIR: "off" },
+      });
+
+      expect(result.code).toBe(EXIT.ok);
+      expect(seen).toHaveLength(2);
+      expect(result.err.split("\n").filter((line) => line.startsWith("jev:"))).toEqual([
+        "jev: 2 requests, 240 input tokens, about $0.000010 at $0.042 per million input tokens (unsourced price), 22 ms.",
+      ]);
+      expect(result.out).not.toContain("jev:");
+      if (format === "json") expect((JSON.parse(result.out) as CheckJson).flags).toEqual([]);
+    });
+
+    test(`${format}: --quiet hides only usage, keeping the flags and exit code`, async () => {
+      const argv = ["check", "--format", format, "--rules", MIXED, `${TEXTS}/closer.md`];
+      const seen: JevRequest[] = [];
+      const options = {
+        client: stubClient(restating, seen),
+        env: { SNIFFTEST_SEND: "1", SNIFFTEST_CACHE_DIR: "off" },
+      };
+      const normal = await run({ ...options, argv });
+      const quiet = await run({ ...options, argv: [...argv, "--quiet"] });
+
+      expect(normal.code).toBe(EXIT.flags);
+      expect(quiet.code).toBe(normal.code);
+      expect(seen).toHaveLength(2);
+      expect(quiet.out).toBe(normal.out);
+      expect(quiet.err).toBe(normal.err.split("\n").filter((line) => !line.startsWith("jev:")).join("\n"));
+      expect(quiet.err).not.toContain("input tokens");
+    });
+  }
+
+  test("--quiet does not bypass consent or hide the disclosure", async () => {
+    const seen: JevRequest[] = [];
+    const result = await run({
+      argv: ["check", "--quiet", "--rules", MIXED, `${TEXTS}/closer.md`],
+      client: stubClient(restating, seen),
+    });
+
+    expect(result.code).toBe(EXIT.consent);
+    expect(seen).toEqual([]);
+    expect(result.err).toContain("api.typesafe.ai");
+    expect(result.out).toContain("dash_present");
+  });
+
+  test("--quiet keeps failure diagnostics and countable findings", async () => {
+    const result = await run({
+      argv: ["check", "--quiet", "--rules", MIXED, `${TEXTS}/flagged.md`],
+      env: { SNIFFTEST_SEND: "1", SNIFFTEST_CACHE_DIR: "off" },
+      client: {
+        async ask(): Promise<JevResult> {
+          throw new Error("jev returned 503");
+        },
+      },
+    });
+
+    expect(result.code).toBe(EXIT.failure);
+    expect(result.out).toContain("dash_present");
+    expect(result.err).toContain("503");
+    expect(result.err).toContain("answered none");
+    expect(result.err).not.toContain("input tokens");
+  });
+
+  test("dry runs make no calls and print no usage, with or without --quiet", async () => {
+    const seen: JevRequest[] = [];
+    for (const quiet of [[], ["--quiet"]]) {
+      const result = await run({
+        argv: ["check", "--dry-run", ...quiet, "--rules", MIXED, `${TEXTS}/clean.md`],
+        client: stubClient(always({ restating_closer: 0.1 }), seen),
+      });
+
+      expect(result.code).toBe(EXIT.ok);
+      expect(result.err).not.toContain("input tokens");
+      expect(result.err).toContain("--dry-run was asked for");
+    }
+    expect(seen).toEqual([]);
+  });
+
+  test("the usage line keeps retry counts beside the estimate", async () => {
+    const client = stubClient(restating, []);
+    const result = await run({
+      argv: ["check", "--rules", MIXED, `${TEXTS}/closer.md`],
+      env: { SNIFFTEST_SEND: "1", SNIFFTEST_CACHE_DIR: "off" },
+      client: {
+        async ask(request): Promise<JevResult> {
+          return { ...await client.ask(request), attempts: 3 };
+        },
+      },
+    });
+
+    expect(result.err).toContain("jev: 1 request, 120 input tokens, about $0.000005 at $0.042 per million input tokens (unsourced price), 11 ms, 2 retried.");
+  });
+});
+
 describe("output formats", () => {
   test("--format json carries the flags, the threshold and what the judgment arm did", async () => {
     const result = await run({
@@ -1025,7 +1125,17 @@ describe("a service that falls over in the middle of a long check", () => {
     expect(outage.calls()).toBe(5);
     expect(rerun.calls()).toBe(1);
     expect(parsed.judgment.answered).toBe(5);
-    expect(second.err).toContain("answered from the cache and not paid for again");
+    expect(second.err).toContain("jev: 1 request, 40 input tokens, about $0.000002 at $0.042 per million input tokens (unsourced price)");
+    expect(second.err).toContain("4 paragraphs answered from the cache and not paid for again");
+
+    const cached = await run({
+      argv,
+      cwd: dir,
+      env: { SNIFFTEST_CACHE_DIR: cacheDir },
+      client: forbiddenClient(),
+    });
+    expect(cached.code).toBe(EXIT.flags);
+    expect(cached.err).toContain("jev: 0 requests, 0 input tokens, about $0.000000 at $0.042 per million input tokens (unsourced price), 0 ms, 5 paragraphs answered from the cache and not paid for again.");
   });
 
   test("--no-cache asks about every paragraph again", async () => {

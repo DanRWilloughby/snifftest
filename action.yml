@@ -30,7 +30,7 @@ inputs:
   version:
     description: The exact version of the checker to run. An exact version, never a floating tag.
     required: false
-    default: "0.1.0"
+    default: "0.2.0"
   send:
     description: Run the judgment rules, which sends the text to TypeSafe. Needs a key. Forced off for a pull request from a fork.
     required: false

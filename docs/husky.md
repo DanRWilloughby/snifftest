@@ -12,7 +12,7 @@ judgment rules need a key and an explicit yes, and neither is assumed for you.
 One command, from the root of your repository:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.1.0/hooks/pre-commit \
+curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.2.0/hooks/pre-commit \
   -o .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
 ```
 
@@ -20,7 +20,7 @@ Read the script once before you trust it. It is about a hundred lines of shell
 that will run on every commit you make, and you should no more install it
 unread than any other script fetched over the network.
 
-A git tag can be moved to point at different code, and `v0.1.0` above is a tag.
+A git tag can be moved to point at different code, and `v0.2.0` above is a tag.
 Pin the commit instead if you want the stronger guarantee, exactly as you would
 for the Action below:
 
@@ -30,7 +30,7 @@ curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/<commit-sh
 ```
 
 Take the SHA from the tag you meant to install:
-`git ls-remote https://github.com/DanRWilloughby/snifftest refs/tags/v0.1.0`.
+`git ls-remote https://github.com/DanRWilloughby/snifftest refs/tags/v0.2.0`.
 
 If you maintain a repository that publishes a hook this way, add a tag
 protection rule for `v*` so a released tag cannot be repointed after people
@@ -105,7 +105,7 @@ Husky owns `.husky/` instead of `.git/hooks/`. Same script, different home:
 
 ```sh
 npx husky init
-curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.1.0/hooks/pre-commit \
+curl -fsSL https://raw.githubusercontent.com/DanRWilloughby/snifftest/v0.2.0/hooks/pre-commit \
   -o .husky/pre-commit && chmod +x .husky/pre-commit
 ```
 
@@ -122,7 +122,7 @@ In `.pre-commit-config.yaml`, pinned to a tag:
 ```yaml
 repos:
   - repo: https://github.com/DanRWilloughby/snifftest
-    rev: v0.1.0
+    rev: v0.2.0
     hooks:
       - id: snifftest
 ```
@@ -152,13 +152,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.0.0
-      - uses: DanRWilloughby/snifftest@v0.1.0
+      - uses: DanRWilloughby/snifftest@v0.2.0
         with:
           paths: docs
 ```
 
 Pin the Action by commit SHA rather than by tag if you want the stronger
-guarantee; `@v0.1.0` above is the readable form. A tag can be moved, a commit
+guarantee; `@v0.2.0` above is the readable form. A tag can be moved, a commit
 cannot, which is why `actions/checkout` is pinned by SHA in the example.
 
 To run the judgment rules on your own repository's pull requests, pass the key
@@ -166,7 +166,7 @@ in explicitly. The Action reads no other secret, and reaches for nothing on its
 own:
 
 ```yaml
-      - uses: DanRWilloughby/snifftest@v0.1.0
+      - uses: DanRWilloughby/snifftest@v0.2.0
         with:
           paths: docs
           send: "true"

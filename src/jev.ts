@@ -176,6 +176,12 @@ export interface JevResult {
 }
 
 export interface JevClient {
+  /**
+   * What the cache files this client's answers under. Absent means Jev's alias;
+   * a model you run yourself names itself, so its answers never stand in for
+   * Jev's or the other way round.
+   */
+  readonly model?: string;
   ask(request: JevRequest): Promise<JevResult>;
 }
 

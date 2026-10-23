@@ -15,8 +15,8 @@ jobs:
     name: Publish to npm, then cut the release
     runs-on: ubuntu-latest
 
-    # The gate. The npm token lives on this environment, not on the repository,
-    # so a workflow that is not this one cannot reach it, and a required
+    # The gate. npm's trusted publisher for this package names this workflow
+    # and this environment, so nothing else can publish, and a required
     # reviewer on the environment means a tag alone never publishes unattended.
     environment:
       name: release
@@ -135,10 +135,14 @@ jobs:
           fi
 
       - name: Publish to npm with provenance
+        # Trusted publishing: npm exchanges this job's OIDC token for a
+        # one-time publish credential, so no npm token is stored anywhere.
+        # That needs npm 11.5.1 or later, and Node 22 bundles npm 10.
         if: steps.registry.outputs.published != 'true'
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --provenance --access public
+        run: |
+          set -euo pipefail
+          npm install --global npm@11.19.0
+          npm publish --provenance --access public
 
       - name: Cut the GitHub Release
         env:

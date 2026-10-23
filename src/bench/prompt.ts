@@ -64,8 +64,11 @@ const FOOTER = [
   "No prose, no explanation, no code fence.",
 ];
 
+/** The parts of a rule the prompt reads, so a caller holding only the wire questions can build it. */
+export type PromptRule = Pick<JudgmentRule, "id" | "what" | "not_for" | "examples" | "criteria">;
+
 /** The system prompt, built from the ruleset's own wording. */
-export function buildSystemPrompt(rules: readonly JudgmentRule[]): string {
+export function buildSystemPrompt(rules: readonly PromptRule[]): string {
   const lines = [...HEADER];
 
   for (const rule of rules) {

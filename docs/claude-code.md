@@ -65,7 +65,7 @@ not an error to work around. It is the question, asked.
 ## The version
 
 The bundled script pins the version of the checker it fetches, currently
-`0.1.0`, rather than taking whatever is newest. Set `SNIFFTEST_VERSION` to move
+`0.2.0`, rather than taking whatever is newest. Set `SNIFFTEST_VERSION` to move
 it, or `SNIFFTEST_BIN` to point at a build of your own.
 
 It also refuses to run a `snifftest` that lives inside the repository being

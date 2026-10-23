@@ -418,6 +418,8 @@ export interface JudgmentArmOptions {
   readonly cache?: AnswerCache;
   /** The clock, so a test can run the budget out without waiting for it. */
   readonly now?: () => number;
+  /** A slower judge gets a longer budget. Absent means `PER_PARAGRAPH_BUDGET_MS`. */
+  readonly perParagraphBudgetMs?: number;
 }
 
 export async function runJudgmentArm(
@@ -464,7 +466,11 @@ export async function runJudgmentArm(
 
   const now = options.now ?? Date.now;
   const deadline =
-    now() + Math.max(MINIMUM_ARM_BUDGET_MS, prose.length * PER_PARAGRAPH_BUDGET_MS);
+    now() +
+    Math.max(
+      MINIMUM_ARM_BUDGET_MS,
+      prose.length * (options.perParagraphBudgetMs ?? PER_PARAGRAPH_BUDGET_MS),
+    );
 
   const skipped: SkippedChunk[] = [];
   let answered = 0;
@@ -496,7 +502,7 @@ export async function runJudgmentArm(
       cache === undefined
         ? undefined
         : { rules: applicable.map((rule) => rule.id), wording: wordingHash(questions) };
-    const key = cache === undefined ? undefined : cacheKey(chunk.text, questions, MODEL);
+    const key = cache === undefined ? undefined : cacheKey(chunk.text, questions, client.model ?? MODEL);
     const held =
       cache === undefined || key === undefined || expect === undefined
         ? undefined

@@ -40,7 +40,7 @@ const plugin = JSON.parse(pluginSource) as any;
 const marketplace = JSON.parse(marketplaceSource) as any;
 
 /** The one version the plugin is allowed to fetch. Pinned, everywhere, together. */
-const PINNED_VERSION = "0.1.0";
+const PINNED_VERSION = "0.2.0";
 
 /** The skill's own frontmatter, parsed by a real YAML parser. */
 // biome-ignore lint/suspicious/noExplicitAny: the document's shape is what is asserted.
@@ -137,7 +137,7 @@ describe("what the skill tells an agent to do", () => {
 
 describe("the bundled script", () => {
   test("pins the version it would fetch, and names no floating one", () => {
-    expect(runScript).toContain('SNIFFTEST_VERSION="${SNIFFTEST_VERSION:-0.1.0}"');
+    expect(runScript).toContain('SNIFFTEST_VERSION="${SNIFFTEST_VERSION:-0.2.0}"');
     expect(runScript).toContain('snifftest@$SNIFFTEST_VERSION');
     expect(runScript).not.toContain("snifftest@latest");
   });

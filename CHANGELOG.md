@@ -9,6 +9,26 @@ Release notes are cut from this file: the release workflow publishes the section
 whose heading matches the tag, so a tag with no section here fails the release
 rather than shipping an empty one.
 
+## [Unreleased]
+
+## [0.2.0] - 2026-10-22
+
+### Added
+
+- `check --judge-url <url> --judge-model <name>` (or `SNIFFTEST_JUDGE_URL` and
+  `SNIFFTEST_JUDGE_MODEL`) answers the judgment rules with a model you run
+  yourself, through any Chat Completions server such as Ollama or LM Studio.
+  On `localhost` nothing leaves the machine, no key is needed and no send
+  question is asked; any other host is a named destination with its own
+  consent. Jev stays the default. Its answers are cached under the local
+  model's name, never Jev's. (#6)
+
+### Changed
+
+- The `check` usage line identifies Jev and carries the input-token rate beside
+  the estimated cost, marked as an unsourced price. `--quiet` hides that line
+  without hiding flags or diagnostics.
+
 ## [0.1.0] - 2026-09-18
 
 ### Added
@@ -72,4 +92,5 @@ rather than shipping an empty one.
   request. The README's numbers table reads from that run.
 - The nose: one hand-drawn SVG with six expressions, and a favicon cut.
 
+[0.2.0]: https://github.com/DanRWilloughby/snifftest/releases/tag/v0.2.0
 [0.1.0]: https://github.com/DanRWilloughby/snifftest/releases/tag/v0.1.0

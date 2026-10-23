@@ -386,11 +386,21 @@ describe("the release publishes something anyone can verify", () => {
     expect(parsed.on.push.branches).toBeUndefined();
   });
 
-  test("an environment stands between the tag and the token", () => {
-    // The npm token lives on this environment rather than on the repository, so
-    // no other workflow can reach it, and a required reviewer on the
-    // environment means a tag alone never publishes unattended.
+  test("an environment stands between the tag and the publish", () => {
+    // npm's trusted publisher names this environment, so no other workflow or
+    // job can publish, and a required reviewer on the environment means a tag
+    // alone never publishes unattended.
     expect(parsed.jobs.publish.environment.name).toBe("release");
+  });
+
+  test("the publish holds no npm token", () => {
+    // Trusted publishing: npm trusts this workflow's OIDC token, so there is no
+    // long-lived token to leak, rotate or expire. The first release went red on
+    // a token secret that was never set.
+    expect(release).not.toContain("secrets.");
+    expect(release).not.toContain("NODE_AUTH_TOKEN");
+    // Trusted publishing needs npm 11.5.1 or later; Node 22 bundles npm 10.
+    expect(release).toMatch(/npm install --global npm@11\.\d+\.\d+/);
   });
 
   test("the tarball is signed to this workflow and this commit", () => {
