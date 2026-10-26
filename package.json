@@ -40,7 +40,7 @@
     "check": "bun run typecheck && bun test"
   },
   "devDependencies": {
-    "@types/bun": "1.4.3",
+    "@types/bun": "1.4.4",
     "typescript": "7.0.2"
   }
 }
